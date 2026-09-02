@@ -128,7 +128,7 @@
                      FORM
                 ================================================== -->
 
-                <form method="POST" action="#" class="px-6 pb-8 pt-7 sm:px-8">
+                <form method="POST" action="{{ route('login') }}" class="px-6 pb-8 pt-7 sm:px-8">
 
                     @csrf
 
