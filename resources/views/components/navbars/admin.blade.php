@@ -75,7 +75,7 @@
             </p>
 
 
-            <a href="#"
+            <a href="{{ route('admin.registrations.buyers.index') }}"
                 class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'users'
                     ? 'bg-primary/10 text-primary font-semibold'

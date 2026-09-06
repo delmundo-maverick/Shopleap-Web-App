@@ -1,5 +1,5 @@
 <?php
-// FILE PATH: app/Http/Controllers/Admin/SellerManagementController.php
+
 
 namespace App\Http\Controllers\Admin;
 
@@ -55,8 +55,8 @@ class SellerManagementController extends Controller
             'address' => "{$sellerProfile->street_address}, {$sellerProfile->barangay}, {$sellerProfile->municipality}, {$sellerProfile->province}",
             'business_name' => $sellerProfile->business_name,
             'line_of_business' => $sellerProfile->line_of_business,
-            'id_url' => Storage::disk('public')->url($sellerProfile->id_upload_path),
-            'permit_url' => Storage::disk('public')->url($sellerProfile->business_permit_path),
+            'id_url' => Storage::disk('r2')->temporaryUrl($sellerProfile->id_upload_path, now()->addMinutes(10)),
+            'permit_url' => Storage::disk('r2')->temporaryUrl($sellerProfile->business_permit_path, now()->addMinutes(10)),
             'registration_status' => $sellerProfile->status,
             'rejection_reason' => $sellerProfile->rejection_reason,
             'account_status' => $sellerProfile->user->account_status,

@@ -31,7 +31,7 @@ class LoginController extends Controller
         // Gate: block login for roles awaiting admin approval
         $profile = match ($user->role) {
             'seller' => $user->sellerProfile,
-            // 'buyer' => $user->buyerProfile,       // add once buyer_profiles exists
+            'buyer' => $user->buyerProfile,
             // 'logistics' => $user->logisticsProfile, // add once logistics_profiles exists
             default => null,
         };
@@ -65,6 +65,7 @@ class LoginController extends Controller
         return match ($user->role) {
             'super_admin' => redirect()->intended(route('admin.dashboard')),
             'seller' => redirect()->intended(route('seller.dashboard')),
+            'buyer' => redirect()->intended(route('buyer.home')),
             default => redirect()->intended(route('home')),
         };
     }

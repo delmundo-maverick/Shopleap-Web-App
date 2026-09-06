@@ -2,9 +2,13 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\BuyerRegistrationController;
 use App\Http\Controllers\Auth\SellerRegistrationController;
 use App\Http\Controllers\Admin\SellerManagementController;
+use App\Http\Controllers\Admin\BuyerManagementController;
 use App\Http\Controllers\Seller\DashboardController as SellerDashboardController;
+use App\Http\Controllers\Buyer\HomeController as BuyerHomeController;
+use App\Http\Controllers\Seller\ProductController as SellerProductController;
 
 /*
 |--------------------------------------------------------------------------
@@ -33,9 +37,8 @@ Route::get('/register', function () {
 })->name('register');
 
 // Buyer Registration
-Route::get('/register/buyer', function () {
-    return view('auth.register.buyer');
-})->name('register.buyer');
+Route::get('/register/buyer', [BuyerRegistrationController::class, 'create'])->name('register.buyer');
+Route::post('/register/buyer', [BuyerRegistrationController::class, 'store']);
 
 // Seller Registration
 Route::get('/register/seller', [SellerRegistrationController::class, 'create'])->name('register.seller');
@@ -73,6 +76,14 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::post('/{sellerProfile}/reject', [SellerManagementController::class, 'reject'])->name('reject');
         Route::post('/{sellerProfile}/account-status', [SellerManagementController::class, 'updateAccountStatus'])->name('accountStatus');
     });
+
+    Route::prefix('registrations/buyers')->name('registrations.buyers.')->group(function () {
+        Route::get('/', [BuyerManagementController::class, 'index'])->name('index');
+        Route::get('/{buyerProfile}/details', [BuyerManagementController::class, 'details'])->name('details');
+        Route::post('/{buyerProfile}/approve', [BuyerManagementController::class, 'approve'])->name('approve');
+        Route::post('/{buyerProfile}/reject', [BuyerManagementController::class, 'reject'])->name('reject');
+        Route::post('/{buyerProfile}/account-status', [BuyerManagementController::class, 'updateAccountStatus'])->name('accountStatus');
+    });
 });
 
 
@@ -83,4 +94,20 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 */
 Route::middleware(['auth', 'seller'])->prefix('seller')->name('seller.')->group(function () {
     Route::get('/dashboard', [SellerDashboardController::class, 'index'])->name('dashboard');
+});
+
+Route::middleware(['auth', 'seller'])->prefix('seller')->name('seller.')->group(function () {
+    Route::get('/dashboard', [SellerDashboardController::class, 'index'])->name('dashboard');
+
+    Route::get('/products/create', [SellerProductController::class, 'create'])->name('products.create');
+    Route::post('/products', [SellerProductController::class, 'store'])->name('products.store');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Buyer Routes
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'buyer'])->prefix('buyer')->name('buyer.')->group(function () {
+    Route::get('/', [BuyerHomeController::class, 'index'])->name('home');
 });
