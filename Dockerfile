@@ -1,6 +1,6 @@
 FROM php:8.4-fpm
 
-# Install system dependencies (including libicu-dev for intl)
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
     unzip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Configure and install PHP extensions including intl
+# Configure and install PHP extensions (including intl)
 RUN docker-php-ext-configure intl \
     && docker-php-ext-install pdo pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip intl
 
