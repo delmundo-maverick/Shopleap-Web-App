@@ -19,10 +19,91 @@
 
         <!-- Top thin utility row -->
         <div class="border-b border-white/10">
-            <div class="mx-auto flex h-8 max-w-7xl items-center justify-end gap-5 px-5 text-xs text-white/80 sm:px-8">
-                <a href="#" class="hover:text-white">Seller Centre</a>
-                <a href="#" class="hover:text-white">Track My Order</a>
-                <a href="#" class="hover:text-white">Help Center</a>
+            <div
+                class="mx-auto flex h-8 max-w-7xl items-center justify-between gap-5 px-5 text-xs text-white/80 sm:px-8">
+
+                <!-- LEFT: utility links -->
+                <div class="flex items-center gap-5">
+                    <a href="#" class="hover:text-white">Seller Centre</a>
+                    <a href="#" class="hover:text-white">Track My Order</a>
+                    <a href="#" class="hover:text-white">Help Center</a>
+                </div>
+
+                <!-- RIGHT: notifications, help, profile -->
+                <div class="flex items-center gap-5">
+
+                    <!-- Notifications -->
+                    <div class="relative" id="notifWrapper">
+                        <button type="button" id="notifToggle"
+                            class="relative rounded-full p-2.5 transition hover:bg-white/10">
+                            <svg class="h-5.5 w-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
+                                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            </svg>
+                            <span
+                                class="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-sale-red text-[10px] font-bold">3</span>
+                        </button>
+                        <div id="notifMenu"
+                            class="absolute right-0 mt-2 hidden w-72 overflow-hidden rounded-lg bg-white text-charcoal shadow-xl">
+                            <p class="border-b border-light-gray px-4 py-3 text-sm font-bold">Notifications</p>
+                            <div class="max-h-72 overflow-y-auto">
+                                <a href="#"
+                                    class="block border-b border-light-gray px-4 py-3 text-xs transition hover:bg-ice-blue">
+                                    <p class="font-semibold text-charcoal">Order shipped</p>
+                                    <p class="mt-0.5 text-charcoal/50">Your order is on its way — track it now.</p>
+                                </a>
+                                <a href="#"
+                                    class="block border-b border-light-gray px-4 py-3 text-xs transition hover:bg-ice-blue">
+                                    <p class="font-semibold text-charcoal">Flash Sale starts soon</p>
+                                    <p class="mt-0.5 text-charcoal/50">Don't miss out — up to 50% off today only.</p>
+                                </a>
+                                <a href="#" class="block px-4 py-3 text-xs transition hover:bg-ice-blue">
+                                    <p class="font-semibold text-charcoal">Welcome to Shopleap!</p>
+                                    <p class="mt-0.5 text-charcoal/50">Your account has been approved.</p>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Help -->
+                    <a href="#" title="Help"
+                        class="hidden rounded-full p-2.5 transition hover:bg-white/10 sm:block">
+                        <svg class="h-5.5 w-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
+                                d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        </a>
+
+                    <!-- Profile dropdown -->
+                    <div class="relative" id="profileWrapper">
+                        <button type="button" id="profileToggle"
+                            class="flex items-center gap-2 rounded-full py-1 pl-1 pr-2.5 transition hover:bg-white/10">
+                            <div
+                                class="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-bold text-primary">
+                                {{ strtoupper(substr(auth()->user()->name ?? 'B', 0, 1)) }}
+                            </div>
+                            <span
+                                class="hidden max-w-[100px] truncate text-xs font-medium sm:block">{{ auth()->user()->name ?? 'Buyer' }}</span>
+                        </button>
+                        <div id="profileMenu"
+                            class="absolute right-0 mt-2 hidden w-52 overflow-hidden rounded-lg bg-white py-1.5 text-charcoal shadow-xl">
+                            <a href="#" class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My
+                                Account</a>
+                            <a href="#" class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My
+                                Orders</a>
+                            <a href="#" class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">Chat /
+                                Messages</a>
+                            <div class="my-1 h-px bg-light-gray"></div>
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <button type="submit"
+                                    class="block w-full px-4 py-2.5 text-left text-sm text-sale-red transition hover:bg-sale-red/10">Logout</button>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+
             </div>
         </div>
 
@@ -81,48 +162,6 @@
             <!-- ICONS -->
             <div class="flex shrink-0 items-center gap-1">
 
-                <!-- Notifications -->
-                <div class="relative" id="notifWrapper">
-                    <button type="button" id="notifToggle"
-                        class="relative rounded-full p-2.5 transition hover:bg-white/10">
-                        <svg class="h-5.5 w-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
-                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                        </svg>
-                        <span
-                            class="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-sale-red text-[10px] font-bold">3</span>
-                    </button>
-                    <div id="notifMenu"
-                        class="absolute right-0 mt-2 hidden w-72 overflow-hidden rounded-lg bg-white text-charcoal shadow-xl">
-                        <p class="border-b border-light-gray px-4 py-3 text-sm font-bold">Notifications</p>
-                        <div class="max-h-72 overflow-y-auto">
-                            <a href="#"
-                                class="block border-b border-light-gray px-4 py-3 text-xs transition hover:bg-ice-blue">
-                                <p class="font-semibold text-charcoal">Order shipped</p>
-                                <p class="mt-0.5 text-charcoal/50">Your order is on its way — track it now.</p>
-                            </a>
-                            <a href="#"
-                                class="block border-b border-light-gray px-4 py-3 text-xs transition hover:bg-ice-blue">
-                                <p class="font-semibold text-charcoal">Flash Sale starts soon</p>
-                                <p class="mt-0.5 text-charcoal/50">Don't miss out — up to 50% off today only.</p>
-                            </a>
-                            <a href="#" class="block px-4 py-3 text-xs transition hover:bg-ice-blue">
-                                <p class="font-semibold text-charcoal">Welcome to Shopleap!</p>
-                                <p class="mt-0.5 text-charcoal/50">Your account has been approved.</p>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Help -->
-                <a href="#" title="Help"
-                    class="hidden rounded-full p-2.5 transition hover:bg-white/10 sm:block">
-                    <svg class="h-5.5 w-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
-                            d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </a>
-
                 <!-- Cart with hover preview -->
                 <div class="group relative">
                     <a href="#" class="relative block rounded-full p-2.5 transition hover:bg-white/10">
@@ -160,33 +199,6 @@
                                 View Cart
                             </a>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Profile dropdown -->
-                <div class="relative" id="profileWrapper">
-                    <button type="button" id="profileToggle"
-                        class="flex items-center gap-2 rounded-full py-1 pl-1 pr-2.5 transition hover:bg-white/10">
-                        <div
-                            class="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-bold text-primary">
-                            {{ strtoupper(substr(auth()->user()->name ?? 'B', 0, 1)) }}
-                        </div>
-                        <span
-                            class="hidden max-w-[100px] truncate text-xs font-medium sm:block">{{ auth()->user()->name ?? 'Buyer' }}</span>
-                    </button>
-                    <div id="profileMenu"
-                        class="absolute right-0 mt-2 hidden w-52 overflow-hidden rounded-lg bg-white py-1.5 text-charcoal shadow-xl">
-                        <a href="#" class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My
-                            Account</a>
-                        <a href="#" class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My Orders</a>
-                        <a href="#" class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">Chat /
-                            Messages</a>
-                        <div class="my-1 h-px bg-light-gray"></div>
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit"
-                                class="block w-full px-4 py-2.5 text-left text-sm text-sale-red transition hover:bg-sale-red/10">Logout</button>
-                        </form>
                     </div>
                 </div>
 

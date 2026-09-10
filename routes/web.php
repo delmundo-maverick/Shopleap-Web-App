@@ -9,6 +9,8 @@ use App\Http\Controllers\Admin\BuyerManagementController;
 use App\Http\Controllers\Seller\DashboardController as SellerDashboardController;
 use App\Http\Controllers\Buyer\HomeController as BuyerHomeController;
 use App\Http\Controllers\Seller\ProductController as SellerProductController;
+use App\Http\Controllers\Buyer\ProductController as BuyerProductController;
+use App\Http\Controllers\Buyer\CartController;
 
 /*
 |--------------------------------------------------------------------------
@@ -93,14 +95,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'seller'])->prefix('seller')->name('seller.')->group(function () {
-    Route::get('/dashboard', [SellerDashboardController::class, 'index'])->name('dashboard');
-});
 
-Route::middleware(['auth', 'seller'])->prefix('seller')->name('seller.')->group(function () {
     Route::get('/dashboard', [SellerDashboardController::class, 'index'])->name('dashboard');
 
+    Route::get('/products', [SellerProductController::class, 'index'])->name('products.index');
     Route::get('/products/create', [SellerProductController::class, 'create'])->name('products.create');
     Route::post('/products', [SellerProductController::class, 'store'])->name('products.store');
+    Route::get('/products/{product}/details', [SellerProductController::class, 'details'])->name('products.details');
+    Route::post('/products/{product}', [SellerProductController::class, 'update'])->name('products.update');
+    Route::post('/products/{product}/status', [SellerProductController::class, 'updateStatus'])->name('products.status');
 });
 
 /*
@@ -108,6 +111,14 @@ Route::middleware(['auth', 'seller'])->prefix('seller')->name('seller.')->group(
 | Buyer Routes
 |--------------------------------------------------------------------------
 */
+
 Route::middleware(['auth', 'buyer'])->prefix('buyer')->name('buyer.')->group(function () {
     Route::get('/', [BuyerHomeController::class, 'index'])->name('home');
+
+    Route::get('/products/{product}', [BuyerProductController::class, 'show'])->name('products.show');
+
+    Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
+    Route::post('/cart/{product}', [CartController::class, 'store'])->name('cart.store');
+    Route::post('/cart/item/{cartItem}', [CartController::class, 'update'])->name('cart.update');
+    Route::delete('/cart/item/{cartItem}', [CartController::class, 'destroy'])->name('cart.destroy');
 });
