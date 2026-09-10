@@ -1,6 +1,6 @@
 FROM php:8.4-fpm
 
-# Install system dependencies
+# Install system dependencies (including Node.js & NPM)
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -12,9 +12,11 @@ RUN apt-get update && apt-get install -y \
     libicu-dev \
     zip \
     unzip \
+    nodejs \
+    npm \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Configure and install PHP extensions (including intl)
+# Configure and install PHP extensions
 RUN docker-php-ext-configure intl \
     && docker-php-ext-install pdo pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip intl
 
@@ -29,8 +31,12 @@ COPY . .
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache \
     && chmod -R 775 /var/www/storage /var/www/bootstrap/cache
 
-# Install dependencies without script execution
+# Install PHP dependencies
 RUN COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --optimize-autoloader --no-scripts
+
+# Install Node dependencies and compile Vite assets for production
+RUN npm ci || npm install
+RUN npm run build
 
 EXPOSE 10000
 
