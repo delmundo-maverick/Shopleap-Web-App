@@ -276,7 +276,7 @@
             </div>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
                 @foreach ($bestSellers as $product)
-                    <x-buyer.product-card :product="$product" />
+                    <x-Buyer.product-card :product="$product" />
                 @endforeach
             </div>
         </section>
@@ -290,7 +290,7 @@
 
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
                 @foreach ($recommended as $product)
-                    <x-buyer.product-card :product="$product" />
+                    <x-Buyer.product-card :product="$product" />
                 @endforeach
             </div>
 
