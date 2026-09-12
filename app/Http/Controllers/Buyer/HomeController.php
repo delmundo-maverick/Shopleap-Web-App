@@ -1,5 +1,4 @@
 <?php
-// FILE PATH: app/Http/Controllers/Buyer/HomeController.php
 
 namespace App\Http\Controllers\Buyer;
 
