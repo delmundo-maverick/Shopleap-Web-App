@@ -15,6 +15,6 @@ class ProductController extends Controller
 
         $product->load(['images', 'seller.sellerProfile']);
 
-        return view('buyer.products.show', compact('product'));
+        return view('Buyer.products.show', compact('product'));
     }
 }

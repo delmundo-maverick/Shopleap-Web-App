@@ -24,6 +24,6 @@ class HomeController extends Controller
             ->paginate(16)
             ->withQueryString();
 
-        return view('buyer.home', compact('categories', 'bestSellers', 'recommended'));
+        return view('Buyer.home', compact('categories', 'bestSellers', 'recommended'));
     }
 }

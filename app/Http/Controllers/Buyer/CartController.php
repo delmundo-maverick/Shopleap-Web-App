@@ -18,7 +18,7 @@ class CartController extends Controller
 
         $total = $cartItems->sum('line_total');
 
-        return view('buyer.cart.index', compact('cartItems', 'total'));
+        return view('Buyer.cart.index', compact('cartItems', 'total'));
     }
 
     /**
