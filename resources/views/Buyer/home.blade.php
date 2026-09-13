@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -24,7 +25,6 @@
 
                 <!-- LEFT: utility links -->
                 <div class="flex items-center gap-5">
-                    <a href="#" class="hover:text-white">Seller Centre</a>
                     <a href="#" class="hover:text-white">Track My Order</a>
                     <a href="#" class="hover:text-white">Help Center</a>
                 </div>
@@ -35,13 +35,16 @@
                     <!-- Notifications -->
                     <div class="relative" id="notifWrapper">
                         <button type="button" id="notifToggle"
-                            class="relative rounded-full p-2.5 transition hover:bg-white/10">
-                            <svg class="h-5.5 w-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
-                                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                            </svg>
-                            <span
-                                class="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-sale-red text-[10px] font-bold">3</span>
+                            class="relative flex items-center gap-1.5 rounded-full py-1.5 pl-2 pr-3 transition hover:bg-white/10">
+                            <span class="relative">
+                                <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
+                                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                </svg>
+                                <span
+                                    class="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-sale-red text-[9px] font-bold">3</span>
+                            </span>
+                            <span>Notifications</span>
                         </button>
                         <div id="notifMenu"
                             class="absolute right-0 mt-2 hidden w-72 overflow-hidden rounded-lg bg-white text-charcoal shadow-xl">
@@ -62,17 +65,21 @@
                                     <p class="mt-0.5 text-charcoal/50">Your account has been approved.</p>
                                 </a>
                             </div>
+                            <p class="border-t border-light-gray px-4 py-2 text-center text-[10px] text-charcoal/35">
+                                Sample notifications — live notifications coming soon.
+                            </p>
                         </div>
                     </div>
 
                     <!-- Help -->
                     <a href="#" title="Help"
-                        class="hidden rounded-full p-2.5 transition hover:bg-white/10 sm:block">
-                        <svg class="h-5.5 w-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="hidden items-center gap-1.5 rounded-full py-1.5 pl-2 pr-3 transition hover:bg-white/10 sm:flex">
+                        <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
                                 d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        </a>
+                        <span>Help</span>
+                    </a>
 
                     <!-- Profile dropdown -->
                     <div class="relative" id="profileWrapper">
@@ -162,39 +169,55 @@
             <!-- ICONS -->
             <div class="flex shrink-0 items-center gap-1">
 
-                <!-- Cart with hover preview -->
+                <!-- Cart with hover preview — now fully real, no hardcoded items -->
                 <div class="group relative">
-                    <a href="#" class="relative block rounded-full p-2.5 transition hover:bg-white/10">
+                    <a href="{{ route('buyer.cart.index') }}"
+                        class="relative block rounded-full p-2.5 transition hover:bg-white/10">
                         <svg class="h-5.5 w-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
                                 d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
-                        <span
-                            class="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-bold text-primary">2</span>
+                        <span id="buyerCartBadge"
+                            class="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-bold text-primary">
+                            {{ $cartCount }}
+                        </span>
                     </a>
 
                     <!-- Preview dropdown — shows on hover (desktop) -->
                     <div
                         class="invisible absolute right-0 top-full z-50 w-80 -translate-y-1 rounded-lg bg-white text-charcoal opacity-0 shadow-xl transition-all duration-150 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
-                        <p class="border-b border-light-gray px-4 py-3 text-sm font-bold">2 items in your cart</p>
-                        <div class="max-h-64 overflow-y-auto">
-                            <div class="flex items-center gap-3 border-b border-light-gray px-4 py-3">
-                                <div class="h-12 w-12 shrink-0 rounded bg-ice-blue"></div>
-                                <div class="min-w-0 flex-1">
-                                    <p class="truncate text-xs text-charcoal">Wireless Bluetooth Earbuds</p>
-                                    <p class="text-xs font-bold text-primary">₱899</p>
-                                </div>
+                        <p class="border-b border-light-gray px-4 py-3 text-sm font-bold">
+                            {{ $cartCount }} {{ $cartCount === 1 ? 'item' : 'items' }} in your cart
+                        </p>
+
+                        @if ($cartPreviewItems->isEmpty())
+                            <p class="px-4 py-6 text-center text-xs text-charcoal/40">Your cart is empty.</p>
+                        @else
+                            <div class="max-h-64 overflow-y-auto">
+                                @foreach ($cartPreviewItems as $item)
+                                    <div
+                                        class="flex items-center gap-3 border-b border-light-gray px-4 py-3 last:border-b-0">
+                                        <div class="h-12 w-12 shrink-0 overflow-hidden rounded bg-ice-blue">
+                                            @if ($item->product->main_image_url)
+                                                <img src="{{ $item->product->main_image_url }}"
+                                                    alt="{{ $item->product->name }}"
+                                                    class="h-full w-full object-cover">
+                                            @endif
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="truncate text-xs text-charcoal">{{ $item->product->name }}</p>
+                                            <p class="text-xs font-bold text-primary">
+                                                {{ $item->quantity }} ×
+                                                ₱{{ number_format($item->product->display_price, 2) }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                @endforeach
                             </div>
-                            <div class="flex items-center gap-3 px-4 py-3">
-                                <div class="h-12 w-12 shrink-0 rounded bg-ice-blue"></div>
-                                <div class="min-w-0 flex-1">
-                                    <p class="truncate text-xs text-charcoal">Running Shoes Unisex</p>
-                                    <p class="text-xs font-bold text-primary">₱1,650</p>
-                                </div>
-                            </div>
-                        </div>
+                        @endif
+
                         <div class="p-3">
-                            <a href="#"
+                            <a href="{{ route('buyer.cart.index') }}"
                                 class="block w-full rounded-lg bg-primary px-4 py-2.5 text-center text-xs font-bold text-white transition hover:bg-sky-blue">
                                 View Cart
                             </a>

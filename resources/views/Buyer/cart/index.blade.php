@@ -101,12 +101,10 @@
 
                         <div class="my-4 h-px bg-light-gray"></div>
 
-                        <button type="button" disabled
-                            class="w-full cursor-not-allowed rounded-xl bg-charcoal/20 px-6 py-3.5 text-sm font-bold text-white"
-                            title="Checkout is coming in a future update">
+                        <a href="{{ route('buyer.checkout.index') }}"
+                            class="block w-full rounded-xl bg-primary px-6 py-3.5 text-center text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue">
                             Proceed to Checkout
-                        </button>
-                        <p class="mt-2 text-center text-xs text-charcoal/40">Checkout is coming soon.</p>
+                        </a>
                     </div>
                 </div>
 

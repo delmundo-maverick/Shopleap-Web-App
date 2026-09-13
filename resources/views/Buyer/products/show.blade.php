@@ -139,6 +139,49 @@
     </div>
 
 
+    <!-- =====================================================
+         ADDED TO CART — CONFIRMATION MODAL
+    ====================================================== -->
+    <div id="cartModalOverlay" class="fixed inset-0 z-[90] hidden items-center justify-center bg-charcoal/50 p-4">
+        <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+
+            <div
+                class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-leaf-green/10 text-leaf-green">
+                <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+            </div>
+
+            <p class="mt-4 text-center text-base font-bold text-charcoal">Added to Cart</p>
+
+            <div class="mt-4 flex items-center gap-3 rounded-xl border border-light-gray p-3">
+                <div class="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-ice-blue/60">
+                    @if ($product->images->isNotEmpty())
+                        <img src="{{ $product->images->first()->url }}" alt="{{ $product->name }}"
+                            class="h-full w-full object-cover">
+                    @endif
+                </div>
+                <div class="min-w-0 flex-1">
+                    <p class="line-clamp-2 text-sm text-charcoal">{{ $product->name }}</p>
+                    <p id="cartModalQty" class="mt-0.5 text-xs text-charcoal/50">Qty: 1</p>
+                </div>
+            </div>
+
+            <div class="mt-5 flex gap-3">
+                <button type="button" id="cartModalContinueBtn"
+                    class="flex-1 rounded-xl border-2 border-primary px-4 py-2.5 text-sm font-bold text-primary transition hover:bg-primary/5">
+                    Continue Shopping
+                </button>
+                <a href="{{ route('buyer.cart.index') }}"
+                    class="flex-1 rounded-xl bg-primary px-4 py-2.5 text-center text-sm font-bold text-white transition hover:bg-sky-blue">
+                    View Cart
+                </a>
+            </div>
+
+        </div>
+    </div>
+
+
     <script>
         const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
@@ -195,12 +238,32 @@
                     return;
                 }
 
-                showToast(data.message);
+                document.getElementById('cartModalQty').textContent = `Qty: ${quantity}`;
+                openCartModal();
+
                 const badge = document.getElementById('buyerCartBadge');
                 if (badge) badge.textContent = data.cart_count;
             } catch (err) {
                 showToast('Network error — please try again.', true);
             }
+        });
+
+        // Added-to-cart confirmation modal
+        const cartModalOverlay = document.getElementById('cartModalOverlay');
+
+        function openCartModal() {
+            cartModalOverlay.classList.remove('hidden');
+            cartModalOverlay.classList.add('flex');
+        }
+
+        function closeCartModal() {
+            cartModalOverlay.classList.add('hidden');
+            cartModalOverlay.classList.remove('flex');
+        }
+
+        document.getElementById('cartModalContinueBtn').addEventListener('click', closeCartModal);
+        cartModalOverlay.addEventListener('click', (e) => {
+            if (e.target === cartModalOverlay) closeCartModal();
         });
     </script>
 

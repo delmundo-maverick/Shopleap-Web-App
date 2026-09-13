@@ -1,6 +1,6 @@
 @props(['product'])
 
-<a href="#"
+<a href="{{ route('buyer.products.show', $product) }}"
     class="group block overflow-hidden rounded-lg border border-light-gray bg-white transition hover:shadow-lg hover:shadow-charcoal/10">
 
     <!-- IMAGE -->

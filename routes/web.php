@@ -1,16 +1,23 @@
 <?php
+// FILE PATH: routes/web.php
 
 use Illuminate\Support\Facades\Route;
+
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\BuyerRegistrationController;
 use App\Http\Controllers\Auth\SellerRegistrationController;
+
 use App\Http\Controllers\Admin\SellerManagementController;
 use App\Http\Controllers\Admin\BuyerManagementController;
+
 use App\Http\Controllers\Seller\DashboardController as SellerDashboardController;
-use App\Http\Controllers\Buyer\HomeController as BuyerHomeController;
 use App\Http\Controllers\Seller\ProductController as SellerProductController;
+
+use App\Http\Controllers\Buyer\HomeController as BuyerHomeController;
 use App\Http\Controllers\Buyer\ProductController as BuyerProductController;
 use App\Http\Controllers\Buyer\CartController;
+use App\Http\Controllers\Buyer\CheckoutController;
+use App\Http\Controllers\Buyer\OrderController as BuyerOrderController;
 
 /*
 |--------------------------------------------------------------------------
@@ -33,20 +40,16 @@ Route::get('/login', [LoginController::class, 'create'])->name('login');
 Route::post('/login', [LoginController::class, 'store']);
 Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
-// Registration Selection
 Route::get('/register', function () {
     return view('auth.register');
 })->name('register');
 
-// Buyer Registration
 Route::get('/register/buyer', [BuyerRegistrationController::class, 'create'])->name('register.buyer');
 Route::post('/register/buyer', [BuyerRegistrationController::class, 'store']);
 
-// Seller Registration
 Route::get('/register/seller', [SellerRegistrationController::class, 'create'])->name('register.seller');
 Route::post('/register/seller', [SellerRegistrationController::class, 'store']);
 
-// Logistics Registration
 Route::get('/register/logistics', function () {
     return view('auth.register.logistics');
 })->name('register.logistics');
@@ -57,13 +60,6 @@ Route::get('/register/logistics', function () {
 | Admin Routes
 |--------------------------------------------------------------------------
 */
-
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
-
-    Route::get('/dashboard', function () {
-        return view('admin.dashboard');
-    })->name('dashboard');
-});
 
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
 
@@ -94,6 +90,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 | Seller Routes
 |--------------------------------------------------------------------------
 */
+
 Route::middleware(['auth', 'seller'])->prefix('seller')->name('seller.')->group(function () {
 
     Route::get('/dashboard', [SellerDashboardController::class, 'index'])->name('dashboard');
@@ -106,6 +103,7 @@ Route::middleware(['auth', 'seller'])->prefix('seller')->name('seller.')->group(
     Route::post('/products/{product}/status', [SellerProductController::class, 'updateStatus'])->name('products.status');
 });
 
+
 /*
 |--------------------------------------------------------------------------
 | Buyer Routes
@@ -113,6 +111,7 @@ Route::middleware(['auth', 'seller'])->prefix('seller')->name('seller.')->group(
 */
 
 Route::middleware(['auth', 'buyer'])->prefix('buyer')->name('buyer.')->group(function () {
+
     Route::get('/', [BuyerHomeController::class, 'index'])->name('home');
 
     Route::get('/products/{product}', [BuyerProductController::class, 'show'])->name('products.show');
@@ -121,4 +120,10 @@ Route::middleware(['auth', 'buyer'])->prefix('buyer')->name('buyer.')->group(fun
     Route::post('/cart/{product}', [CartController::class, 'store'])->name('cart.store');
     Route::post('/cart/item/{cartItem}', [CartController::class, 'update'])->name('cart.update');
     Route::delete('/cart/item/{cartItem}', [CartController::class, 'destroy'])->name('cart.destroy');
+
+    Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
+    Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+
+    Route::get('/orders', [BuyerOrderController::class, 'index'])->name('orders.index');
+    Route::get('/orders/{order}', [BuyerOrderController::class, 'show'])->name('orders.show');
 });

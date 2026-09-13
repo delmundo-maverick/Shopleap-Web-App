@@ -24,6 +24,20 @@ class HomeController extends Controller
             ->paginate(16)
             ->withQueryString();
 
-        return view('Buyer.home', compact('categories', 'bestSellers', 'recommended'));
+        $cartItems = $request->user()->cartItems()
+            ->with('product.images')
+            ->latest()
+            ->get();
+
+        $cartCount = $cartItems->sum('quantity');
+        $cartPreviewItems = $cartItems->take(3);
+
+        return view('Buyer.home', compact(
+            'categories',
+            'bestSellers',
+            'recommended',
+            'cartCount',
+            'cartPreviewItems'
+        ));
     }
 }
