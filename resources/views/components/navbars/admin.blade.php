@@ -32,8 +32,15 @@
     }
 </style>
 
+{{--
+    FIXED: was previously hand-rolled with raw utilities
+    (bg-white/70 backdrop-blur-xl shadow-[...]) instead of the shared
+    frost-panel-solid class the Seller sidebar already uses. Now both
+    reference the same app.css definition — change the blur/opacity once,
+    both sidebars update together.
+--}}
 <aside id="sidebarNav"
-    class="fixed inset-y-0 left-0 z-50 w-64 overflow-visible border-r border-white/50 bg-white/70 shadow-[0_8px_30px_-12px_rgba(15,23,42,0.15)] backdrop-blur-xl transition-[width] duration-300 ease-in-out lg:static lg:z-auto lg:translate-x-0">
+    class="frost-panel-solid fixed inset-y-0 left-0 z-50 w-64 -translate-x-full overflow-visible transition-[width,transform] duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:z-auto lg:translate-x-0">
 
     {{-- Sidebar content --}}
     <div id="sidebarContent" class="flex h-full w-full min-w-0 flex-col overflow-hidden">
@@ -43,7 +50,8 @@
 
             <div class="sidebar-header-inner flex min-w-0 items-center gap-3">
 
-                <img src="{{ asset('storage\images\Shopleap Logo.png') }}" alt="Shopleap logo"
+                {{-- FIXED: backslashes -> forward slashes (URLs always need /, this was breaking on production) --}}
+                <img src="{{ asset('storage/images/Shopleap Logo.png') }}" alt="Shopleap logo"
                     class="h-11 w-11 shrink-0 rounded-xl object-contain">
 
                 <div class="brand-text min-w-0 flex-1">
@@ -60,9 +68,9 @@
 
             <div class="flex shrink-0 items-center gap-1.5">
 
-                {{-- Desktop collapse toggle (hamburger, square, inside the navbar) --}}
+                {{-- Desktop collapse toggle — now uses frost-btn instead of hand-rolled border/bg/blur --}}
                 <button type="button" id="sidebarToggleBtn"
-                    class="hidden h-9 w-9 items-center justify-center rounded-lg border border-white/60 bg-white/80 text-charcoal/60 shadow-sm backdrop-blur-md transition-all duration-300 hover:bg-ice-blue hover:text-primary lg:flex"
+                    class="frost-btn hidden h-9 w-9 items-center justify-center rounded-lg text-charcoal/60 transition-all duration-300 hover:bg-ice-blue hover:text-primary lg:flex"
                     title="Toggle Sidebar">
 
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -92,7 +100,7 @@
             <a href="{{ route('admin.dashboard') }}" title="System Overview"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'dashboard'
-                    ? 'bg-primary/10 text-primary font-semibold'
+                    ? 'frost-chip text-primary font-semibold'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
 
                 <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -112,7 +120,7 @@
             <a href="{{ route('admin.registrations.buyers.index') }}" title="Buyers & Customers"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'users'
-                    ? 'bg-primary/10 text-primary font-semibold'
+                    ? 'frost-chip text-primary font-semibold'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
 
                 <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,7 +135,7 @@
             <a href="{{ route('admin.registrations.sellers.index') }}" title="Sellers & Merchants"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'sellers'
-                    ? 'bg-primary/10 text-primary font-semibold'
+                    ? 'frost-chip text-primary font-semibold'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
 
                 <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -142,7 +150,7 @@
             <a href="#" title="Logistics Partners"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'logistics'
-                    ? 'bg-primary/10 text-primary font-semibold'
+                    ? 'frost-chip text-primary font-semibold'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
 
                 <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -162,7 +170,7 @@
             <a href="#" title="All Transactions"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'transactions'
-                    ? 'bg-primary/10 text-primary font-semibold'
+                    ? 'frost-chip text-primary font-semibold'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
 
                 <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -177,7 +185,7 @@
             <a href="#" title="System Activity Logs"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'logs'
-                    ? 'bg-primary/10 text-primary font-semibold'
+                    ? 'frost-chip text-primary font-semibold'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
 
                 <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -197,7 +205,7 @@
             <a href="#" title="Global Platform Settings"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'settings'
-                    ? 'bg-primary/10 text-primary font-semibold'
+                    ? 'frost-chip text-primary font-semibold'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
 
                 <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -246,12 +254,13 @@
 </aside>
 
 
-{{-- Logout confirmation modal --}}
+{{-- Logout confirmation modal — kept as a sibling of <aside>, same reasoning as Seller's version:
+     the sidebar's translate-x-* transform would otherwise trap a fixed-position modal inside it. --}}
 <div id="logoutModalOverlay"
     class="fixed inset-0 z-[90] hidden items-center justify-center bg-charcoal/40 p-4 backdrop-blur-sm">
 
-    <div
-        class="w-full max-w-sm rounded-3xl border border-white/60 bg-white/90 p-6 text-center shadow-2xl backdrop-blur-2xl">
+    {{-- FIXED: was hand-rolled (border-white/60 bg-white/90 backdrop-blur-2xl) -> now frost-panel-solid --}}
+    <div class="frost-panel-solid w-full max-w-sm rounded-3xl p-6 text-center">
 
         <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-sale-red/10 text-sale-red">
             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -264,8 +273,9 @@
         <p class="mt-1.5 text-sm text-charcoal/60">You'll need to sign back in to access the admin panel.</p>
 
         <div class="mt-6 flex gap-3">
+            {{-- FIXED: was hand-rolled border/bg -> now frost-btn --}}
             <button type="button" id="logoutCancelBtn"
-                class="flex-1 rounded-xl border border-white/70 bg-white/80 px-4 py-2.5 text-sm font-semibold text-charcoal transition hover:bg-ice-blue">
+                class="frost-btn flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-charcoal transition hover:bg-ice-blue">
                 Cancel
             </button>
             <button type="button" id="logoutConfirmBtn"
@@ -288,12 +298,6 @@
         const toggleBtn = document.getElementById('sidebarToggleBtn');
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Desktop Sidebar Collapse (icon-only rail)
-        |--------------------------------------------------------------------------
-        */
-
         if (toggleBtn) {
 
             toggleBtn.addEventListener('click', function() {
@@ -302,26 +306,26 @@
 
         }
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Mobile Sidebar
-        |--------------------------------------------------------------------------
-        */
-
-        function openSidebar() {
-
-            sidebar?.classList.remove('-translate-x-full');
-            overlay?.classList.remove('hidden');
-
+        function isOpen() {
+            return !sidebar?.classList.contains('-translate-x-full');
         }
 
+        function openSidebar() {
+            sidebar?.classList.remove('-translate-x-full');
+            overlay?.classList.remove('hidden');
+        }
 
         function closeSidebar() {
-
             sidebar?.classList.add('-translate-x-full');
             overlay?.classList.add('hidden');
+        }
 
+        function toggleSidebar() {
+            if (isOpen()) {
+                closeSidebar();
+            } else {
+                openSidebar();
+            }
         }
 
 
@@ -330,16 +334,7 @@
             if (e.target.closest('[data-sidebar-toggle]')) {
 
                 e.preventDefault();
-
-                if (sidebar?.classList.contains('-translate-x-full')) {
-
-                    openSidebar();
-
-                } else {
-
-                    closeSidebar();
-
-                }
+                toggleSidebar();
 
             }
 
@@ -359,12 +354,6 @@
 
         }
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Logout confirmation
-        |--------------------------------------------------------------------------
-        */
 
         const logoutForm = document.getElementById('logoutForm');
         const logoutTriggerBtn = document.getElementById('logoutTriggerBtn');
@@ -403,12 +392,6 @@
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Responsive Resize
-        |--------------------------------------------------------------------------
-        */
-
         window.addEventListener('resize', function() {
 
             if (window.innerWidth >= 1024) {
@@ -417,7 +400,6 @@
 
             } else {
 
-                // Always expand on mobile — the icon rail is a desktop-only mode
                 sidebar.classList.remove('is-collapsed');
 
             }

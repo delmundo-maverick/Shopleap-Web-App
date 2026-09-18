@@ -30,6 +30,11 @@ class User extends Authenticatable
         ];
     }
 
+    public function logisticsProfile()
+    {
+        return $this->hasOne(LogisticsProfile::class);
+    }
+
     public function sellerProfile()
     {
         return $this->hasOne(SellerProfile::class);
@@ -45,4 +50,3 @@ class User extends Authenticatable
         return $this->hasMany(CartItem::class);
     }
 }
-

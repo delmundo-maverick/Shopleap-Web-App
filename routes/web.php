@@ -7,11 +7,13 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\BuyerRegistrationController;
 use App\Http\Controllers\Auth\SellerRegistrationController;
 
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\SellerManagementController;
 use App\Http\Controllers\Admin\BuyerManagementController;
 
 use App\Http\Controllers\Seller\DashboardController as SellerDashboardController;
 use App\Http\Controllers\Seller\ProductController as SellerProductController;
+use App\Http\Controllers\Seller\OrderController as SellerOrderController;
 
 use App\Http\Controllers\Buyer\HomeController as BuyerHomeController;
 use App\Http\Controllers\Buyer\ProductController as BuyerProductController;
@@ -63,9 +65,7 @@ Route::get('/register/logistics', function () {
 
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
 
-    Route::get('/dashboard', function () {
-        return view('admin.dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
 
     Route::prefix('registrations/sellers')->name('registrations.sellers.')->group(function () {
         Route::get('/', [SellerManagementController::class, 'index'])->name('index');
@@ -101,6 +101,9 @@ Route::middleware(['auth', 'seller'])->prefix('seller')->name('seller.')->group(
     Route::get('/products/{product}/details', [SellerProductController::class, 'details'])->name('products.details');
     Route::post('/products/{product}', [SellerProductController::class, 'update'])->name('products.update');
     Route::post('/products/{product}/status', [SellerProductController::class, 'updateStatus'])->name('products.status');
+    Route::get('/orders', [SellerOrderController::class, 'index'])->name('orders.index');
+    Route::get('/orders/{order}', [SellerOrderController::class, 'show'])->name('orders.show');
+    Route::post('/orders/{order}/status', [SellerOrderController::class, 'updateStatus'])->name('orders.status');
 });
 
 
