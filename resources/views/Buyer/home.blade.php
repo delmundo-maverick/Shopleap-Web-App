@@ -13,7 +13,7 @@
 
 <body class="min-h-screen bg-ice-blue text-charcoal">
 
-    <x-buyer.header :cart-count="$cartCount" :cart-preview-items="$cartPreviewItems" />
+    <x-Buyer.header :cart-count="$cartCount" :cart-preview-items="$cartPreviewItems" />
 
 
     <!-- =====================================================
