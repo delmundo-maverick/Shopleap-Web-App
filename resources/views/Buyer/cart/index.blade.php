@@ -17,7 +17,7 @@
         $headerCartPreview = $cartPreviewItems ?? $cartItems->take(3);
     @endphp
 
-    <x-buyer.header :cart-count="$headerCartCount" :cart-preview-items="$headerCartPreview" />
+    <x-Buyer.header :cart-count="$headerCartCount" :cart-preview-items="$headerCartPreview" />
 
     <main class="mx-auto max-w-5xl px-5 py-6 sm:px-8">
 
