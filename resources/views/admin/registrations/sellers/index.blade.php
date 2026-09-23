@@ -64,7 +64,7 @@
                     </div>
 
                     <button type="submit"
-                        class="rounded-xl bg-seller px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-seller/30 transition hover:bg-seller-light">
+                        class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-seller/30 transition hover:bg-sky-blue">
                         Search
                     </button>
 
@@ -159,14 +159,14 @@
                                             {{ $profile->created_at->diffForHumans() }}</td>
                                         <td class="px-5 py-4 text-right">
                                             <button type="button" data-view-seller="{{ $profile->id }}"
-                                                class="inline-flex items-center gap-1.5 rounded-lg bg-seller px-3.5 py-2 text-xs font-semibold text-white shadow-sm shadow-seller/20 transition hover:bg-seller-light">
+                                                class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-white shadow-sm shadow-seller/20 transition hover:bg-sky-blue">
                                                 View
                                             </button>
                                         </td>
                                     </tr>
                                 @endforeach
                             </tbody>
-                        </table>
+                        </table>s  
 
                     @endif
 

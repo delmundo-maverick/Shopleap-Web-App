@@ -13,14 +13,13 @@ class CheckoutController extends Controller
     public function index(Request $request)
     {
         $cartItems = $request->user()->cartItems()
-            ->with('product.seller.sellerProfile')
+            ->with('product.seller.sellerProfile', 'variant')
             ->get();
 
         if ($cartItems->isEmpty()) {
             return redirect()->route('buyer.cart.index');
         }
 
-        // Group by seller so the buyer sees exactly how their order will be split
         $groupedBySeller = $cartItems->groupBy('product.seller_id');
 
         $total = $cartItems->sum('line_total');
@@ -30,7 +29,7 @@ class CheckoutController extends Controller
 
     public function store(Request $request)
     {
-        $cartItems = $request->user()->cartItems()->with('product')->get();
+        $cartItems = $request->user()->cartItems()->with('product', 'variant')->get();
 
         if ($cartItems->isEmpty()) {
             return redirect()->route('buyer.cart.index')->with('status', 'Your cart is empty.');
@@ -38,7 +37,9 @@ class CheckoutController extends Controller
 
         // Verify stock is still available for everything before committing to anything
         foreach ($cartItems as $item) {
-            if (!$item->product || $item->product->status !== 'active' || $item->product->stock_quantity < $item->quantity) {
+            $availableStock = $item->variant?->stock_quantity ?? $item->product?->stock_quantity;
+
+            if (!$item->product || $item->product->status !== 'active' || $availableStock < $item->quantity) {
                 return back()->withErrors([
                     'stock' => "\"{$item->product?->name}\" no longer has enough stock. Please update your cart.",
                 ]);
@@ -58,7 +59,7 @@ class CheckoutController extends Controller
                     'seller_id' => $sellerId,
                     'buyer_id' => $buyer->id,
                     'buyer_name' => $buyer->name,
-                    'status' => 'pending',
+                    'status' => Order::STATUS_PLACED,
                     'total_amount' => $orderTotal,
                     'commission_amount' => round($orderTotal * 0.10, 2),
                 ]);
@@ -67,19 +68,24 @@ class CheckoutController extends Controller
                     OrderItem::create([
                         'order_id' => $order->id,
                         'product_id' => $item->product_id,
+                        'product_variant_id' => $item->product_variant_id,
                         'product_name' => $item->product->name,
+                        'selected_options' => $item->selected_options,
                         'quantity' => $item->quantity,
-                        'price_at_purchase' => $item->product->display_price,
+                        'price_at_purchase' => $item->unit_price,
                         'subtotal' => $item->line_total,
                     ]);
 
-                    $item->product->decrement('stock_quantity', $item->quantity);
+                    if ($item->variant) {
+                        $item->variant->decrement('stock_quantity', $item->quantity);
+                    } else {
+                        $item->product->decrement('stock_quantity', $item->quantity);
+                    }
                 }
 
                 $createdOrderIds[] = $order->id;
             }
 
-            // Empty the cart only after every order successfully posted
             $buyer->cartItems()->delete();
         });
 

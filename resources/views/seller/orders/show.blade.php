@@ -1,7 +1,3 @@
-{{--
-    FILE PATH: resources/views/seller/orders/show.blade.php
---}}
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -47,10 +43,10 @@
                     </div>
                 </div>
 
-                <span :class="`status-badge status-badge--${status}`"
+                <span :class="`status-badge status-badge--${status.toLowerCase()}`"
                     class="rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide"
-                    x-text="status.replace('_', ' ')">
-                    {{ str_replace('_', ' ', $order->status) }}
+                    x-text="statusLabel(status)">
+                    {{ $order->status_label }}
                 </span>
             </header>
 
@@ -139,25 +135,28 @@
                         <div class="frost-panel sticky top-6 rounded-2xl p-5">
                             <p class="mb-3 text-xs font-bold uppercase tracking-wide text-primary">Update Order Status
                             </p>
-
-                            <select x-model="status"
-                                class="frost-input mb-3 w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition focus:ring-4 focus:ring-primary/10">
-                                <option value="pending">Pending</option>
-                                <option value="to_ship">To Ship</option>
-                                <option value="shipped">Shipped</option>
-                                <option value="delivered">Delivered</option>
-                                <option value="cancelled">Cancelled</option>
-                            </select>
-
-                            <button type="button" @click="updateStatus()" :disabled="saving"
-                                class="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:opacity-60">
-                                <span x-text="saving ? 'Updating…' : 'Update Status'"></span>
-                            </button>
-
-                            <p class="mt-3 text-xs text-charcoal/40">
-                                Typical flow: Pending → To Ship → Shipped → Delivered. Use Cancelled only if the order
-                                cannot be fulfilled.
-                            </p>
+                            @if (in_array($order->status, \App\Models\Order::SELLER_EDITABLE_STATUSES, true))
+                                <select x-model="status"
+                                    class="frost-input mb-3 w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition focus:ring-4 focus:ring-primary/10">
+                                    @foreach (\App\Models\Order::SELLER_EDITABLE_STATUSES as $value)
+                                        <option value="{{ $value }}">
+                                            {{ \App\Models\Order::STATUS_LABELS[$value] }}</option>
+                                    @endforeach
+                                </select>
+                                <button type="button" @click="updateStatus()" :disabled="saving"
+                                    class="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:opacity-60">
+                                    <span x-text="saving ? 'Updating…' : 'Update Status'"></span>
+                                </button>
+                                <p class="mt-3 text-xs text-charcoal/40">
+                                    Typical flow: Placed → Confirmed → Preparing → Ready for Pickup. Use Cancelled only
+                                    if the order cannot be fulfilled.
+                                </p>
+                            @else
+                                <div class="rounded-xl bg-ice-blue/60 p-4 text-xs text-charcoal/60">
+                                    This order has moved past your control — it's now with delivery. You'll see its
+                                    status update here automatically as it progresses.
+                                </div>
+                            @endif
                         </div>
                     </div>
 
@@ -178,19 +177,49 @@
 
 
     <style>
-        .status-badge--pending {
+        .status-badge--placed {
             background: rgb(255 237 213);
             color: rgb(234 88 12);
         }
 
-        .status-badge--to_ship {
+        .status-badge--confirmed {
             background: rgb(219 234 254);
             color: rgb(37 99 235);
         }
 
-        .status-badge--shipped {
+        .status-badge--preparing {
             background: rgb(224 231 255);
             color: rgb(67 56 202);
+        }
+
+        .status-badge--ready_for_pickup {
+            background: rgb(224 231 255);
+            color: rgb(67 56 202);
+        }
+
+        .status-badge--picked_up {
+            background: rgb(219 234 254);
+            color: rgb(26 95 180);
+        }
+
+        .status-badge--at_sorting_center {
+            background: rgb(219 234 254);
+            color: rgb(26 95 180);
+        }
+
+        .status-badge--sorted {
+            background: rgb(219 234 254);
+            color: rgb(26 95 180);
+        }
+
+        .status-badge--assigned_to_rider {
+            background: rgb(219 234 254);
+            color: rgb(26 95 180);
+        }
+
+        .status-badge--out_for_delivery {
+            background: rgb(219 234 254);
+            color: rgb(26 95 180);
         }
 
         .status-badge--delivered {
@@ -198,7 +227,22 @@
             color: rgb(22 163 74);
         }
 
+        .status-badge--completed {
+            background: rgb(220 252 231);
+            color: rgb(22 163 74);
+        }
+
         .status-badge--cancelled {
+            background: rgb(254 226 226);
+            color: rgb(220 38 38);
+        }
+
+        .status-badge--delivery_failed {
+            background: rgb(254 226 226);
+            color: rgb(220 38 38);
+        }
+
+        .status-badge--returned {
             background: rgb(254 226 226);
             color: rgb(220 38 38);
         }
@@ -215,11 +259,13 @@
                     message: '',
                     error: false,
                 },
-
+                statusLabels: @json(\App\Models\Order::STATUS_LABELS),
+                statusLabel(value) {
+                    return this.statusLabels[value] ?? value.replace(/_/g, ' ');
+                },
                 csrfToken() {
                     return document.querySelector('meta[name="csrf-token"]').content;
                 },
-
                 showToast(message, isError = false) {
                     this.toast = {
                         show: true,
@@ -230,10 +276,8 @@
                         this.toast.show = false;
                     }, 3500);
                 },
-
                 async updateStatus() {
                     this.saving = true;
-
                     try {
                         const res = await fetch(`/seller/orders/{{ $order->id }}/status`, {
                             method: 'POST',
@@ -247,12 +291,10 @@
                             }),
                         });
                         const data = await res.json();
-
                         if (!res.ok || !data.success) {
                             this.showToast(data.message || 'Could not update status.', true);
                             return;
                         }
-
                         this.showToast(data.message);
                         this.status = data.status;
                     } catch (err) {

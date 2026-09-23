@@ -4,13 +4,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/css/pages/auth-register.css', 'resources/js/app.js', 'resources/js/pages/auth/buyer-register.js'])
 
     <title>Buyer Registration | Shopleap</title>
 </head>
 
-<body class="min-h-screen bg-ice-blue text-charcoal">
+<body class="min-h-screen bg-ice-blue text-charcoal" x-data="otpRegistration({
+    verifyUrl: '{{ route('register.otp.verify', 'buyer') }}',
+    resendUrl: '{{ route('register.resend-otp', 'buyer') }}',
+    loginUrl: '{{ route('login') }}'
+})">
 
     <header class="border-b border-light-gray bg-white">
         <div class="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
@@ -33,9 +38,26 @@
         <div class="mx-auto max-w-4xl">
 
             <form method="POST" action="{{ route('register.buyer') }}" enctype="multipart/form-data"
+                @submit.prevent="submitRegistration($event)"
                 class="overflow-hidden rounded-2xl border border-light-gray bg-white shadow-xl shadow-charcoal/5">
 
                 @csrf
+                <div class="mb-8 text-center">
+                    <h2 class="mt-5 text-3xl font-bold tracking-tight text-charcoal">Buyer Registration</h2>
+                    <p class="mx-auto mt-2 max-w-xl text-sm leading-6 text-charcoal/65">
+                        Create your Shopleap Buyer account and start shopping from our marketplace.
+                    </p>
+                </div>
+
+                <div x-show="formErrors.length > 0" x-cloak
+                    class="mx-6 mt-6 rounded-xl border border-sale-red/20 bg-sale-red/10 p-4 sm:mx-8">
+                    <p class="text-sm font-semibold text-sale-red">Please correct the following errors:</p>
+                    <ul class="mt-1 list-inside list-disc text-xs text-sale-red/80">
+                        <template x-for="error in formErrors" :key="error">
+                            <li x-text="error"></li>
+                        </template>
+                    </ul>
+                </div>
 
                 @if ($errors->any())
                     <div class="mx-6 mt-6 rounded-xl border border-sale-red/20 bg-sale-red/10 p-4 sm:mx-8">
@@ -90,12 +112,12 @@
                                 <input type="password" id="password" name="password" required
                                     autocomplete="new-password" placeholder="Create a password" minlength="8"
                                     class="w-full rounded-xl border border-light-gray bg-white px-4 py-3.5 pr-11 text-sm text-charcoal outline-none transition placeholder:text-charcoal/35 focus:border-primary focus:ring-4 focus:ring-primary/10">
-                                <button type="button" onclick="togglePassword('password', 'passwordEye')"
+                                <button type="button" id="togglePasswordBtn"
                                     class="absolute inset-y-0 right-0 flex items-center px-4 text-charcoal/40 hover:text-primary">
                                     <svg id="passwordEye" class="h-5 w-5" fill="none" stroke="currentColor"
                                         viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                                            d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z" />
+                                            d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6z" />
                                         <circle cx="12" cy="12" r="2.5" stroke-width="1.8" />
                                     </svg>
                                 </button>
@@ -107,16 +129,16 @@
                                 class="mb-2 block text-sm font-semibold text-charcoal">Confirm Password <span
                                     class="text-sale-red">*</span></label>
                             <div class="relative">
-                                <input type="password" id="password_confirmation" name="password_confirmation" required
-                                    autocomplete="new-password" placeholder="Confirm your password" minlength="8"
+                                <input type="password" id="password_confirmation" name="password_confirmation"
+                                    required autocomplete="new-password" placeholder="Confirm your password"
+                                    minlength="8"
                                     class="w-full rounded-xl border border-light-gray bg-white px-4 py-3.5 pr-11 text-sm text-charcoal outline-none transition placeholder:text-charcoal/35 focus:border-primary focus:ring-4 focus:ring-primary/10">
-                                <button type="button"
-                                    onclick="togglePassword('password_confirmation', 'confirmPasswordEye')"
+                                <button type="button" id="toggleConfirmPasswordBtn"
                                     class="absolute inset-y-0 right-0 flex items-center px-4 text-charcoal/40 hover:text-primary">
-                                    <svg id="confirmPasswordEye" class="h-5 w-5" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24">
+                                    <svg id="confirmPasswordEye" class="h-5 w-5" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                                            d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z" />
+                                            d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6z" />
                                         <circle cx="12" cy="12" r="2.5" stroke-width="1.8" />
                                     </svg>
                                 </button>
@@ -144,18 +166,18 @@
 
                     <div class="grid gap-5 md:grid-cols-3">
                         <div>
-                            <label for="first_name" class="mb-2 block text-sm font-semibold text-charcoal">First Name
-                                <span class="text-sale-red">*</span></label>
-                            <input type="text" id="first_name" name="first_name" value="{{ old('first_name') }}"
-                                required autocomplete="given-name" placeholder="First name"
-                                class="w-full rounded-xl border border-light-gray bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-charcoal/35 focus:border-primary focus:ring-4 focus:ring-primary/10">
-                        </div>
-
-                        <div>
                             <label for="last_name" class="mb-2 block text-sm font-semibold text-charcoal">Last Name
                                 <span class="text-sale-red">*</span></label>
                             <input type="text" id="last_name" name="last_name" value="{{ old('last_name') }}"
                                 required autocomplete="family-name" placeholder="Last name"
+                                class="w-full rounded-xl border border-light-gray bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-charcoal/35 focus:border-primary focus:ring-4 focus:ring-primary/10">
+                        </div>
+
+                        <div>
+                            <label for="first_name" class="mb-2 block text-sm font-semibold text-charcoal">First Name
+                                <span class="text-sale-red">*</span></label>
+                            <input type="text" id="first_name" name="first_name" value="{{ old('first_name') }}"
+                                required autocomplete="given-name" placeholder="First name"
                                 class="w-full rounded-xl border border-light-gray bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-charcoal/35 focus:border-primary focus:ring-4 focus:ring-primary/10">
                         </div>
 
@@ -375,10 +397,12 @@
                         </label>
                     </div>
 
-                    <button type="submit"
-                        class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-primary/20">
-                        Submit Registration
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button type="submit" :disabled="submitting"
+                        class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-primary/20 disabled:opacity-60">
+                        <span x-show="!submitting">Submit Registration</span>
+                        <span x-show="submitting" x-cloak>Submitting…</span>
+                        <svg x-show="!submitting" class="h-5 w-5" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M5 12h14m-6-6l6 6-6 6" />
                         </svg>
@@ -405,183 +429,73 @@
         </div>
     </main>
 
+    <!-- OTP VERIFICATION MODAL -->
+    <div x-show="showOtpModal" x-cloak x-transition.opacity
+        class="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/50 px-4"
+        @keydown.escape.window="closeOtpModal()">
+        <div @click.outside="closeOtpModal()" x-transition
+            class="w-full max-w-md rounded-2xl border border-light-gray bg-white p-8 shadow-2xl shadow-charcoal/20">
+
+            <div class="flex items-start gap-4">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ice-blue text-primary">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                            d="M3 8l7.9 5.26a2 2 0 002.2 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-charcoal">Verify your e-mail</h3>
+                    <p class="mt-1 text-xs leading-5 text-charcoal/60">
+                        Enter the 6-digit code sent to <span class="font-semibold text-charcoal"
+                            x-text="email"></span>
+                    </p>
+                </div>
+                <button type="button" @click="closeOtpModal()" class="ml-auto text-charcoal/40 hover:text-charcoal">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div x-show="otpError" x-cloak x-text="otpError"
+                class="mt-5 rounded-xl border border-sale-red/20 bg-sale-red/10 px-4 py-3 text-xs font-medium text-sale-red">
+            </div>
+
+            <div class="mt-6 flex justify-between gap-2" @paste="handleOtpPaste($event)">
+                @for ($i = 0; $i < 6; $i++)
+                    <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1"
+                        x-ref="otpInput{{ $i }}" x-model="otpDigits[{{ $i }}]"
+                        @input="handleOtpInput({{ $i }}, $event)"
+                        @keydown="handleOtpKeydown({{ $i }}, $event)" :disabled="verifying"
+                        class="h-14 w-full rounded-xl border border-light-gray bg-white text-center text-xl font-bold text-charcoal outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:opacity-50">
+                @endfor
+            </div>
+
+            <button type="button" @click="verifyOtp()" :disabled="verifying"
+                class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:opacity-60">
+                <span x-show="!verifying">Verify & Complete Registration</span>
+                <span x-show="verifying">Verifying…</span>
+            </button>
+
+            <div class="mt-5 flex items-center justify-between text-xs">
+                <button type="button" @click="resendOtp()" :disabled="resendCooldown > 0 || resending"
+                    class="font-semibold text-primary transition hover:text-sky-blue disabled:cursor-not-allowed disabled:text-charcoal/40">
+                    <span x-show="!resending">Resend code</span>
+                    <span x-show="resending">Sending…</span>
+                </button>
+                <span class="text-charcoal/50" x-show="resendCooldown > 0"
+                    x-text="`Resend in ${resendCooldown}s`"></span>
+            </div>
+        </div>
+    </div>
+
     <footer class="border-t border-light-gray bg-white">
         <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-5 py-6 sm:flex-row">
             <p class="text-xs text-charcoal/60">© {{ date('Y') }} Shopleap. All rights reserved.</p>
             <p class="text-xs text-charcoal/60">Shop Smart. Shop Simple.</p>
         </div>
     </footer>
-
-    <script>
-        // ---------------------------------------------------
-        // PASSWORD VISIBILITY
-        // ---------------------------------------------------
-        function togglePassword(inputId, iconId) {
-            const input = document.getElementById(inputId);
-            const icon = document.getElementById(iconId);
-            if (input.type === 'password') {
-                input.type = 'text';
-                icon.innerHTML =
-                    `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 5.2A10.7 10.7 0 0112 5c6 0 9.5 7 9.5 7a17 17 0 01-3 3.8M6.2 6.2C3.7 8.1 2.5 12 2.5 12s3.5 6 9.5 6c1.4 0 2.6-.3 3.7-.8" />`;
-            } else {
-                input.type = 'password';
-                icon.innerHTML =
-                    `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z" /><circle cx="12" cy="12" r="2.5" stroke-width="1.8" />`;
-            }
-        }
-
-        // ---------------------------------------------------
-        // AUTOMATIC AGE CALCULATION
-        // ---------------------------------------------------
-        const birthdayInput = document.getElementById('birthday');
-        const ageInput = document.getElementById('age');
-
-        function calculateAge() {
-            if (!birthdayInput.value) {
-                ageInput.value = '';
-                return;
-            }
-            const birthday = new Date(birthdayInput.value);
-            const today = new Date();
-            let age = today.getFullYear() - birthday.getFullYear();
-            const m = today.getMonth() - birthday.getMonth();
-            if (m < 0 || (m === 0 && today.getDate() < birthday.getDate())) age--;
-            ageInput.value = age >= 0 ? age : '';
-        }
-        birthdayInput.addEventListener('change', calculateAge);
-
-        // ---------------------------------------------------
-        // ID FILE SELECTION
-        // ---------------------------------------------------
-        const idUpload = document.getElementById('id_upload');
-        const selectedFile = document.getElementById('selectedFile');
-        const fileName = document.getElementById('fileName');
-        idUpload.addEventListener('change', function() {
-            if (this.files && this.files.length > 0) {
-                fileName.textContent = this.files[0].name;
-                selectedFile.classList.remove('hidden');
-            } else {
-                fileName.textContent = '';
-                selectedFile.classList.add('hidden');
-            }
-        });
-
-        // ---------------------------------------------------
-        // MIDDLE INITIAL — letters only
-        // ---------------------------------------------------
-        document.getElementById('middle_initial').addEventListener('input', function() {
-            this.value = this.value.replace(/[^a-zA-Z]/g, '').slice(0, 1).toUpperCase();
-        });
-
-        // ---------------------------------------------------
-        // CASCADING ADDRESS DROPDOWNS (PSGC API) — THE ACTUAL FIX
-        // Docs: https://psgc.gitlab.io/api/
-        // NOTE: verify this endpoint/response shape in your own browser —
-        // this was not live-tested from this sandbox (no external network
-        // access here). If field names differ, adjust `p.name` / `p.code`
-        // below to match the real response.
-        // ---------------------------------------------------
-        const PSGC_BASE = 'https://psgc.gitlab.io/api';
-
-        const provinceSelect = document.getElementById('province');
-        const municipalitySelect = document.getElementById('municipality');
-        const barangaySelect = document.getElementById('barangay');
-
-        async function loadProvinces() {
-            const oldValue = provinceSelect.dataset.oldValue;
-            try {
-                const res = await fetch(`${PSGC_BASE}/provinces/`);
-                const data = await res.json();
-
-                provinceSelect.innerHTML = '<option value="" disabled selected>Select province</option>';
-                data.sort((a, b) => a.name.localeCompare(b.name)).forEach(p => {
-                    const opt = document.createElement('option');
-                    opt.value = p.name;
-                    opt.dataset.code = p.code;
-                    opt.textContent = p.name;
-                    if (oldValue && oldValue === p.name) opt.selected = true;
-                    provinceSelect.appendChild(opt);
-                });
-
-                // If this is a re-render after a failed submission, cascade
-                // the municipality list immediately using the restored province.
-                if (oldValue) {
-                    const selectedOpt = provinceSelect.querySelector(`option[value="${CSS.escape(oldValue)}"]`);
-                    if (selectedOpt) await loadMunicipalities(selectedOpt.dataset.code, municipalitySelect.dataset
-                        .oldValue);
-                }
-            } catch (err) {
-                provinceSelect.innerHTML = '<option value="">Could not load — check your connection</option>';
-                console.error('Failed to load provinces:', err);
-            }
-        }
-
-        async function loadMunicipalities(provinceCode, oldValue = null) {
-            municipalitySelect.disabled = true;
-            municipalitySelect.innerHTML = '<option value="">Loading...</option>';
-            barangaySelect.disabled = true;
-            barangaySelect.innerHTML = '<option value="">Select municipality first</option>';
-
-            try {
-                const res = await fetch(`${PSGC_BASE}/provinces/${provinceCode}/cities-municipalities/`);
-                const data = await res.json();
-
-                municipalitySelect.innerHTML = '<option value="" disabled selected>Select municipality/city</option>';
-                data.sort((a, b) => a.name.localeCompare(b.name)).forEach(m => {
-                    const opt = document.createElement('option');
-                    opt.value = m.name;
-                    opt.dataset.code = m.code;
-                    opt.textContent = m.name;
-                    if (oldValue && oldValue === m.name) opt.selected = true;
-                    municipalitySelect.appendChild(opt);
-                });
-                municipalitySelect.disabled = false;
-
-                if (oldValue) {
-                    const selectedOpt = municipalitySelect.querySelector(`option[value="${CSS.escape(oldValue)}"]`);
-                    if (selectedOpt) await loadBarangays(selectedOpt.dataset.code, barangaySelect.dataset.oldValue);
-                }
-            } catch (err) {
-                municipalitySelect.innerHTML = '<option value="">Could not load</option>';
-                console.error('Failed to load municipalities:', err);
-            }
-        }
-
-        async function loadBarangays(municipalityCode, oldValue = null) {
-            barangaySelect.disabled = true;
-            barangaySelect.innerHTML = '<option value="">Loading...</option>';
-
-            try {
-                const res = await fetch(`${PSGC_BASE}/cities-municipalities/${municipalityCode}/barangays/`);
-                const data = await res.json();
-
-                barangaySelect.innerHTML = '<option value="" disabled selected>Select barangay</option>';
-                data.sort((a, b) => a.name.localeCompare(b.name)).forEach(b => {
-                    const opt = document.createElement('option');
-                    opt.value = b.name;
-                    opt.textContent = b.name;
-                    if (oldValue && oldValue === b.name) opt.selected = true;
-                    barangaySelect.appendChild(opt);
-                });
-                barangaySelect.disabled = false;
-            } catch (err) {
-                barangaySelect.innerHTML = '<option value="">Could not load</option>';
-                console.error('Failed to load barangays:', err);
-            }
-        }
-
-        provinceSelect.addEventListener('change', function() {
-            const code = this.options[this.selectedIndex].dataset.code;
-            if (code) loadMunicipalities(code);
-        });
-
-        municipalitySelect.addEventListener('change', function() {
-            const code = this.options[this.selectedIndex].dataset.code;
-            if (code) loadBarangays(code);
-        });
-
-        loadProvinces();
-    </script>
 
 </body>
 

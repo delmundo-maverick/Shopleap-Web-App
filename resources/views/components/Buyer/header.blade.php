@@ -3,7 +3,7 @@
     'cartPreviewItems' => collect(),
 ])
 
-<header class="sticky top-0 z-40 bg-primary text-white shadow-sm">
+<header class="sticky top-0 z-50 bg-primary text-white shadow-sm">
 
     {{-- =====================================================
          TOP UTILITY ROW
@@ -107,17 +107,16 @@
     ====================================================== --}}
     <div class="mx-auto flex h-[68px] max-w-7xl items-center gap-6 px-5 sm:px-8">
 
-        {{-- LOGO — acts as home button --}}
+        {{-- LOGO --}}
         <a href="{{ route('buyer.home') }}" class="flex shrink-0 items-center gap-2">
             <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
-                {{-- LOGO PLACEHOLDER — replace /public/images/shopleap-logo.png with the real logo --}}
                 <img src="{{ asset('images/shopleap-logo.png') }}" alt="Shopleap"
                     class="h-full w-full rounded-lg object-contain">
             </div>
             <span class="hidden text-xl font-extrabold tracking-tight sm:block">Shopleap</span>
         </a>
 
-        {{-- SEARCH BAR with suggestions dropdown --}}
+        {{-- SEARCH BAR --}}
         <div class="relative flex-1" x-data="{ open: false }" @click.outside="open = false">
             <form action="#" method="GET" class="flex overflow-hidden rounded-sm bg-white">
                 <input type="text" name="q" autocomplete="off" @focus="open = true"
@@ -132,7 +131,6 @@
                 </button>
             </form>
 
-            {{-- Suggestions / recent searches dropdown --}}
             <div x-show="open" x-cloak x-transition
                 class="absolute left-0 right-0 top-full mt-1.5 rounded-lg bg-white p-3 text-charcoal shadow-xl">
                 <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-charcoal/40">Recent Searches</p>
@@ -158,8 +156,6 @@
 
         {{-- ICONS --}}
         <div class="flex shrink-0 items-center gap-1">
-
-            {{-- Cart with hover preview --}}
             <div class="group relative">
                 <a href="{{ route('buyer.cart.index') }}"
                     class="relative block rounded-full p-2.5 transition hover:bg-white/10">
@@ -173,7 +169,6 @@
                     </span>
                 </a>
 
-                {{-- Preview dropdown — shows on hover (desktop) --}}
                 <div
                     class="invisible absolute right-0 top-full z-50 w-80 -translate-y-1 rounded-lg bg-white text-charcoal opacity-0 shadow-xl transition-all duration-150 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
                     <p class="border-b border-light-gray px-4 py-3 text-sm font-bold">
@@ -213,7 +208,6 @@
                     </div>
                 </div>
             </div>
-
         </div>
 
     </div>

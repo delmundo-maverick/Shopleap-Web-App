@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Seller;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Models\ProductOption;
+use App\Models\ProductVariant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -34,11 +36,12 @@ class ProductController extends Controller
         return view('seller.products.index', compact('products', 'categories'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $categories = config('shopleap_categories.list');
+        $sellerCategory = $request->user()->sellerProfile?->line_of_business;
 
-        return view('seller.products.create', compact('categories'));
+        return view('seller.products.create', compact('categories', 'sellerCategory'));
     }
 
     public function store(Request $request)
@@ -46,25 +49,46 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:2000'],
-            'category' => ['required', 'string'],
-            'subcategory' => ['nullable', 'string'],
             'price' => ['required', 'numeric', 'min:0'],
             'discount_price' => ['nullable', 'numeric', 'min:0', 'lt:price'],
             'stock_quantity' => ['required', 'integer', 'min:0'],
             'images' => ['required', 'array', 'min:1', 'max:6'],
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
+
+            // Option groups, e.g. "Pack Size" -> "Pack of 4, Pack of 5"
+            'options' => ['nullable', 'array'],
+            'options.*.name' => ['required', 'string', 'max:100'],
+            'options.*.values' => ['required', 'string', 'max:500'],
+
+            // One row per combination of option values
+            'variants' => ['nullable', 'array'],
+            'variants.*.options' => ['required', 'array'],
+            'variants.*.price' => ['required', 'numeric', 'min:0'],
+            'variants.*.stock_quantity' => ['required', 'integer', 'min:0'],
+            'variants.*.sku' => ['nullable', 'string', 'max:100'],
         ]);
 
-        DB::transaction(function () use ($request, $validated) {
+        $sellerCategory = $request->user()->sellerProfile?->line_of_business;
+        $hasVariants = $request->filled('variants');
+
+        DB::transaction(function () use ($request, $validated, $sellerCategory, $hasVariants) {
             $product = Product::create([
                 'seller_id' => $request->user()->id,
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
-                'category' => $validated['category'],
-                'subcategory' => $validated['subcategory'] ?? null,
-                'price' => $validated['price'],
-                'discount_price' => $validated['discount_price'] ?? null,
-                'stock_quantity' => $validated['stock_quantity'],
+                'category' => $sellerCategory,
+                'subcategory' => null,
+
+                // With variants, the product's own price/stock become
+                // "starting from" price and total stock across variants.
+                'price' => $hasVariants
+                    ? collect($request->input('variants'))->min('price')
+                    : $validated['price'],
+                'discount_price' => $hasVariants ? null : ($validated['discount_price'] ?? null),
+                'stock_quantity' => $hasVariants
+                    ? collect($request->input('variants'))->sum('stock_quantity')
+                    : $validated['stock_quantity'],
+
                 'status' => 'active',
             ]);
 
@@ -77,20 +101,35 @@ class ProductController extends Controller
                     'sort_order' => $index,
                 ]);
             }
+
+            foreach ($request->input('options', []) as $option) {
+                ProductOption::create([
+                    'product_id' => $product->id,
+                    'name' => $option['name'],
+                    'values' => array_map('trim', explode(',', $option['values'])),
+                ]);
+            }
+
+            foreach ($request->input('variants', []) as $variant) {
+                ProductVariant::create([
+                    'product_id' => $product->id,
+                    'options' => $variant['options'],
+                    'price' => $variant['price'],
+                    'stock_quantity' => $variant['stock_quantity'],
+                    'sku' => $variant['sku'] ?? null,
+                ]);
+            }
         });
 
         return redirect()->route('seller.products.index')
             ->with('status', 'Product added successfully.');
     }
 
-    /**
-     * AJAX — full product details for the edit modal.
-     */
     public function details(Request $request, Product $product)
     {
         $this->authorizeOwnership($request, $product);
 
-        $product->load('images');
+        $product->load(['images', 'options', 'variants']);
 
         return response()->json([
             'id' => $product->id,
@@ -103,12 +142,11 @@ class ProductController extends Controller
             'stock_quantity' => $product->stock_quantity,
             'status' => $product->status,
             'images' => $product->images->map(fn($img) => ['id' => $img->id, 'url' => $img->url]),
+            'options' => $product->options,
+            'variants' => $product->variants,
         ]);
     }
 
-    /**
-     * AJAX — update core product fields from the edit modal.
-     */
     public function update(Request $request, Product $product)
     {
         $this->authorizeOwnership($request, $product);
@@ -138,9 +176,6 @@ class ProductController extends Controller
         ]);
     }
 
-    /**
-     * AJAX — toggle between active and archived.
-     */
     public function updateStatus(Request $request, Product $product)
     {
         $this->authorizeOwnership($request, $product);

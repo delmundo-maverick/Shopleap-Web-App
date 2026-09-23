@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/pages/buyer/buyer-cart.js'])
 
     <title>My Cart | Shopleap</title>
 </head>
@@ -39,9 +39,6 @@
                 </a>
             </div>
         @else
-            {{-- ===================================================
-                 TABLE HEADER ROW (Shopee-style column labels)
-            ==================================================== --}}
             <div
                 class="mb-2 hidden items-center gap-4 rounded-lg bg-white px-5 py-3 text-xs font-semibold uppercase tracking-wide text-charcoal/40 shadow-sm shadow-charcoal/5 sm:flex">
                 <input type="checkbox" id="selectAllTop"
@@ -53,11 +50,9 @@
                 <span class="w-20 shrink-0 text-right">Actions</span>
             </div>
 
-            {{-- ===================================================
-                 ITEMS
-            ==================================================== --}}
             <div class="space-y-2" id="cartItemsList">
                 @foreach ($cartItems as $item)
+                    @php $hasOptions = $item->product->options->isNotEmpty(); @endphp
                     <div data-cart-item-id="{{ $item->id }}" data-line-total="{{ $item->line_total }}"
                         class="flex items-center gap-4 rounded-lg bg-white p-4 shadow-sm shadow-charcoal/5">
 
@@ -77,12 +72,27 @@
                                 class="line-clamp-2 text-sm font-medium text-charcoal hover:text-primary">
                                 {{ $item->product->name }}
                             </a>
-                            <p class="mt-1 text-sm font-bold text-primary sm:hidden">
-                                ₱{{ number_format($item->product->display_price, 2) }}</p>
+
+                            <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                <p
+                                    class="selected-options-label text-xs text-charcoal/45 {{ $item->selected_options ? '' : 'hidden' }}">
+                                    {{ $item->selected_options ? collect($item->selected_options)->map(fn($v, $k) => "{$k}: {$v}")->implode(', ') : '' }}
+                                </p>
+
+                                @if ($hasOptions)
+                                    <button type="button" data-cart-item-id="{{ $item->id }}"
+                                        class="change-variant-btn text-xs font-semibold text-primary hover:underline">
+                                        Change
+                                    </button>
+                                @endif
+                            </div>
+
+                            <p class="unit-price-cell mt-1 text-sm font-bold text-primary sm:hidden">
+                                ₱{{ number_format($item->unit_price, 2) }}</p>
                         </div>
 
-                        <p class="hidden w-24 shrink-0 text-right text-sm text-charcoal/70 sm:block">
-                            ₱{{ number_format($item->product->display_price, 2) }}
+                        <p class="unit-price-cell hidden w-24 shrink-0 text-right text-sm text-charcoal/70 sm:block">
+                            ₱{{ number_format($item->unit_price, 2) }}
                         </p>
 
                         <div class="flex w-28 shrink-0 items-center justify-center rounded-lg border border-light-gray">
@@ -91,7 +101,7 @@
                             <input type="number"
                                 class="qty-input w-10 border-x border-light-gray py-1.5 text-center text-sm outline-none"
                                 value="{{ $item->quantity }}" min="1"
-                                max="{{ $item->product->stock_quantity }}">
+                                max="{{ $item->variant?->stock_quantity ?? $item->product->stock_quantity }}">
                             <button type="button"
                                 class="qty-plus px-2.5 py-1.5 text-charcoal/60 hover:text-primary">+</button>
                         </div>
@@ -118,9 +128,6 @@
 
     </main>
 
-    {{-- ===================================================
-         STICKY SELECTION / CHECKOUT BAR (Shopee-style)
-    ==================================================== --}}
     @if (!$cartItems->isEmpty())
         <div
             class="fixed inset-x-0 bottom-0 z-30 border-t border-light-gray bg-white px-5 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:px-8">
@@ -162,224 +169,73 @@
     </div>
 
 
-    <script>
-        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-        const checkoutRoute = "{{ route('buyer.checkout.index') }}";
-        const selectedIds = new Set();
+    <!-- CHANGE VARIANT MODAL -->
+    <div id="cartVariantModalOverlay"
+        class="fixed inset-0 z-[95] hidden items-end justify-center bg-charcoal/50 p-0 sm:items-center sm:p-4">
+        <div
+            class="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-6 shadow-2xl sm:max-w-md sm:rounded-2xl">
 
-        function showToast(message, isError = false) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.style.background = isError ? '#DC2626' : '#16A34A';
-            toast.classList.remove('hidden');
-            setTimeout(() => toast.classList.add('hidden'), 3000);
-        }
+            <div class="flex items-start justify-between">
+                <div>
+                    <p id="cartVariantModalPrice" class="text-xl font-bold text-primary">₱0.00</p>
+                    <p id="cartVariantModalStock" class="mt-1 text-xs text-charcoal/50">0 in stock</p>
+                </div>
+                <button type="button" id="cartVariantModalCloseBtn"
+                    class="shrink-0 rounded-full p-1.5 text-charcoal/40 transition hover:bg-ice-blue hover:text-charcoal">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
 
-        function updateHeaderBadge(count) {
-            const badge = document.getElementById('buyerCartBadge');
-            if (badge) badge.textContent = count;
-        }
+            <div class="my-5 h-px bg-light-gray"></div>
 
-        function peso(amount) {
-            return `₱${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-        }
+            <div id="cartVariantOptionsContainer"></div>
 
-        // -----------------------------------------------------
-        // SELECTION / STICKY FOOTER LOGIC
-        // -----------------------------------------------------
-        function getAllRows() {
-            return document.querySelectorAll('[data-cart-item-id]');
-        }
+            <p id="cartVariantModalWarning" class="hidden text-xs font-semibold text-sale-red">
+                Please select all options above.
+            </p>
 
-        function updateFooter() {
-            const rows = getAllRows();
-            let subtotal = 0;
+            <button type="button" id="cartVariantModalConfirmBtn" disabled
+                class="mt-6 w-full rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:bg-charcoal/20 disabled:shadow-none">
+                Confirm
+            </button>
 
-            rows.forEach(row => {
-                const id = row.dataset.cartItemId;
-                if (selectedIds.has(id)) {
-                    subtotal += parseFloat(row.dataset.lineTotal || 0);
-                }
-            });
+        </div>
+    </div>
 
-            const count = selectedIds.size;
-            document.getElementById('selectedCount').textContent = count;
-            document.getElementById('selectedCountPlural').textContent = count === 1 ? '' : 's';
-            document.getElementById('selectedSubtotal').textContent = peso(subtotal);
-            document.getElementById('totalItemCount').textContent = rows.length;
 
-            const checkoutBtn = document.getElementById('checkoutBtn');
-            const deleteBtn = document.getElementById('deleteSelectedBtn');
-            checkoutBtn.disabled = count === 0;
-            deleteBtn.disabled = count === 0;
+    <!-- Data bridge for external JS -->
+    <div id="cartPageData" data-checkout-route="{{ route('buyer.checkout.index') }}"></div>
 
-            const allChecked = rows.length > 0 && count === rows.length;
-            ['selectAllTop', 'selectAllBottom'].forEach(id => {
-                const el = document.getElementById(id);
-                if (!el) return;
-                el.checked = allChecked;
-                el.indeterminate = count > 0 && !allChecked;
-            });
-        }
-
-        function toggleSelectAll(checked) {
-            getAllRows().forEach(row => {
-                const checkbox = row.querySelector('.item-checkbox');
-                checkbox.checked = checked;
-                const id = row.dataset.cartItemId;
-                checked ? selectedIds.add(id) : selectedIds.delete(id);
-            });
-            updateFooter();
-        }
-
-        document.getElementById('selectAllTop')?.addEventListener('change', e => toggleSelectAll(e.target.checked));
-        document.getElementById('selectAllBottom')?.addEventListener('change', e => toggleSelectAll(e.target.checked));
-
-        document.querySelectorAll('.item-checkbox').forEach(checkbox => {
-            const row = checkbox.closest('[data-cart-item-id]');
-            checkbox.addEventListener('change', () => {
-                const id = row.dataset.cartItemId;
-                checkbox.checked ? selectedIds.add(id) : selectedIds.delete(id);
-                updateFooter();
-            });
-        });
-
-        // -----------------------------------------------------
-        // DELETE SELECTED (bulk)
-        // -----------------------------------------------------
-        document.getElementById('deleteSelectedBtn')?.addEventListener('click', async () => {
-            if (selectedIds.size === 0) return;
-            if (!confirm(`Remove ${selectedIds.size} item(s) from your cart?`)) return;
-
-            const idsToRemove = Array.from(selectedIds);
-            let lastData = null;
-
-            for (const id of idsToRemove) {
-                try {
-                    const res = await fetch(`/buyer/cart/item/${id}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'X-CSRF-TOKEN': csrfToken,
-                            'Accept': 'application/json'
-                        },
-                    });
-                    const data = await res.json();
-                    if (res.ok && data.success) {
-                        document.querySelector(`[data-cart-item-id="${id}"]`)?.remove();
-                        selectedIds.delete(id);
-                        lastData = data;
-                    }
-                } catch (err) {
-                    showToast('Network error while removing an item.', true);
-                }
-            }
-
-            if (lastData) updateHeaderBadge(lastData.cart_count);
-            updateFooter();
-
-            if (getAllRows().length === 0) {
-                window.location.reload(); // shows the empty-cart state cleanly
-            }
-        });
-
-        // -----------------------------------------------------
-        // CHECKOUT (only the selected items)
-        // -----------------------------------------------------
-        document.getElementById('checkoutBtn')?.addEventListener('click', () => {
-            if (selectedIds.size === 0) return;
-            const params = new URLSearchParams();
-            selectedIds.forEach(id => params.append('items[]', id));
-            window.location.href = `${checkoutRoute}?${params.toString()}`;
-        });
-
-        // -----------------------------------------------------
-        // QUANTITY / REMOVE (per item — same as before)
-        // -----------------------------------------------------
-        async function patchQuantity(row, quantity) {
-            const id = row.dataset.cartItemId;
-            try {
-                const res = await fetch(`/buyer/cart/item/${id}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        quantity
-                    }),
-                });
-                const data = await res.json();
-
-                if (!res.ok || !data.success) {
-                    showToast(data.message || 'Could not update quantity.', true);
-                    return;
-                }
-
-                row.dataset.lineTotal = data.line_total;
-                row.querySelector('.line-total').textContent = peso(data.line_total);
-                updateHeaderBadge(data.cart_count);
-                updateFooter();
-            } catch (err) {
-                showToast('Network error — please try again.', true);
-            }
-        }
-
-        document.querySelectorAll('[data-cart-item-id]').forEach(row => {
-            const input = row.querySelector('.qty-input');
-
-            row.querySelector('.qty-minus').addEventListener('click', () => {
-                const newVal = Math.max(1, parseInt(input.value || 1) - 1);
-                input.value = newVal;
-                patchQuantity(row, newVal);
-            });
-
-            row.querySelector('.qty-plus').addEventListener('click', () => {
-                const max = parseInt(input.max);
-                const newVal = Math.min(max, parseInt(input.value || 1) + 1);
-                input.value = newVal;
-                patchQuantity(row, newVal);
-            });
-
-            input.addEventListener('change', () => {
-                let val = parseInt(input.value || 1);
-                val = Math.max(1, Math.min(parseInt(input.max), val));
-                input.value = val;
-                patchQuantity(row, val);
-            });
-
-            row.querySelector('.remove-btn').addEventListener('click', async () => {
-                const id = row.dataset.cartItemId;
-                try {
-                    const res = await fetch(`/buyer/cart/item/${id}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'X-CSRF-TOKEN': csrfToken,
-                            'Accept': 'application/json'
-                        },
-                    });
-                    const data = await res.json();
-
-                    if (!res.ok || !data.success) {
-                        showToast('Could not remove item.', true);
-                        return;
-                    }
-
-                    selectedIds.delete(id);
-                    row.remove();
-                    updateHeaderBadge(data.cart_count);
-                    updateFooter();
-
-                    if (data.cart_count === 0) {
-                        window.location.reload(); // shows the empty-cart state cleanly
-                    }
-                } catch (err) {
-                    showToast('Network error — please try again.', true);
-                }
-            });
-        });
-
-        updateFooter();
+    @php
+        $cartDataForJs = $cartItems->map(
+            fn($item) => [
+                'id' => $item->id,
+                'productId' => $item->product_id,
+                'unitPrice' => (float) $item->unit_price,
+                'maxStock' => $item->variant?->stock_quantity ?? $item->product->stock_quantity,
+                'selectedOptions' => $item->selected_options,
+                'options' => $item->product->options->map(
+                    fn($opt) => [
+                        'name' => $opt->name,
+                        'values' => $opt->values,
+                    ],
+                ),
+                'variants' => $item->product->variants->map(
+                    fn($v) => [
+                        'id' => $v->id,
+                        'options' => $v->options,
+                        'price' => (float) $v->price,
+                        'stock_quantity' => $v->stock_quantity,
+                    ],
+                ),
+            ],
+        );
+    @endphp
+    <script id="cartData" type="application/json">
+        @json($cartDataForJs)
     </script>
 
 </body>

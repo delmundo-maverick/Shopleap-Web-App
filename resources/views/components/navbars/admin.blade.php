@@ -32,13 +32,6 @@
     }
 </style>
 
-{{--
-    FIXED: was previously hand-rolled with raw utilities
-    (bg-white/70 backdrop-blur-xl shadow-[...]) instead of the shared
-    frost-panel-solid class the Seller sidebar already uses. Now both
-    reference the same app.css definition — change the blur/opacity once,
-    both sidebars update together.
---}}
 <aside id="sidebarNav"
     class="frost-panel-solid fixed inset-y-0 left-0 z-50 w-64 -translate-x-full overflow-visible transition-[width,transform] duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:z-auto lg:translate-x-0">
 
@@ -147,7 +140,7 @@
             </a>
 
 
-            <a href="#" title="Logistics Partners"
+            <a href="{{ route('admin.registrations.logistics.index') }}" title="Logistics Partners"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'logistics'
                     ? 'frost-chip text-primary font-semibold'

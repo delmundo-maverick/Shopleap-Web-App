@@ -3,20 +3,22 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\LogisticsProfile;
-use App\Models\User;
+use App\Http\Controllers\Auth\Concerns\HandlesOtpRegistration;
+use App\Services\OtpService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class LogisticsRegistrationController extends Controller
 {
+    use HandlesOtpRegistration;
+
     public function create()
     {
         return view('auth.register.logistics');
     }
 
-    public function store(Request $request)
+    public function store(Request $request, OtpService $otpService)
     {
         $validated = $request->validate([
             'last_name' => ['required', 'string', 'max:100'],
@@ -38,40 +40,35 @@ class LogisticsRegistrationController extends Controller
 
         $age = Carbon::parse($validated['birthday'])->age;
 
-        DB::transaction(function () use ($request, $validated, $age) {
-            $user = User::create([
-                'name' => trim($validated['first_name'] . ' ' . $validated['last_name']),
-                'email' => $validated['email'],
-                'password' => $validated['password'],
-                'role' => 'logistics',
-            ]);
+        $idPath = $request->file('id_upload')->store('logistics_uploads/ids', 'r2');
+        $permitPath = $request->file('business_permit')->store('logistics_uploads/permits', 'r2');
 
-            $idPath = $request->file('id_upload')->store('logistics_uploads/ids', 'r2');
-            $permitPath = $request->file('business_permit')->store('logistics_uploads/permits', 'r2');
+        $userAttributes = [
+            'name' => trim("{$validated['first_name']} {$validated['last_name']}"),
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'role' => 'logistics',
+            'account_status' => 'active',
+        ];
 
-            LogisticsProfile::create([
-                'user_id' => $user->id,
-                'last_name' => $validated['last_name'],
-                'first_name' => $validated['first_name'],
-                'middle_initial' => $validated['middle_initial'] ?? null,
-                'sex' => $validated['sex'],
-                'contact_no' => $validated['contact_no'],
-                'birthday' => $validated['birthday'],
-                'age' => $age,
-                'province' => $validated['province'],
-                'municipality' => $validated['municipality'],
-                'barangay' => $validated['barangay'],
-                'street_address' => $validated['street_address'],
-                'business_name' => $validated['business_name'],
-                'id_upload_path' => $idPath,
-                'business_permit_path' => $permitPath,
-                'status' => 'pending',
-            ]);
-        });
+        $profileAttributes = [
+            'last_name' => $validated['last_name'],
+            'first_name' => $validated['first_name'],
+            'middle_initial' => $validated['middle_initial'] ?? null,
+            'sex' => $validated['sex'],
+            'contact_no' => $validated['contact_no'],
+            'birthday' => $validated['birthday'],
+            'age' => $age,
+            'province' => $validated['province'],
+            'municipality' => $validated['municipality'],
+            'barangay' => $validated['barangay'],
+            'street_address' => $validated['street_address'],
+            'business_name' => $validated['business_name'],
+            'id_upload_path' => $idPath,
+            'business_permit_path' => $permitPath,
+            'status' => 'pending',
+        ];
 
-        return redirect()->route('login')->with(
-            'status',
-            'Registration submitted! Please wait for the administrator\'s approval — you\'ll be notified by email.'
-        );
+        return $this->stashForOtpVerification($request, 'logistics', $userAttributes, $profileAttributes, $otpService);
     }
 }

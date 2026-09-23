@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use App\Models\SellerProfile;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Services\OtpService;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 
 class SellerRegistrationController extends Controller
 {
@@ -16,7 +15,7 @@ class SellerRegistrationController extends Controller
         return view('auth.register.seller');
     }
 
-    public function store(Request $request)
+    public function store(Request $request, OtpService $otpService)
     {
         $validated = $request->validate([
             'last_name' => ['required', 'string', 'max:100'],
@@ -40,42 +39,49 @@ class SellerRegistrationController extends Controller
         // Server-side age calculation — never trust client-computed age
         $age = Carbon::parse($validated['birthday'])->age;
 
-        DB::transaction(function () use ($request, $validated, $age) {
-            $user = User::create([
-                'name' => trim($validated['first_name'] . ' ' . $validated['last_name']),
-                'email' => $validated['email'],
-                'password' => $validated['password'], // hashed automatically via model cast
+        // Uploaded now (files don't survive past this request); DB rows wait until OTP is verified.
+        $idPath = $request->file('id_upload')->store('seller_uploads/ids', 'r2');
+        $permitPath = $request->file('business_permit')->store('seller_uploads/permits', 'r2');
+
+        session([
+            'pending_registration' => [
                 'role' => 'seller',
-            ]);
+                'email' => $validated['email'],
+                'user' => [
+                    'name' => trim($validated['first_name'] . ' ' . $validated['last_name']),
+                    'email' => $validated['email'],
+                    'password' => Hash::make($validated['password']),
+                    'role' => 'seller',
+                    'account_status' => 'active',
+                ],
+                'profile' => [
+                    'last_name' => $validated['last_name'],
+                    'first_name' => $validated['first_name'],
+                    'middle_initial' => $validated['middle_initial'] ?? null,
+                    'sex' => $validated['sex'],
+                    'contact_no' => $validated['contact_no'],
+                    'birthday' => $validated['birthday'],
+                    'age' => $age,
+                    'province' => $validated['province'],
+                    'municipality' => $validated['municipality'],
+                    'barangay' => $validated['barangay'],
+                    'street_address' => $validated['street_address'],
+                    'business_name' => $validated['business_name'],
+                    'line_of_business' => $validated['line_of_business'],
+                    'id_upload_path' => $idPath,
+                    'business_permit_path' => $permitPath,
+                    'status' => 'pending',
+                ],
+            ],
+        ]);
 
-            // Sensitive documents — private R2 bucket, accessed later via temporary signed URLs
-            $idPath = $request->file('id_upload')->store('seller_uploads/ids', 'r2');
-            $permitPath = $request->file('business_permit')->store('seller_uploads/permits', 'r2');
+        $otpService->generateAndSend($validated['email'], 'seller');
 
-            SellerProfile::create([
-                'user_id' => $user->id,
-                'last_name' => $validated['last_name'],
-                'first_name' => $validated['first_name'],
-                'middle_initial' => $validated['middle_initial'] ?? null,
-                'sex' => $validated['sex'],
-                'contact_no' => $validated['contact_no'],
-                'birthday' => $validated['birthday'],
-                'age' => $age,
-                'province' => $validated['province'],
-                'municipality' => $validated['municipality'],
-                'barangay' => $validated['barangay'],
-                'street_address' => $validated['street_address'],
-                'business_name' => $validated['business_name'],
-                'line_of_business' => $validated['line_of_business'],
-                'id_upload_path' => $idPath,
-                'business_permit_path' => $permitPath,
-                'status' => 'pending',
-            ]);
-        });
+        if ($request->wantsJson()) {
+            return response()->json(['email' => $validated['email']]);
+        }
 
-        return redirect()->route('login')->with(
-            'status',
-            'Registration submitted! Please wait for the administrator\'s approval — you\'ll be notified by email.'
-        );
+        return redirect()->route('register.otp.form', 'seller')
+            ->with('status', 'We sent a verification code to your email.');
     }
 }

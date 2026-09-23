@@ -7,8 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 class Product extends Model
 {
     protected $fillable = [
-        'seller_id', 'name', 'description', 'category', 'subcategory',
-        'price', 'discount_price', 'stock_quantity', 'status',
+        'seller_id',
+        'name',
+        'description',
+        'category',
+        'subcategory',
+        'price',
+        'discount_price',
+        'stock_quantity',
+        'status',
     ];
 
     protected function casts(): array
@@ -66,5 +73,25 @@ class Product extends Model
         $profile = $this->seller?->sellerProfile;
 
         return $profile?->municipality ?? $profile?->province ?? null;
+    }
+
+    public function options()
+    {
+        return $this->hasMany(ProductOption::class);
+    }
+
+    public function variants()
+    {
+        return $this->hasMany(ProductVariant::class);
+    }
+
+    public function hasVariants(): bool
+    {
+        return $this->variants()->exists();
+    }
+    
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active');
     }
 }

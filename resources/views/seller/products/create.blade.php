@@ -1,7 +1,3 @@
-{{--
-    FILE PATH: resources/views/seller/products/create.blade.php
---}}
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -60,7 +56,7 @@
                 @endif
 
                 <form method="POST" action="{{ route('seller.products.store') }}" enctype="multipart/form-data"
-                    class="mx-auto max-w-3xl space-y-6">
+                    id="productForm" class="mx-auto max-w-3xl space-y-6">
                     @csrf
 
                     <!-- BASIC INFO -->
@@ -82,59 +78,90 @@
                                     class="w-full resize-none rounded-xl border border-light-gray bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">{{ old('description') }}</textarea>
                             </div>
 
-                            <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                                <div>
-                                    <label class="mb-2 block text-sm font-semibold text-charcoal">Category *</label>
-                                    <select id="category" name="category" required
-                                        class="w-full rounded-xl border border-light-gray bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
-                                        <option value="" disabled {{ old('category') ? '' : 'selected' }}>Select
-                                            category</option>
-                                        @foreach ($categories as $cat)
-                                            <option value="{{ $cat['name'] }}"
-                                                {{ old('category') === $cat['name'] ? 'selected' : '' }}>
-                                                {{ $cat['name'] }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label class="mb-2 block text-sm font-semibold text-charcoal">Subcategory</label>
-                                    <select id="subcategory" name="subcategory"
-                                        class="w-full rounded-xl border border-light-gray bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:bg-ice-blue disabled:text-charcoal/40"
-                                        {{ old('category') ? '' : 'disabled' }}>
-                                        <option value="">Select category first</option>
-                                    </select>
-                                </div>
+                            <div class="rounded-xl border border-light-gray bg-ice-blue/50 px-4 py-3">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/45">Category</p>
+                                <p class="mt-1 text-sm font-semibold text-charcoal">{{ $sellerCategory ?? 'Not set' }}
+                                </p>
+                                <p class="mt-1 text-xs text-charcoal/45">
+                                    Automatically set from your registered business category. To change it, update your
+                                    seller profile.
+                                </p>
                             </div>
                         </div>
                     </section>
 
                     <!-- PRICING & STOCK -->
                     <section class="rounded-2xl border border-light-gray bg-white p-6 shadow-sm shadow-charcoal/5">
-                        <p class="mb-4 text-xs font-bold uppercase tracking-wide text-primary">Pricing &amp; Stock</p>
+                        <p class="mb-1 text-xs font-bold uppercase tracking-wide text-primary">Pricing &amp; Stock</p>
+                        <p id="pricingHint" class="mb-4 text-xs text-charcoal/50">
+                            Set a single price and stock count, or add options below to price each variant separately.
+                        </p>
 
-                        <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                        <div id="basePricingFields" class="grid grid-cols-1 gap-5 sm:grid-cols-3">
                             <div>
                                 <label class="mb-2 block text-sm font-semibold text-charcoal">Price (₱) *</label>
-                                <input type="number" name="price" value="{{ old('price') }}" required
+                                <input type="number" id="basePrice" name="price" value="{{ old('price') }}" required
                                     min="0" step="0.01" placeholder="0.00"
                                     class="w-full rounded-xl border border-light-gray bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
                             </div>
 
                             <div>
                                 <label class="mb-2 block text-sm font-semibold text-charcoal">Discount Price (₱)</label>
-                                <input type="number" name="discount_price" value="{{ old('discount_price') }}"
-                                    min="0" step="0.01" placeholder="Optional"
+                                <input type="number" id="baseDiscountPrice" name="discount_price"
+                                    value="{{ old('discount_price') }}" min="0" step="0.01"
+                                    placeholder="Optional"
                                     class="w-full rounded-xl border border-light-gray bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
                                 <p class="mt-1.5 text-xs text-charcoal/45">Must be lower than the regular price.</p>
                             </div>
 
                             <div>
                                 <label class="mb-2 block text-sm font-semibold text-charcoal">Stock Quantity *</label>
-                                <input type="number" name="stock_quantity" value="{{ old('stock_quantity') }}"
-                                    required min="0" placeholder="0"
+                                <input type="number" id="baseStock" name="stock_quantity"
+                                    value="{{ old('stock_quantity') }}" required min="0" placeholder="0"
                                     class="w-full rounded-xl border border-light-gray bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- OPTIONS & VARIANTS -->
+                    <section class="rounded-2xl border border-light-gray bg-white p-6 shadow-sm shadow-charcoal/5">
+                        <div class="mb-4 flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-wide text-primary">Options & Variants</p>
+                                <p class="mt-1 text-xs text-charcoal/50">
+                                    Add option groups like Pack Size, Flavor, Color or Size. Each combination can have
+                                    its own price and stock.
+                                </p>
+                            </div>
+                            <button type="button" id="addOptionBtn"
+                                class="shrink-0 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary/10">
+                                + Add Option
+                            </button>
+                        </div>
+
+                        <div id="optionsContainer" class="space-y-3"></div>
+
+                        <button type="button" id="generateVariantsBtn"
+                            class="mt-4 hidden w-full rounded-xl border border-dashed border-primary/30 bg-primary/5 px-4 py-2.5 text-xs font-bold text-primary transition hover:bg-primary/10">
+                            Generate Variant Combinations
+                        </button>
+
+                        <div id="variantsWrapper" class="mt-5 hidden">
+                            <p class="mb-3 text-xs font-bold uppercase tracking-wide text-primary">Variant Pricing &amp;
+                                Stock</p>
+                            <div class="overflow-x-auto rounded-xl border border-light-gray">
+                                <table class="w-full text-sm">
+                                    <thead
+                                        class="bg-ice-blue/60 text-left text-xs font-semibold uppercase tracking-wide text-charcoal/50">
+                                        <tr>
+                                            <th class="px-4 py-3">Combination</th>
+                                            <th class="px-4 py-3">Price (₱) *</th>
+                                            <th class="px-4 py-3">Stock *</th>
+                                            <th class="px-4 py-3">SKU</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="variantsBody" class="divide-y divide-light-gray"></tbody>
+                                </table>
                             </div>
                         </div>
                     </section>
@@ -142,7 +169,8 @@
                     <!-- IMAGES -->
                     <section class="rounded-2xl border border-light-gray bg-white p-6 shadow-sm shadow-charcoal/5">
                         <p class="mb-1 text-xs font-bold uppercase tracking-wide text-primary">Product Photos</p>
-                        <p class="mb-4 text-xs text-charcoal/50">Upload 1–6 images. First image will be used as the main
+                        <p class="mb-4 text-xs text-charcoal/50">Upload 1–6 images. First image will be used as the
+                            main
                             thumbnail.</p>
 
                         <label for="images"
@@ -180,44 +208,187 @@
 
     </div>
 
-
     <script>
         // ---------------------------------------------------
-        // CATEGORY -> SUBCATEGORY CASCADE (client-side, from
-        // the same config the server validates against)
+        // OPTION GROUPS (e.g. "Pack Size" -> "Pack of 4, Pack of 5")
         // ---------------------------------------------------
-        const CATEGORIES = @json($categories);
+        let optionRowCount = 0;
+        const optionsContainer = document.getElementById('optionsContainer');
+        const addOptionBtn = document.getElementById('addOptionBtn');
+        const generateVariantsBtn = document.getElementById('generateVariantsBtn');
+        const variantsWrapper = document.getElementById('variantsWrapper');
+        const variantsBody = document.getElementById('variantsBody');
+        const basePricingFields = document.getElementById('basePricingFields');
+        const pricingHint = document.getElementById('pricingHint');
+        const basePrice = document.getElementById('basePrice');
+        const baseStock = document.getElementById('baseStock');
+        const baseDiscountPrice = document.getElementById('baseDiscountPrice');
 
-        const categorySelect = document.getElementById('category');
-        const subcategorySelect = document.getElementById('subcategory');
+        // Remembers previously entered price/stock/sku per combination key
+        // so regenerating variants doesn't wipe out what was typed.
+        const savedVariantData = new Map();
 
-        function populateSubcategories(categoryName, oldSubcategory = null) {
-            const match = CATEGORIES.find(c => c.name === categoryName);
-            if (!match) {
-                subcategorySelect.innerHTML = '<option value="">Select category first</option>';
-                subcategorySelect.disabled = true;
+        function addOptionRow(name = '', values = '') {
+            const index = optionRowCount++;
+            const row = document.createElement('div');
+            row.className = 'flex items-start gap-3 rounded-xl border border-light-gray p-3';
+            row.dataset.rowIndex = index;
+            row.innerHTML = `
+                <div class="flex-1">
+                    <input type="text" name="options[${index}][name]" class="option-name-input" value="${name}" placeholder="Option name (e.g. Pack Size)"
+                        class="w-full rounded-lg border border-light-gray px-3 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
+                </div>
+                <div class="flex-[2]">
+                    <input type="text" name="options[${index}][values]" class="option-values-input" value="${values}" placeholder="Values, comma-separated (e.g. Pack of 4, Pack of 5)"
+                        class="w-full rounded-lg border border-light-gray px-3 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
+                </div>
+                <button type="button" class="remove-option-btn mt-1 shrink-0 rounded-lg p-2 text-charcoal/40 transition hover:bg-sale-red/10 hover:text-sale-red">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            `;
+            row.querySelector('.remove-option-btn').addEventListener('click', () => {
+                row.remove();
+                refreshOptionState();
+            });
+            row.querySelectorAll('input').forEach(input => {
+                input.addEventListener('input', refreshOptionState);
+            });
+            optionsContainer.appendChild(row);
+            refreshOptionState();
+        }
+
+        function getCurrentOptionGroups() {
+            return Array.from(optionsContainer.children)
+                .map(row => ({
+                    name: row.querySelector('.option-name-input').value.trim(),
+                    values: row.querySelector('.option-values-input').value
+                        .split(',')
+                        .map(v => v.trim())
+                        .filter(Boolean),
+                }))
+                .filter(group => group.name && group.values.length > 0);
+        }
+
+        function refreshOptionState() {
+            const groups = getCurrentOptionGroups();
+            generateVariantsBtn.classList.toggle('hidden', groups.length === 0);
+
+            // If options no longer valid, fall back to simple pricing.
+            if (groups.length === 0) {
+                showVariantMode(false);
+            }
+        }
+
+        function cartesianProduct(groups) {
+            return groups.reduce((acc, group) => {
+                const combos = [];
+                acc.forEach(prefix => {
+                    group.values.forEach(value => {
+                        combos.push({
+                            ...prefix,
+                            [group.name]: value
+                        });
+                    });
+                });
+                return combos;
+            }, [{}]);
+        }
+
+        function showVariantMode(enabled) {
+            variantsWrapper.classList.toggle('hidden', !enabled);
+            basePricingFields.classList.toggle('hidden', enabled);
+            pricingHint.textContent = enabled ?
+                'Price and stock are now set per variant below.' :
+                'Set a single price and stock count, or add options below to price each variant separately.';
+
+            if (enabled) {
+                basePrice.removeAttribute('required');
+                baseStock.removeAttribute('required');
+                baseDiscountPrice.value = '';
+            } else {
+                basePrice.setAttribute('required', 'required');
+                baseStock.setAttribute('required', 'required');
+                variantsBody.innerHTML = '';
+            }
+        }
+
+        function renderVariantRows() {
+            const groups = getCurrentOptionGroups();
+            if (groups.length === 0) {
+                showVariantMode(false);
                 return;
             }
 
-            subcategorySelect.innerHTML = '<option value="">Select subcategory (optional)</option>';
-            match.subcategories.forEach(sub => {
-                const opt = document.createElement('option');
-                opt.value = sub;
-                opt.textContent = sub;
-                if (oldSubcategory === sub) opt.selected = true;
-                subcategorySelect.appendChild(opt);
+            const combos = cartesianProduct(groups);
+            variantsBody.innerHTML = '';
+
+            combos.forEach((combo, i) => {
+                const comboKey = JSON.stringify(combo);
+                const saved = savedVariantData.get(comboKey) || {};
+                const label = Object.entries(combo).map(([k, v]) => `${k}: ${v}`).join(', ');
+
+                const hiddenInputs = Object.entries(combo)
+                    .map(([name, value]) =>
+                        `<input type="hidden" name="variants[${i}][options][${name}]" value="${value}">`)
+                    .join('');
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-4 py-3 font-medium text-charcoal">
+                        ${label}
+                        ${hiddenInputs}
+                    </td>
+                    <td class="px-4 py-2">
+                        <input type="number" name="variants[${i}][price]" value="${saved.price ?? ''}" min="0" step="0.01" required
+                            class="variant-price-input w-28 rounded-lg border border-light-gray px-2 py-1.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
+                    </td>
+                    <td class="px-4 py-2">
+                        <input type="number" name="variants[${i}][stock_quantity]" value="${saved.stock ?? ''}" min="0" required
+                            class="variant-stock-input w-24 rounded-lg border border-light-gray px-2 py-1.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
+                    </td>
+                    <td class="px-4 py-2">
+                        <input type="text" name="variants[${i}][sku]" value="${saved.sku ?? ''}" placeholder="Optional"
+                            class="variant-sku-input w-28 rounded-lg border border-light-gray px-2 py-1.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
+                    </td>
+                `;
+
+                row.querySelector('.variant-price-input').addEventListener('input', e =>
+                    saveVariantField(comboKey, 'price', e.target.value));
+                row.querySelector('.variant-stock-input').addEventListener('input', e =>
+                    saveVariantField(comboKey, 'stock', e.target.value));
+                row.querySelector('.variant-sku-input').addEventListener('input', e =>
+                    saveVariantField(comboKey, 'sku', e.target.value));
+
+                variantsBody.appendChild(row);
             });
-            subcategorySelect.disabled = false;
+
+            showVariantMode(true);
         }
 
-        categorySelect.addEventListener('change', function() {
-            populateSubcategories(this.value);
-        });
+        function saveVariantField(comboKey, field, value) {
+            const existing = savedVariantData.get(comboKey) || {};
+            existing[field] = value;
+            savedVariantData.set(comboKey, existing);
+        }
 
-        // Restore subcategory on validation failure
-        @if (old('category'))
-            populateSubcategories(@json(old('category')), @json(old('subcategory')));
-        @endif
+        addOptionBtn.addEventListener('click', () => addOptionRow());
+        generateVariantsBtn.addEventListener('click', renderVariantRows);
+
+        // Before submit, if using variants, fill the (hidden) base price/stock
+        // so nothing blocks submission — the backend recalculates them anyway.
+        document.getElementById('productForm').addEventListener('submit', function() {
+            if (!variantsWrapper.classList.contains('hidden')) {
+                const prices = Array.from(document.querySelectorAll('.variant-price-input'))
+                    .map(el => parseFloat(el.value)).filter(v => !isNaN(v));
+                const stocks = Array.from(document.querySelectorAll('.variant-stock-input'))
+                    .map(el => parseInt(el.value)).filter(v => !isNaN(v));
+
+                basePrice.value = prices.length ? Math.min(...prices) : 0;
+                baseStock.value = stocks.length ? stocks.reduce((a, b) => a + b, 0) : 0;
+            }
+        });
 
         // ---------------------------------------------------
         // IMAGE PREVIEW

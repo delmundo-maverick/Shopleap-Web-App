@@ -129,7 +129,7 @@
                     @foreach ($groupedBySeller as $sellerId => $items)
                         @php
                             $seller = $items->first()->product->seller;
-                            $sellerSubtotal = $items->sum(fn($item) => $item->quantity * $item->product->display_price);
+                            $sellerSubtotal = $items->sum('line_total');
                         @endphp
                         <div class="rounded-lg bg-white p-5 shadow-sm shadow-charcoal/5">
                             <p class="mb-3 flex items-center gap-2 text-sm font-bold text-charcoal">
@@ -154,11 +154,16 @@
                                         <div class="min-w-0 flex-1">
                                             <p class="line-clamp-1 text-sm text-charcoal">{{ $item->product->name }}
                                             </p>
+                                            @if ($item->selected_options)
+                                                <p class="text-xs text-charcoal/45">
+                                                    {{ collect($item->selected_options)->map(fn($v, $k) => "{$k}: {$v}")->implode(', ') }}
+                                                </p>
+                                            @endif
                                             <p class="text-xs text-charcoal/50">Qty: {{ $item->quantity }} ×
-                                                ₱{{ number_format($item->product->display_price, 2) }}</p>
+                                                ₱{{ number_format($item->unit_price, 2) }}</p>
                                         </div>
                                         <p class="shrink-0 text-sm font-bold text-charcoal">
-                                            ₱{{ number_format($item->quantity * $item->product->display_price, 2) }}
+                                            ₱{{ number_format($item->line_total, 2) }}
                                         </p>
                                     </div>
                                 @endforeach

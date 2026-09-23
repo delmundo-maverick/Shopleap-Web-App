@@ -60,13 +60,11 @@
                         class="frost-input rounded-xl px-3.5 py-2.5 text-sm outline-none transition focus:ring-4 focus:ring-primary/10">
                         <option value="all" {{ request('status', 'all') === 'all' ? 'selected' : '' }}>All Status
                         </option>
-                        <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending</option>
-                        <option value="to_ship" {{ request('status') === 'to_ship' ? 'selected' : '' }}>To Ship</option>
-                        <option value="shipped" {{ request('status') === 'shipped' ? 'selected' : '' }}>Shipped</option>
-                        <option value="delivered" {{ request('status') === 'delivered' ? 'selected' : '' }}>Delivered
-                        </option>
-                        <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Cancelled
-                        </option>
+                        @foreach (\App\Models\Order::STATUS_LABELS as $value => $label)
+                            <option value="{{ $value }}" {{ request('status') === $value ? 'selected' : '' }}>
+                                {{ $label }}
+                            </option>
+                        @endforeach
                     </select>
 
                     <button type="submit"
@@ -98,15 +96,6 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-white/50">
-                                @php
-                                    $statusColors = [
-                                        'pending' => 'bg-orange-100 text-orange-600',
-                                        'to_ship' => 'bg-blue-100 text-blue-600',
-                                        'shipped' => 'bg-primary/10 text-primary',
-                                        'delivered' => 'bg-leaf-green/10 text-leaf-green',
-                                        'cancelled' => 'bg-sale-red/10 text-sale-red',
-                                    ];
-                                @endphp
                                 @foreach ($orders as $order)
                                     <tr class="transition hover:bg-white/40">
                                         <td class="px-5 py-4 font-semibold text-charcoal">#{{ $order->id }}</td>
@@ -117,8 +106,8 @@
                                             ₱{{ number_format($order->total_amount, 2) }}</td>
                                         <td class="px-5 py-4">
                                             <span
-                                                class="rounded-full px-2.5 py-1 text-xs font-semibold capitalize {{ $statusColors[$order->status] ?? '' }}">
-                                                {{ str_replace('_', ' ', $order->status) }}
+                                                class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $order->status_color }}">
+                                                {{ $order->status_label }}
                                             </span>
                                         </td>
                                         <td class="px-5 py-4 text-charcoal/60">

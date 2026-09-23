@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Seller;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
@@ -18,7 +19,7 @@ class OrderController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('id', $search)
-                  ->orWhere('buyer_name', 'ilike', "%{$search}%");
+                    ->orWhere('buyer_name', 'ilike', "%{$search}%");
             });
         }
 
@@ -41,14 +42,22 @@ class OrderController extends Controller
     }
 
     /**
-     * AJAX — update order status.
+     * AJAX — update order status. Restricted to the stages a Seller
+     * actually controls; anything past that belongs to Courier/Logistics.
      */
     public function updateStatus(Request $request, Order $order)
     {
         $this->authorizeOwnership($request, $order);
 
+        if (!in_array($order->status, Order::SELLER_EDITABLE_STATUSES, true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This order has moved past the stage you can update — it is now being handled by delivery.',
+            ], 422);
+        }
+
         $request->validate([
-            'status' => ['required', 'in:pending,to_ship,shipped,delivered,cancelled'],
+            'status' => ['required', Rule::in(Order::SELLER_EDITABLE_STATUSES)],
         ]);
 
         $order->update(['status' => $request->status]);
@@ -57,8 +66,8 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "Order #{$order->id} is now marked as " . str_replace('_', ' ', $request->status) . '.',
-            'status' => $request->status,
+            'message' => "Order #{$order->id} is now marked as {$order->status_label}.",
+            'status' => $order->status,
         ]);
     }
 

@@ -4,11 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    @vite(['resources/css/app.css', 'resources/css/pages/auth-register.css', 'resources/js/app.js', 'resources/js/pages/auth/seller-register.js'])
     <title>Seller Registration | Shopleap</title>
 </head>
 
-<body class="min-h-screen bg-ice-blue text-charcoal">
+<body x-data="otpRegistration({
+    verifyUrl: '{{ route('register.otp.verify', 'seller') }}',
+    resendUrl: '{{ route('register.resend-otp', 'seller') }}',
+    loginUrl: '{{ route('login') }}'
+})" class="min-h-screen bg-ice-blue text-charcoal">
 
     @php
         // Shared Tailwind class strings so every field stays visually consistent
@@ -58,11 +63,43 @@
 
     <!-- ===================== MAIN ===================== -->
     <main class="px-4 py-10 sm:px-6 lg:py-14">
+
         <div class="mx-auto max-w-4xl">
 
-            <form method="POST" action="{{ route('register.seller') }}" enctype="multipart/form-data"
+            <form @submit.prevent="submitRegistration($event)" method="POST" action="{{ route('register.seller') }}"
+                enctype="multipart/form-data"
                 class="overflow-hidden rounded-2xl border border-light-gray bg-white shadow-xl shadow-charcoal/5">
+
+                <!-- PAGE TITLE & HERO: SELLER -->
+                <div class="mb-8 text-center">
+                    <h2 class="mt-5 text-3xl font-bold tracking-tight text-charcoal">
+                        Seller Registration
+                    </h2>
+                    <p class="mx-auto mt-2 max-w-xl text-sm leading-6 text-charcoal/65">
+                        Start selling your products, manage your online inventory, and grow your business with Shopleap.
+                    </p>
+                </div>
+
                 @csrf
+
+                <div x-show="formErrors.length > 0" x-cloak
+                    class="mx-6 mt-6 rounded-xl border border-sale-red/20 bg-sale-red/10 p-4 sm:mx-8">
+                    <div class="flex items-start gap-3">
+                        <svg class="mt-0.5 h-5 w-5 shrink-0 text-sale-red" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 9v3m0 4h.01M10.3 3.8L2.9 17a2 2 0 001.75 3h14.7a2 2 0 001.75-3L13.7 3.8a2 2 0 00-3.4 0z" />
+                        </svg>
+                        <div>
+                            <p class="text-sm font-semibold text-sale-red">Please correct the following errors:</p>
+                            <ul class="mt-1 list-inside list-disc text-xs text-sale-red/80">
+                                <template x-for="error in formErrors" :key="error">
+                                    <li x-text="error"></li>
+                                </template>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
 
                 @if ($errors->any())
                     <div class="mx-6 mt-6 rounded-xl border border-sale-red/20 bg-sale-red/10 p-4 sm:mx-8">
@@ -116,7 +153,7 @@
                                 <input type="password" id="password" name="password" required minlength="8"
                                     autocomplete="new-password" placeholder="Create a password"
                                     class="{{ $inputClass }} pr-11">
-                                <button type="button" onclick="togglePassword('password', 'passwordEye')"
+                                <button type="button" id="togglePasswordBtn"
                                     class="absolute inset-y-0 right-0 flex items-center px-4 text-charcoal/40 hover:text-primary">
                                     <svg id="passwordEye" class="h-5 w-5" fill="none" stroke="currentColor"
                                         viewBox="0 0 24 24">
@@ -132,14 +169,13 @@
                             <label for="password_confirmation" class="{{ $labelClass }}">Confirm Password <span
                                     class="text-sale-red">*</span></label>
                             <div class="relative">
-                                <input type="password" id="password_confirmation" name="password_confirmation" required
-                                    minlength="8" autocomplete="new-password" placeholder="Confirm your password"
-                                    class="{{ $inputClass }} pr-11">
-                                <button type="button"
-                                    onclick="togglePassword('password_confirmation', 'confirmPasswordEye')"
+                                <input type="password" id="password_confirmation" name="password_confirmation"
+                                    required minlength="8" autocomplete="new-password"
+                                    placeholder="Confirm your password" class="{{ $inputClass }} pr-11">
+                                <button type="button" id="toggleConfirmPasswordBtn"
                                     class="absolute inset-y-0 right-0 flex items-center px-4 text-charcoal/40 hover:text-primary">
-                                    <svg id="confirmPasswordEye" class="h-5 w-5" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24">
+                                    <svg id="confirmPasswordEye" class="h-5 w-5" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                             d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z" />
                                         <circle cx="12" cy="12" r="2.5" stroke-width="1.8" />
@@ -175,7 +211,7 @@
                                 required autocomplete="given-name" placeholder="First name"
                                 class="{{ $inputClass }}">
                         </div>
-                        
+
                         <div>
                             <label for="last_name" class="{{ $labelClass }}">Last Name <span
                                     class="text-sale-red">*</span></label>
@@ -313,16 +349,16 @@
                         </div>
 
                         <div>
-                            <label for="line_of_business" class="{{ $labelClass }}">Line of Business <span
-                                    class="text-sale-red">*</span></label>
-                            <select id="line_of_business" name="line_of_business" required
-                                class="{{ $selectClass }}">
+                            <label class="mb-2 block text-sm font-semibold text-charcoal">Line of business (category)
+                                *</label>
+                            <select name="line_of_business" required
+                                class="w-full rounded-xl border border-light-gray bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
                                 <option value="" disabled {{ old('line_of_business') ? '' : 'selected' }}>Select
                                     category</option>
-                                @foreach ($businessCategories as $category)
-                                    <option value="{{ $category }}"
-                                        {{ old('line_of_business') === $category ? 'selected' : '' }}>
-                                        {{ $category }}
+                                @foreach (config('shopleap_categories.list') as $category)
+                                    <option value="{{ $category['name'] }}"
+                                        {{ old('line_of_business') === $category['name'] ? 'selected' : '' }}>
+                                        {{ $category['name'] }}
                                     </option>
                                 @endforeach
                             </select>
@@ -455,10 +491,12 @@
                         </label>
                     </div>
 
-                    <button type="submit"
-                        class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-primary/20">
-                        Submit Registration
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button type="submit" :disabled="submitting"
+                        class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60">
+                        <span x-show="!submitting">Submit Registration</span>
+                        <span x-show="submitting">Submitting…</span>
+                        <svg x-show="!submitting" class="h-5 w-5" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M5 12h14m-6-6l6 6-6 6" />
                         </svg>
@@ -481,6 +519,9 @@
                 </p>
             </div>
         </div>
+        <script id="sellerAddressOldValues" type="application/json">
+                @json(['province' => old('province'), 'municipality' => old('municipality'), 'barangay' => old('barangay')])
+            </script>
     </main>
 
     <!-- ===================== FOOTER ===================== -->
@@ -491,226 +532,66 @@
         </div>
     </footer>
 
-    <!-- ===================== JAVASCRIPT ===================== -->
-    <script>
-        /* ---------------------------------------------------------------
-                     | Password Visibility
-                     | Icon markup is stored once per state and reused for both the
-                     | password and confirm-password fields instead of being
-                     | duplicated inline for each toggle.
-                     * ------------------------------------------------------------- */
-        const EYE_OPEN_ICON = `
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                  d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z" />
-            <circle cx="12" cy="12" r="2.5" stroke-width="1.8" />
-        `;
+    <!-- ===================== OTP VERIFICATION MODAL ===================== -->
+    <div x-show="showOtpModal" x-cloak x-transition.opacity
+        class="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/50 px-4"
+        @keydown.escape.window="closeOtpModal()">
+        <div @click.outside="closeOtpModal()" x-transition
+            class="w-full max-w-md rounded-2xl border border-light-gray bg-white p-8 shadow-2xl shadow-charcoal/20">
 
-        const EYE_CLOSED_ICON = `
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                  d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 5.2A10.7 10.7 0 0112 5c6 0 9.5 7 9.5 7a17 17 0 01-3 3.8M6.2 6.2C3.7 8.1 2.5 12 2.5 12s3.5 6 9.5 6c1.4 0 2.6-.3 3.7-.8" />
-        `;
+            <div class="flex items-start gap-4">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ice-blue text-primary">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                            d="M3 8l7.9 5.26a2 2 0 002.2 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-charcoal">Verify your e-mail</h3>
+                    <p class="mt-1 text-xs leading-5 text-charcoal/60">
+                        Enter the 6-digit code sent to <span class="font-semibold text-charcoal"
+                            x-text="email"></span>
+                    </p>
+                </div>
+                <button type="button" @click="closeOtpModal()" class="ml-auto text-charcoal/40 hover:text-charcoal">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
 
-        function togglePassword(inputId, iconId) {
-            const input = document.getElementById(inputId);
-            const icon = document.getElementById(iconId);
-            const isCurrentlyHidden = input.type === 'password';
+            <div x-show="otpError" x-cloak x-text="otpError"
+                class="mt-5 rounded-xl border border-sale-red/20 bg-sale-red/10 px-4 py-3 text-xs font-medium text-sale-red">
+            </div>
 
-            input.type = isCurrentlyHidden ? 'text' : 'password';
-            icon.innerHTML = isCurrentlyHidden ? EYE_CLOSED_ICON : EYE_OPEN_ICON;
-        }
+            <div class="mt-6 flex justify-between gap-2" @paste="handleOtpPaste($event)">
+                @for ($i = 0; $i < 6; $i++)
+                    <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1"
+                        x-ref="otpInput{{ $i }}" x-model="otpDigits[{{ $i }}]"
+                        @input="handleOtpInput({{ $i }}, $event)"
+                        @keydown="handleOtpKeydown({{ $i }}, $event)" :disabled="verifying"
+                        class="h-14 w-full rounded-xl border border-light-gray bg-white text-center text-xl font-bold text-charcoal outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:opacity-50">
+                @endfor
+            </div>
 
-        /* ---------------------------------------------------------------
-         | Automatic Age Calculation
-         * ------------------------------------------------------------- */
-        const birthdayInput = document.getElementById('birthday');
-        const ageInput = document.getElementById('age');
+            <button type="button" @click="verifyOtp()" :disabled="verifying"
+                class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:opacity-60">
+                <span x-show="!verifying">Verify code</span>
+                <span x-show="verifying">Verifying…</span>
+            </button>
 
-        function calculateAge() {
-            if (!birthdayInput.value) {
-                ageInput.value = '';
-                return;
-            }
-
-            const birthday = new Date(birthdayInput.value);
-            const today = new Date();
-
-            let age = today.getFullYear() - birthday.getFullYear();
-
-            const hasHadBirthdayThisYear =
-                today.getMonth() > birthday.getMonth() ||
-                (today.getMonth() === birthday.getMonth() && today.getDate() >= birthday.getDate());
-
-            if (!hasHadBirthdayThisYear) age--;
-
-            ageInput.value = age >= 0 ? age : '';
-        }
-
-        birthdayInput.addEventListener('change', calculateAge);
-
-        /* ---------------------------------------------------------------
-         | Document File Selection (ID + Business Permit)
-         * ------------------------------------------------------------- */
-        function wireFileInput(inputId, wrapperId, nameId) {
-            const input = document.getElementById(inputId);
-            const wrapper = document.getElementById(wrapperId);
-            const nameEl = document.getElementById(nameId);
-
-            input.addEventListener('change', function() {
-                const file = this.files?.[0];
-                nameEl.textContent = file?.name ?? '';
-                wrapper.classList.toggle('hidden', !file);
-            });
-        }
-
-        wireFileInput('id_upload', 'idFileSelected', 'idFileName');
-        wireFileInput('business_permit', 'permitFileSelected', 'permitFileName');
-
-        /* ---------------------------------------------------------------
-         | Middle Initial (letters only)
-         * ------------------------------------------------------------- */
-        document.getElementById('middle_initial').addEventListener('input', function() {
-            this.value = this.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
-        });
-
-        /* ---------------------------------------------------------------
-         | Province / Municipality / Barangay cascading dropdowns
-         |
-         | Data source: the public PSGC (Philippine Standard Geographic
-         | Code) API at https://psgc.gitlab.io/api/. Trailing slashes are
-         | required on every endpoint below — without them the API issues
-         | a redirect that breaks the CORS request from the browser.
-         |
-         | The three levels share identical load/reset/restore behaviour,
-         | so they're driven by one generic cascade instead of three
-         | near-duplicate functions.
-         * ------------------------------------------------------------- */
-        (function() {
-            const PSGC_BASE = 'https://psgc.gitlab.io/api';
-
-            // Old input, so a validation error doesn't wipe the user's selections.
-            const OLD_VALUES = {
-                province: @json(old('province')),
-                municipality: @json(old('municipality')),
-                barangay: @json(old('barangay')),
-            };
-
-            const levels = [{
-                    select: document.getElementById('province'),
-                    help: document.getElementById('provinceHelp'),
-                    placeholder: 'Select province',
-                    loadingText: 'Fetching province list…',
-                    errorText: 'Could not load the province list. Please refresh the page.',
-                    resetText: 'Select province',
-                    url: () => `${PSGC_BASE}/provinces/`,
-                    old: OLD_VALUES.province,
-                },
-                {
-                    select: document.getElementById('municipality'),
-                    help: document.getElementById('municipalityHelp'),
-                    placeholder: 'Select municipality',
-                    loadingText: 'Fetching municipality list…',
-                    errorText: 'Could not load the municipality list. Please try again.',
-                    resetText: 'Select a province first',
-                    url: (code) => `${PSGC_BASE}/provinces/${code}/cities-municipalities/`,
-                    old: OLD_VALUES.municipality,
-                },
-                {
-                    select: document.getElementById('barangay'),
-                    help: document.getElementById('barangayHelp'),
-                    placeholder: 'Select barangay',
-                    loadingText: 'Fetching barangay list…',
-                    errorText: 'Could not load the barangay list. Please try again.',
-                    resetText: 'Select a municipality first',
-                    url: (code) => `${PSGC_BASE}/cities-municipalities/${code}/barangays/`,
-                    old: OLD_VALUES.barangay,
-                },
-            ];
-
-            function fillOptions(select, items, placeholder) {
-                select.innerHTML = '';
-
-                const placeholderOption = new Option(placeholder, '', true, true);
-                placeholderOption.disabled = true;
-                select.append(placeholderOption);
-
-                items
-                    .slice()
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .forEach((item) => {
-                        const option = new Option(item.name, item.name);
-                        option.dataset.code = item.code;
-                        select.append(option);
-                    });
-            }
-
-            function resetLevel(level, text) {
-                level.select.innerHTML = '';
-                level.select.append(new Option(text, ''));
-                level.select.disabled = true;
-
-                if (level.help) level.help.textContent = text;
-            }
-
-            function resetFrom(index) {
-                for (let i = index; i < levels.length; i++) {
-                    resetLevel(levels[i], levels[i].resetText);
-                }
-            }
-
-            async function loadLevel(index, parentCode) {
-                const level = levels[index];
-
-                resetLevel(level, level.loadingText);
-                resetFrom(index + 1);
-
-                try {
-                    const response = await fetch(level.url(parentCode));
-
-                    if (!response.ok) {
-                        throw new Error(`PSGC request failed: ${response.status} ${level.url(parentCode)}`);
-                    }
-
-                    const items = await response.json();
-
-                    fillOptions(level.select, items, level.placeholder);
-                    level.select.disabled = false;
-
-                    if (level.help) {
-                        level.help.textContent = `Select your ${level.placeholder.replace('Select ', '')}`;
-                    }
-
-                    // Restore the previous selection (validation round-trip)
-                    // and cascade into the next level if it matches.
-                    if (level.old) {
-                        const match = [...level.select.options].find((option) => option.value === level.old);
-
-                        if (match) {
-                            level.select.value = level.old;
-
-                            if (index + 1 < levels.length) {
-                                await loadLevel(index + 1, match.dataset.code);
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error(error);
-                    resetLevel(level, level.errorText);
-                }
-            }
-
-            levels.forEach((level, index) => {
-                const isLastLevel = index === levels.length - 1;
-                if (isLastLevel) return;
-
-                level.select.addEventListener('change', function() {
-                    const code = this.options[this.selectedIndex]?.dataset.code;
-                    if (code) loadLevel(index + 1, code);
-                });
-            });
-
-            loadLevel(0);
-        })();
-    </script>
+            <div class="mt-5 flex items-center justify-between text-xs">
+                <button type="button" @click="resendOtp()" :disabled="resendCooldown > 0 || resending"
+                    class="font-semibold text-primary transition hover:text-sky-blue disabled:cursor-not-allowed disabled:text-charcoal/40">
+                    <span x-show="!resending">Resend code</span>
+                    <span x-show="resending">Sending…</span>
+                </button>
+                <span class="text-charcoal/50" x-show="resendCooldown > 0"
+                    x-text="`Resend in ${resendCooldown}s`"></span>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
