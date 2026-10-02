@@ -68,15 +68,15 @@
 
                     <div class="relative flex-1">
                         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-                            <svg class="h-4 w-4 text-charcoal/40" fill="none" stroke="currentColor"
+                            <svg class="h-4 w-4 [stroke:#2E3A46]" fill="none" stroke="currentColor"
                                 viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"
                                     d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
                         </div>
                         <input type="text" name="search" value="{{ request('search') }}"
                             placeholder="Search your products..."
-                            class="frost-input w-full rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none transition focus:ring-4 focus:ring-primary/10">
+                            class="frost-input w-full rounded-xl py-2.5 pl-10 pr-4 text-sm font-medium text-charcoal outline-none transition">
                     </div>
 
                     <select name="category" onchange="this.form.submit()"

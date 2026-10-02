@@ -23,13 +23,19 @@ class OrderController extends Controller
             });
         }
 
-        if ($request->filled('status') && $request->status !== 'all') {
-            $query->where('status', $request->status);
+        $status = $request->get('status', 'all');
+
+        if ($status === 'new') {
+            $query->whereIn('status', Order::GROUP_NEW);
+        } elseif ($status === 'prepare') {
+            $query->whereIn('status', Order::GROUP_PREPARE);
+        } elseif ($status !== 'all') {
+            $query->where('status', $status);
         }
 
         $orders = $query->paginate(15)->withQueryString();
 
-        return view('seller.orders.index', compact('orders'));
+        return view('seller.orders.index', compact('orders', 'status'));
     }
 
     public function show(Request $request, Order $order)

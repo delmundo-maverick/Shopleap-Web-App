@@ -259,7 +259,7 @@
         </form>
 
     </main>
-
+    <x-Buyer.message-widget />
 </body>
 
 </html>

@@ -89,14 +89,16 @@
                 Overview
             </p>
 
+            {{-- 1. Dashboard --}}
             <a href="{{ route('logistics.dashboard') }}" title="Dashboard"
-                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
+                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
                 {{ $active === 'dashboard'
-                    ? 'frost-chip text-primary font-semibold'
+                    ? 'frost-chip bg-primary/10 text-primary font-bold shadow-xs'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
-                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="h-5 w-5 shrink-0 transition-colors {{ $active === 'dashboard' ? 'text-primary' : 'text-charcoal/50' }}"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
                 </svg>
                 <span class="nav-label">Dashboard</span>
             </a>
@@ -105,90 +107,120 @@
                 Rider Management
             </p>
 
-            <a href="{{ route('logistics.dashboard') }}" title="Rider Applications"
-                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
-                {{ $active === 'riders'
-                    ? 'frost-chip text-primary font-semibold'
+            {{-- 2. Rider Applications --}}
+            <a href="{{ route('logistics.riders.index') }}" title="Rider Applications"
+                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
+                {{ $active === 'rider-apps' || $active === 'riders'
+                    ? 'frost-chip bg-primary/10 text-primary font-bold shadow-xs'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
-                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="h-5 w-5 shrink-0 transition-colors {{ $active === 'rider-apps' || $active === 'riders' ? 'text-primary' : 'text-charcoal/50' }}"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <span class="nav-label">Rider Applications</span>
-                <span class="badge-tag ml-auto rounded-full bg-sale-red/10 px-2 py-0.5 text-[10px] font-bold text-sale-red">Soon</span>
             </a>
 
+            {{-- 3. Active Riders --}}
             <a href="{{ route('logistics.dashboard') }}" title="Active Riders"
-                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
+                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
                 {{ $active === 'riders-active'
-                    ? 'frost-chip text-primary font-semibold'
+                    ? 'frost-chip bg-primary/10 text-primary font-bold shadow-xs'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
-                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="h-5 w-5 shrink-0 transition-colors {{ $active === 'riders-active' ? 'text-primary' : 'text-charcoal/50' }}"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
                 <span class="nav-label">Active Riders</span>
-                <span class="badge-tag ml-auto rounded-full bg-sale-red/10 px-2 py-0.5 text-[10px] font-bold text-sale-red">Soon</span>
+                <span
+                    class="badge-tag ml-auto rounded-full bg-sale-red/10 px-2 py-0.5 text-[10px] font-bold text-sale-red">Soon</span>
             </a>
 
             <p class="nav-section-title px-3 pb-2 pt-4 text-xs font-semibold uppercase tracking-wide text-charcoal/40">
                 Parcel Operations
             </p>
 
-            <a href="{{ route('logistics.dashboard') }}" title="Incoming Parcels"
-                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
-                {{ $active === 'incoming'
-                    ? 'frost-chip text-primary font-semibold'
+            {{-- 4. Pickup Requests --}}
+            <a href="{{ route('logistics.pickups.index') }}" title="Pickup Requests"
+                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
+                {{ $active === 'pickups'
+                    ? 'frost-chip bg-primary/10 text-primary font-bold shadow-xs'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
-                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="h-5 w-5 shrink-0 transition-colors {{ $active === 'pickups' ? 'text-primary' : 'text-charcoal/50' }}"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                        d="M20 12H4m16 0l-6-6m6 6l-6 6" />
+                        d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4l3-3m0 0l3 3m-3-3v6" />
+                </svg>
+                <span class="nav-label">Pickup Requests</span>
+            </a>
+
+            {{-- 5. Incoming Parcels --}}
+            <a href="{{ route('logistics.incoming.index') }}" title="Incoming Parcels"
+                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
+                {{ $active === 'incoming'
+                    ? 'frost-chip bg-primary/10 text-primary font-bold shadow-xs'
+                    : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
+                <svg class="h-5 w-5 shrink-0 transition-colors {{ $active === 'incoming' ? 'text-primary' : 'text-charcoal/50' }}"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                        d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                 </svg>
                 <span class="nav-label">Incoming Parcels</span>
-                <span class="badge-tag ml-auto rounded-full bg-sale-red/10 px-2 py-0.5 text-[10px] font-bold text-sale-red">Soon</span>
             </a>
 
+            {{-- 6. Sort & Assign --}}
             <a href="{{ route('logistics.dashboard') }}" title="Sort & Assign"
-                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
+                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
                 {{ $active === 'sorting'
-                    ? 'frost-chip text-primary font-semibold'
+                    ? 'frost-chip bg-primary/10 text-primary font-bold shadow-xs'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
-                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="h-5 w-5 shrink-0 transition-colors {{ $active === 'sorting' ? 'text-primary' : 'text-charcoal/50' }}"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                        d="M4 6h16M4 12h16M4 18h7" />
+                        d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
                 </svg>
                 <span class="nav-label">Sort &amp; Assign</span>
-                <span class="badge-tag ml-auto rounded-full bg-sale-red/10 px-2 py-0.5 text-[10px] font-bold text-sale-red">Soon</span>
+                <span
+                    class="badge-tag ml-auto rounded-full bg-sale-red/10 px-2 py-0.5 text-[10px] font-bold text-sale-red">Soon</span>
             </a>
 
+            {{-- 7. Monitor Deliveries --}}
             <a href="{{ route('logistics.dashboard') }}" title="Monitor Deliveries"
-                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
+                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
                 {{ $active === 'monitor'
-                    ? 'frost-chip text-primary font-semibold'
+                    ? 'frost-chip bg-primary/10 text-primary font-bold shadow-xs'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
-                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="h-5 w-5 shrink-0 transition-colors {{ $active === 'monitor' ? 'text-primary' : 'text-charcoal/50' }}"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                        d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 <span class="nav-label">Monitor Deliveries</span>
-                <span class="badge-tag ml-auto rounded-full bg-sale-red/10 px-2 py-0.5 text-[10px] font-bold text-sale-red">Soon</span>
+                <span
+                    class="badge-tag ml-auto rounded-full bg-sale-red/10 px-2 py-0.5 text-[10px] font-bold text-sale-red">Soon</span>
             </a>
 
             <p class="nav-section-title px-3 pb-2 pt-4 text-xs font-semibold uppercase tracking-wide text-charcoal/40">
                 Reports
             </p>
 
+            {{-- 8. Reports --}}
             <a href="{{ route('logistics.dashboard') }}" title="Reports"
-                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
+                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
                 {{ $active === 'reports'
-                    ? 'frost-chip text-primary font-semibold'
+                    ? 'frost-chip bg-primary/10 text-primary font-bold shadow-xs'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
-                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="h-5 w-5 shrink-0 transition-colors {{ $active === 'reports' ? 'text-primary' : 'text-charcoal/50' }}"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                        d="M9 17v-6h6v6M4 21h16a1 1 0 001-1V4a1 1 0 00-1-1H4a1 1 0 00-1 1v16a1 1 0 001 1z" />
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
                 <span class="nav-label">Reports</span>
-                <span class="badge-tag ml-auto rounded-full bg-sale-red/10 px-2 py-0.5 text-[10px] font-bold text-sale-red">Soon</span>
+                <span
+                    class="badge-tag ml-auto rounded-full bg-sale-red/10 px-2 py-0.5 text-[10px] font-bold text-sale-red">Soon</span>
             </a>
 
         </nav>

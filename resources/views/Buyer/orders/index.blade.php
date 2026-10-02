@@ -212,7 +212,7 @@
 
         </div>
     </div>
-
+    <x-Buyer.message-widget />
 </body>
 
 </html>

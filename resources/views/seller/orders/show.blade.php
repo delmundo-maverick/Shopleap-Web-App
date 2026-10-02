@@ -135,6 +135,52 @@
                         <div class="frost-panel sticky top-6 rounded-2xl p-5">
                             <p class="mb-3 text-xs font-bold uppercase tracking-wide text-primary">Update Order Status
                             </p>
+                            @if (in_array(
+                                    $order->status,
+                                    [
+                                        \App\Models\Order::STATUS_PREPARING,
+                                        \App\Models\Order::STATUS_READY_FOR_PICKUP,
+                                        \App\Models\Order::STATUS_PICKED_UP,
+                                        \App\Models\Order::STATUS_AT_SORTING_CENTER,
+                                        \App\Models\Order::STATUS_SORTED,
+                                        \App\Models\Order::STATUS_ASSIGNED_TO_RIDER,
+                                        \App\Models\Order::STATUS_OUT_FOR_DELIVERY,
+                                        \App\Models\Order::STATUS_DELIVERED,
+                                        \App\Models\Order::STATUS_COMPLETED,
+                                    ],
+                                    true))
+                                <div class="mb-5 border-b border-white/50 pb-5">
+                                    <p class="mb-3 text-xs font-bold uppercase tracking-wide text-primary">Shipping
+                                        Label</p>
+
+                                    <a href="{{ route('seller.orders.waybill', $order) }}" target="_blank"
+                                        class="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-primary px-4 py-2.5 text-sm font-bold text-primary transition hover:bg-primary/5">
+                                        <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m10 0v4a1 1 0 01-1 1H8a1 1 0 01-1-1v-4m10 0H7m10-10V4a1 1 0 00-1-1H8a1 1 0 00-1 1v3" />
+                                        </svg>
+                                        {{ $order->waybill_printed_at ? 'Reprint Waybill' : 'Print Waybill' }}
+                                    </a>
+
+                                    @if ($order->waybill_printed_at)
+                                        <p class="mt-2 text-center text-xs text-charcoal/40">
+                                            First printed {{ $order->waybill_printed_at->diffForHumans() }}
+                                        </p>
+                                    @elseif ($order->status === \App\Models\Order::STATUS_PREPARING)
+                                        <div
+                                            class="mt-3 flex items-start gap-2 rounded-xl bg-orange-50 p-3 text-xs text-orange-700">
+                                            <svg class="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                                            </svg>
+                                            <span>You haven't printed a shipping label for this order yet. Print it
+                                                before marking Ready for Pickup.</span>
+                                        </div>
+                                    @endif
+                                </div>
+                            @endif
                             @if (in_array($order->status, \App\Models\Order::SELLER_EDITABLE_STATUSES, true))
                                 <select x-model="status"
                                     class="frost-input mb-3 w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition focus:ring-4 focus:ring-primary/10">

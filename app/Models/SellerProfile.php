@@ -21,6 +21,7 @@ class SellerProfile extends Model
         'street_address',
         'business_name',
         'line_of_business',
+        'shop_description',
         'id_upload_path',
         'business_permit_path',
         'status',

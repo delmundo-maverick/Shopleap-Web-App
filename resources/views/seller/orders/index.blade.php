@@ -16,7 +16,7 @@
 
     <div class="flex min-h-screen">
 
-        <x-navbars.seller :active="request('status') === 'to_ship' ? 'prepare' : 'orders'" />
+        <x-navbars.seller :active="request('status') === 'prepare' ? 'prepare' : 'orders'" />
 
         <div class="flex flex-1 flex-col">
 

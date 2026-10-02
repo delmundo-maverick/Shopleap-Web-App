@@ -39,5 +39,9 @@ class LogisticsProfile extends Model
     {
         return $this->belongsTo(User::class);
     }
-}
 
+    public function riders()
+    {
+        return $this->hasMany(CourierProfile::class);
+    }
+}

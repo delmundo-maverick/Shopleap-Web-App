@@ -13,7 +13,7 @@
 
 <body class="min-h-screen bg-ice-blue text-charcoal">
 
-    <x-Buyer.header />
+    <x-Buyer.header :cart-count="$cartCount" :cart-preview-items="$cartPreviewItems" />
 
     <!-- SHOP HEADER CARD -->
     <div class="bg-light-gray">
@@ -21,13 +21,14 @@
             <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
 
                 <div class="flex items-center gap-4">
-                    <div
-                        class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 border-white/20 bg-white text-2xl font-bold text-primary">
-                        {{ strtoupper(substr($seller->sellerProfile->shop_name, 0, 1)) }}
-                    </div>
+                    <x-avatar :user="$seller" size="xl" bg="bg-white" class="border-2 border-white/20" />
                     <div>
-                        <p class="text-lg font-bold text-charcoal">{{ $seller->sellerProfile->shop_name }}</p>
-                        <p class="mt-0.5 text-xs text-charcoal/60">{{ $seller->sellerProfile->line_of_business }}</p>
+                        <p class="text-lg font-bold text-white">{{ $seller->sellerProfile->shop_name }}</p>
+                        <p class="mt-0.5 text-xs text-white/60">{{ $seller->sellerProfile->line_of_business }}</p>
+                        @if ($seller->sellerProfile->shop_description)
+                            <p class="mt-1 line-clamp-2 max-w-xl text-xs text-white/70">
+                                {{ $seller->sellerProfile->shop_description }}</p>
+                        @endif
                     </div>
                 </div>
 
@@ -42,7 +43,8 @@
 
                     @if ($seller->sellerProfile->location)
                         <div class="flex items-center gap-2">
-                            <svg class="h-4 w-4 text-charcoal/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="h-4 w-4 text-charcoal/40" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
                                     d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
@@ -113,7 +115,7 @@
         </section>
 
     </main>
-
+    <x-Buyer.message-widget />
 </body>
 
 </html>

@@ -13,7 +13,13 @@ class Order extends Model
         'status',
         'total_amount',
         'commission_amount',
+        'waybill_printed_at',
     ];
+
+    protected function casts(): array
+    {
+        return ['waybill_printed_at' => 'datetime'];
+    }
 
     // Full chain, per the ERP flow: Buyer → Seller → Rider → Sorting Center → Rider → Buyer
     const STATUS_PLACED = 'PLACED';
@@ -30,6 +36,20 @@ class Order extends Model
     const STATUS_CANCELLED = 'CANCELLED';
     const STATUS_DELIVERY_FAILED = 'DELIVERY_FAILED';
     const STATUS_RETURNED = 'RETURNED';
+    const GROUP_REALIZED = [self::STATUS_COMPLETED];
+    const GROUP_IN_PROGRESS = [
+        self::STATUS_PLACED,
+        self::STATUS_CONFIRMED,
+        self::STATUS_PREPARING,
+        self::STATUS_READY_FOR_PICKUP,
+        self::STATUS_PICKED_UP,
+        self::STATUS_AT_SORTING_CENTER,
+        self::STATUS_SORTED,
+        self::STATUS_ASSIGNED_TO_RIDER,
+        self::STATUS_OUT_FOR_DELIVERY,
+        self::STATUS_DELIVERED,
+    ];
+    const GROUP_LOST = [self::STATUS_CANCELLED, self::STATUS_DELIVERY_FAILED, self::STATUS_RETURNED];
 
     const GROUP_TO_SHIP = [
         self::STATUS_PLACED,
@@ -75,6 +95,14 @@ class Order extends Model
         'completed' => self::GROUP_COMPLETED,
         'return_refund' => self::GROUP_RETURN_REFUND,
         'cancelled' => self::GROUP_CANCELLED,
+    ];
+
+    const GROUP_NEW = [self::STATUS_PLACED];
+
+    const GROUP_PREPARE = [
+        self::STATUS_CONFIRMED,
+        self::STATUS_PREPARING,
+        self::STATUS_READY_FOR_PICKUP
     ];
 
     const TAB_LABELS = [
@@ -143,5 +171,15 @@ class Order extends Model
     public function getStatusColorAttribute(): string
     {
         return self::STATUS_COLORS[$this->status] ?? 'bg-light-gray text-charcoal';
+    }
+
+    public function logisticsProfile()
+    {
+        return $this->belongsTo(LogisticsProfile::class);
+    }
+
+    public function assignedRider()
+    {
+        return $this->belongsTo(CourierProfile::class, 'assigned_rider_id');
     }
 }

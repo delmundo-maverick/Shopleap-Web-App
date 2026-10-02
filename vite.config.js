@@ -16,6 +16,10 @@ export default defineConfig({
                 'resources/css/pages/auth-register.css',
                 'resources/js/pages/auth/buyer-register.js',
                 'resources/js/pages/auth/seller-register.js',
+                'resources/js/pages/messaging.js',
+                'resources/js/pages/buyer/message-widget.js',
+                'resources/js/pages/seller/reports.js',
+                'resources/js/pages/seller/account.js',
             ],
             refresh: true,
             fonts: [

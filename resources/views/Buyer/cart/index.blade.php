@@ -21,8 +21,6 @@
 
     <main class="mx-auto max-w-5xl px-5 py-6 sm:px-8">
 
-        <h1 class="mb-5 text-2xl font-bold text-charcoal">My Cart</h1>
-
         @if ($cartItems->isEmpty())
 
             <div
@@ -238,6 +236,7 @@
         @json($cartDataForJs)
     </script>
 
+    <x-Buyer.message-widget />
 </body>
 
 </html>

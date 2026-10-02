@@ -43,16 +43,6 @@
 
                 <div class="flex items-center gap-4">
 
-                    <button
-                        class="relative rounded-full p-2 text-charcoal/60 transition hover:bg-white/70 hover:text-primary">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                        </svg>
-                        <span
-                            class="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-sale-red ring-2 ring-white/80"></span>
-                    </button>
-
                     <div class="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 frost-chip">
                         <div
                             class="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
@@ -74,14 +64,17 @@
                 <!-- STAT CARDS (real data) -->
                 <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 
-                    <div class="frost-panel rounded-2xl p-5 transition hover:-translate-y-0.5 hover:shadow-lg">
+                    <!-- 1. This Month's Sales -->
+                    <div class="frost-panel rounded-2xl p-5">
                         <div class="flex items-center justify-between">
                             <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/45">This Month's Sales
                             </p>
-                            <div class="flex h-8 w-8 items-center justify-center rounded-lg frost-chip text-primary">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 8c-1.66 0-3 .9-3 2s1.34 2 3 2 3 .9 3 2-1.34 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 2v8m0 0v2m0-2c-1.11 0-2.08-.402-2.599-1" />
+                            <div
+                                class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                                <!-- Trending / Currency Icon -->
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 2v8m0 0v2m0-2c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                             </div>
                         </div>
@@ -90,13 +83,16 @@
                         <p class="mt-1 text-xs text-charcoal/50">This calendar month</p>
                     </div>
 
-                    <div class="frost-panel rounded-2xl p-5 transition hover:-translate-y-0.5 hover:shadow-lg">
+                    <!-- 2. Pending Orders -->
+                    <div class="frost-panel rounded-2xl p-5">
                         <div class="flex items-center justify-between">
                             <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/45">Pending Orders</p>
-                            <div class="flex h-8 w-8 items-center justify-center rounded-lg frost-chip text-primary">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2m-6 0h6" />
+                            <div
+                                class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
+                                <!-- Shopping Bag / Clock Icon -->
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                        d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                                 </svg>
                             </div>
                         </div>
@@ -104,13 +100,15 @@
                         <p class="mt-1 text-xs text-charcoal/50">To be prepared</p>
                     </div>
 
-                    <div class="frost-panel rounded-2xl p-5 transition hover:-translate-y-0.5 hover:shadow-lg">
+                    <!-- 3. Products Listed -->
+                    <div class="frost-panel rounded-2xl p-5">
                         <div class="flex items-center justify-between">
                             <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/45">Products Listed
                             </p>
-                            <div class="flex h-8 w-8 items-center justify-center rounded-lg frost-chip text-primary">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                <!-- 3D Box / Inventory Icon -->
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                         d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                 </svg>
                             </div>
@@ -119,13 +117,16 @@
                         <p class="mt-1 text-xs text-charcoal/50">Active in your store</p>
                     </div>
 
-                    <div class="frost-panel rounded-2xl p-5 transition hover:-translate-y-0.5 hover:shadow-lg">
+                    <!-- 4. Store Rating -->
+                    <div class="frost-panel rounded-2xl p-5">
                         <div class="flex items-center justify-between">
                             <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/45">Store Rating</p>
-                            <div class="flex h-8 w-8 items-center justify-center rounded-lg frost-chip text-primary">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.914c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                            <div
+                                class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-400/15 text-amber-500">
+                                <!-- Star Rating Icon -->
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                        d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                                 </svg>
                             </div>
                         </div>

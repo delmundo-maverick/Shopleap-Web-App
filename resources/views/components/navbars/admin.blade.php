@@ -101,7 +101,7 @@
                         d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
                 </svg>
 
-                <span class="nav-label">System Overview</span>
+                <span class="nav-label">Dashboard</span>
             </a>
 
 
@@ -152,6 +152,28 @@
                 </svg>
 
                 <span class="nav-label">Logistics Partners</span>
+            </a>
+
+
+            <p class="nav-section-title px-3 pb-2 pt-4 text-xs font-semibold uppercase tracking-wide text-charcoal/40">
+                Support
+            </p>
+
+
+            <a href="{{ route('messages.index') }}" title="Messages"
+                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
+                {{ $active === 'messages'
+                    ? 'frost-chip text-primary font-semibold'
+                    : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
+
+                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+
+                <span class="nav-label flex-1">Messages</span>
+                <span id="adminMessageBadge"
+                    class="nav-label hidden shrink-0 rounded-full bg-sale-red px-1.5 py-0.5 text-[10px] font-bold text-white"></span>
             </a>
 
 
@@ -289,6 +311,32 @@
         const overlay = document.getElementById('sidebarOverlay');
         const closeBtn = document.getElementById('sidebarCloseBtn');
         const toggleBtn = document.getElementById('sidebarToggleBtn');
+        const messageBadge = document.getElementById('adminMessageBadge');
+
+        async function refreshMessageBadge() {
+            if (!messageBadge) return;
+            try {
+                const res = await fetch('{{ route('messages.unread-count') }}', {
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+
+                if (data.count > 0) {
+                    messageBadge.textContent = data.count > 9 ? '9+' : data.count;
+                    messageBadge.classList.remove('hidden');
+                } else {
+                    messageBadge.classList.add('hidden');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        refreshMessageBadge();
+        setInterval(refreshMessageBadge, 20000);
 
 
         if (toggleBtn) {

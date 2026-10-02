@@ -2,7 +2,7 @@
 
 <div id="sidebarOverlay" class="fixed inset-0 z-40 hidden bg-charcoal/40 backdrop-blur-sm lg:hidden"></div>
 
-<style> 
+<style>
     #sidebarNav.is-collapsed {
         width: 5rem;
     }
@@ -123,7 +123,7 @@
             </a>
 
 
-            <a href="{{ route('seller.orders.index', ['status' => 'pending']) }}" title="Order Notifications"
+            <a href="{{ route('seller.orders.index', ['status' => 'new']) }}" title="Order Notifications"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'orders'
                     ? 'frost-chip text-primary font-semibold'
@@ -138,7 +138,7 @@
             </a>
 
 
-            <a href="{{ route('seller.orders.index', ['status' => 'to_ship']) }}" title="Prepare & Ship Orders"
+            <a href="{{ route('seller.orders.index', ['status' => 'prepare']) }}" title="Prepare & Ship Orders"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'prepare'
                     ? 'frost-chip text-primary font-semibold'
@@ -158,7 +158,7 @@
             </p>
 
 
-            <a href="#" title="Generate Report"
+            <a href="{{ route('seller.reports.index') }}" title="Generate Report"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'reports'
                     ? 'frost-chip text-primary font-semibold'
@@ -178,9 +178,9 @@
             </p>
 
 
-            <a href="#" title="Chat / Messaging"
+            <a href="{{ route('messages.index') }}" title="Chat / Messaging"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
-                {{ $active === 'chat'
+                {{ $active === 'messages'
                     ? 'frost-chip text-primary font-semibold'
                     : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
 
@@ -189,11 +189,13 @@
                         d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
 
-                <span class="nav-label">Chat / Messaging</span>
+                <span class="nav-label flex-1">Chat / Messaging</span>
+                <span id="sellerMessageBadge"
+                    class="nav-label hidden shrink-0 rounded-full bg-sale-red px-1.5 py-0.5 text-[10px] font-bold text-white"></span>
             </a>
 
 
-            <a href="#" title="Account Management"
+            <a href="{{ route('seller.account.index') }}" title="Account Management"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'account'
                     ? 'frost-chip text-primary font-semibold'
@@ -283,6 +285,32 @@
         const overlay = document.getElementById('sidebarOverlay');
         const closeBtn = document.getElementById('sidebarCloseBtn');
         const toggleBtn = document.getElementById('sidebarToggleBtn');
+        const messageBadge = document.getElementById('sellerMessageBadge');
+
+        async function refreshMessageBadge() {
+            if (!messageBadge) return;
+            try {
+                const res = await fetch('{{ route('messages.unread-count') }}', {
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+
+                if (data.count > 0) {
+                    messageBadge.textContent = data.count > 9 ? '9+' : data.count;
+                    messageBadge.classList.remove('hidden');
+                } else {
+                    messageBadge.classList.add('hidden');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        refreshMessageBadge();
+        setInterval(refreshMessageBadge, 20000);
 
 
         if (toggleBtn) {

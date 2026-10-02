@@ -41,9 +41,6 @@ class BuyerRegistrationController extends Controller
 
         $age = Carbon::parse($validated['birthday'])->age;
 
-        // Files must be uploaded now — they don't survive across requests,
-        // and the actual User/BuyerProfile rows aren't created until OTP
-        // verification succeeds (see LoginController::verifyOtp).
         $idPath = $request->file('id_upload')->store('buyer_uploads/ids', 'r2');
 
         $userAttributes = [

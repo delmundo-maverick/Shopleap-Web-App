@@ -14,7 +14,6 @@
             {{-- LEFT: utility links --}}
             <div class="flex items-center gap-5">
                 <a href="#" class="hover:text-white">Track My Order</a>
-                <a href="#" class="hover:text-white">Help Center</a>
             </div>
 
             {{-- RIGHT: notifications, help, profile --}}
@@ -29,39 +28,13 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
                                     d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                             </svg>
-                            <span
-                                class="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-sale-red text-[9px] font-bold">3</span>
                         </span>
                         <span>Notifications</span>
                     </button>
-
-                    <div x-show="open" x-cloak x-transition
-                        class="absolute right-0 mt-2 w-72 overflow-hidden rounded-lg bg-white text-charcoal shadow-xl">
-                        <p class="border-b border-light-gray px-4 py-3 text-sm font-bold">Notifications</p>
-                        <div class="max-h-72 overflow-y-auto">
-                            <a href="#"
-                                class="block border-b border-light-gray px-4 py-3 text-xs transition hover:bg-ice-blue">
-                                <p class="font-semibold text-charcoal">Order shipped</p>
-                                <p class="mt-0.5 text-charcoal/50">Your order is on its way — track it now.</p>
-                            </a>
-                            <a href="#"
-                                class="block border-b border-light-gray px-4 py-3 text-xs transition hover:bg-ice-blue">
-                                <p class="font-semibold text-charcoal">Flash Sale starts soon</p>
-                                <p class="mt-0.5 text-charcoal/50">Don't miss out — up to 50% off today only.</p>
-                            </a>
-                            <a href="#" class="block px-4 py-3 text-xs transition hover:bg-ice-blue">
-                                <p class="font-semibold text-charcoal">Welcome to Shopleap!</p>
-                                <p class="mt-0.5 text-charcoal/50">Your account has been approved.</p>
-                            </a>
-                        </div>
-                        <p class="border-t border-light-gray px-4 py-2 text-center text-[10px] text-charcoal/35">
-                            Sample notifications — live notifications coming soon.
-                        </p>
-                    </div>
                 </div>
 
                 {{-- Help --}}
-                <a href="#" title="Help"
+                <a href="{{ route('messages.support') }}" title="Help"
                     class="hidden items-center gap-1.5 rounded-full py-1.5 pl-2 pr-3 transition hover:bg-white/10 sm:flex">
                     <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"

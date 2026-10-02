@@ -1,7 +1,7 @@
 <?php
-// FILE PATH: routes/web.php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\MessagingController;
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\BuyerRegistrationController;
@@ -14,10 +14,16 @@ use App\Http\Controllers\Admin\BuyerManagementController;
 use App\Http\Controllers\Admin\LogisticsManagementController;
 
 use App\Http\Controllers\Logistics\DashboardController as LogisticsDashboardController;
+use App\Http\Controllers\Logistics\RiderController;
+use App\Http\Controllers\Logistics\PickupController;
+use App\Http\Controllers\Logistics\IncomingParcelController;
 
 use App\Http\Controllers\Seller\DashboardController as SellerDashboardController;
 use App\Http\Controllers\Seller\ProductController as SellerProductController;
 use App\Http\Controllers\Seller\OrderController as SellerOrderController;
+use App\Http\Controllers\Seller\WaybillController;
+use App\Http\Controllers\Seller\ReportController as SellerReportController;
+use App\Http\Controllers\Seller\AccountController as SellerAccountController;
 
 use App\Http\Controllers\Buyer\HomeController as BuyerHomeController;
 use App\Http\Controllers\Buyer\ProductController as BuyerProductController;
@@ -36,6 +42,7 @@ Route::get('/', function () {
     return view('landing.index');
 })->name('home');
 
+Route::get('/', [App\Http\Controllers\LandingController::class, 'index'])->name('home');
 
 /*
 |--------------------------------------------------------------------------
@@ -137,6 +144,18 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 Route::middleware(['auth', 'logistics'])->prefix('logistics')->name('logistics.')->group(function () {
 
     Route::get('/dashboard', [LogisticsDashboardController::class, 'index'])->name('dashboard');
+
+    Route::get('/riders', [RiderController::class, 'index'])->name('riders.index');
+    Route::post('/riders/{rider}/approve', [RiderController::class, 'approve'])->name('riders.approve');
+    Route::post('/riders/{rider}/reject', [RiderController::class, 'reject'])->name('riders.reject');
+
+    Route::post('/riders/{rider}/toggle-active', [RiderController::class, 'toggleActive'])->name('riders.toggle-active');
+    Route::get('/pickups', [PickupController::class, 'index'])->name('pickups.index');
+    Route::post('/pickups/{order}/assign-rider', [PickupController::class, 'assignRider'])->name('pickups.assign-rider');
+    Route::post('/pickups/{order}/confirm', [PickupController::class, 'confirmPickup'])->name('pickups.confirm');
+
+    Route::get('/incoming', [IncomingParcelController::class, 'index'])->name('incoming.index');
+    Route::post('/incoming/{order}/confirm-arrival', [IncomingParcelController::class, 'confirmArrival'])->name('incoming.confirm-arrival');
 });
 
 
@@ -160,6 +179,19 @@ Route::middleware(['auth', 'seller'])->prefix('seller')->name('seller.')->group(
     Route::get('/orders', [SellerOrderController::class, 'index'])->name('orders.index');
     Route::get('/orders/{order}', [SellerOrderController::class, 'show'])->name('orders.show');
     Route::post('/orders/{order}/status', [SellerOrderController::class, 'updateStatus'])->name('orders.status');
+
+    Route::get('/reports', [SellerReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/export/csv', [SellerReportController::class, 'exportCsv'])->name('reports.export.csv');
+    Route::get('/reports/export/pdf', [SellerReportController::class, 'exportPdf'])->name('reports.export.pdf');
+
+    Route::get('/orders/{order}/waybill', [WaybillController::class, 'show'])->name('orders.waybill');
+
+    Route::get('/account', [SellerAccountController::class, 'show'])->name('account.index');
+    Route::post('/account/profile', [SellerAccountController::class, 'updateProfile'])->name('account.profile');
+    Route::post('/account/avatar', [SellerAccountController::class, 'updateAvatar'])->name('account.avatar');
+    Route::delete('/account/avatar', [SellerAccountController::class, 'destroyAvatar'])->name('account.avatar.destroy');
+    Route::post('/account/address', [SellerAccountController::class, 'updateAddress'])->name('account.address');
+    Route::post('/account/password', [SellerAccountController::class, 'updatePassword'])->name('account.password');
 });
 
 
@@ -192,4 +224,24 @@ Route::middleware(['auth', 'buyer'])->prefix('buyer')->name('buyer.')->group(fun
 
     Route::get('/products/{product}', [BuyerProductController::class, 'show'])->name('products.show');
     Route::get('/shop/{seller}', [ShopController::class, 'show'])->name('shop.show');
+});
+
+
+Route::middleware(['auth'])->prefix('messages')->name('messages.')->group(function () {
+    Route::get('/', [MessagingController::class, 'index'])->name('index');
+    Route::get('/contacts', [MessagingController::class, 'contacts'])->name('contacts');
+    Route::post('/', [MessagingController::class, 'store'])->name('store');
+    Route::get('/{conversation}/messages', [MessagingController::class, 'messages'])->name('thread');
+    Route::post('/{conversation}/messages', [MessagingController::class, 'storeMessage'])->name('thread.store');
+    Route::post('/forward/{message}', [MessagingController::class, 'forward'])->name('forward');
+    Route::post('/open', [MessagingController::class, 'open'])->name('open');
+    Route::get('/recent-purchases', [MessagingController::class, 'recentPurchases'])->name('recent-purchases');
+    Route::get('/widget-data', [MessagingController::class, 'widgetData'])->name('widget-data');
+    Route::get('/support', [MessagingController::class, 'openSupport'])->name('support');
+    Route::post('/{conversation}/delete', [MessagingController::class, 'destroy'])->name('destroy');
+    Route::get('/unread-count', [MessagingController::class, 'unreadCount'])->name('unread-count');
+    Route::post('/{conversation}/claim', [MessagingController::class, 'claim'])->name('claim');
+    Route::post('/{conversation}/unclaim', [MessagingController::class, 'unclaim'])->name('unclaim');
+    Route::post('/{conversation}/resolve', [MessagingController::class, 'resolve'])->name('resolve');
+    Route::post('/{conversation}/reopen', [MessagingController::class, 'reopen'])->name('reopen');
 });

@@ -138,10 +138,7 @@
             <div
                 class="mt-4 flex flex-col items-center gap-4 rounded-lg bg-white p-5 shadow-sm shadow-charcoal/5 sm:flex-row sm:justify-between">
                 <div class="flex items-center gap-4">
-                    <div
-                        class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
-                        {{ strtoupper(substr($product->seller->sellerProfile->shop_name, 0, 1)) }}
-                    </div>
+                    <x-avatar :user="$product->seller" size="lg" />
                     <div>
                         <p class="text-base font-bold text-charcoal">
                             {{ $product->seller->sellerProfile->shop_name }}</p>
@@ -160,6 +157,11 @@
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                     </svg>
+                </a>
+
+                <a href="{{ route('messages.index') }}?contact={{ $product->seller_id }}&product={{ $product->id }}"
+                    class="flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white transition hover:bg-sky-blue">
+                    Message Seller
                 </a>
             </div>
         @endif

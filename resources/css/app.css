@@ -92,16 +92,61 @@
         border: 1px solid color-mix(in srgb, var(--color-primary) 14%, transparent);
     }
 
-    /* Form fields — inputs, textareas, selects. Glass by default,
-       solidifies slightly on focus so typed text stays crisp. */
+    /* Form fields — inputs, textareas, selects. */
     .frost-input {
-        background: color-mix(in srgb, white 70%, transparent);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        border: 1px solid color-mix(in srgb, white 80%, transparent);
+        background: color-mix(in srgb, white 85%, transparent);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid color-mix(in srgb, var(--color-charcoal) 18%, white);
+        color: var(--color-charcoal);
+        box-shadow: 0 1px 3px 0 color-mix(in srgb, var(--color-charcoal) 6%, transparent);
+        transition: all 0.2s ease-in-out;
+    }
+
+    .frost-input::placeholder {
+        color: color-mix(in srgb, var(--color-charcoal) 55%, transparent);
     }
 
     .frost-input:focus {
-        background: color-mix(in srgb, white 92%, transparent);
+        background: #FFFFFF;
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+        outline: none;
+    }
+
+    /* Base badge layout */
+    .acc-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.25rem 0.625rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: capitalize;
+        border: 1px solid transparent;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+    }
+
+    /* Active status badge (Refactored to theme palette) */
+    .acc-badge--active {
+        background: color-mix(in srgb, var(--color-leaf-green) 12%, transparent);
+        color: color-mix(in srgb, var(--color-leaf-green) 80%, black);
+        border-color: color-mix(in srgb, var(--color-leaf-green) 30%, transparent);
+    }
+
+    /* Inactive / Disabled status badge */
+    .acc-badge--inactive {
+        background: color-mix(in srgb, var(--color-charcoal) 8%, transparent);
+        color: color-mix(in srgb, var(--color-charcoal) 70%, transparent);
+        border-color: color-mix(in srgb, var(--color-charcoal) 15%, transparent);
+    }
+
+    /* Suspended / Flagged status badge */
+    .acc-badge--suspended {
+        background: color-mix(in srgb, var(--color-sale-red) 12%, transparent);
+        color: color-mix(in srgb, var(--color-sale-red) 85%, black);
+        border-color: color-mix(in srgb, var(--color-sale-red) 30%, transparent);
     }
 }
