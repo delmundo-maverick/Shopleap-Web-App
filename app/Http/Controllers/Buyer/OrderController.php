@@ -54,7 +54,7 @@ class OrderController extends Controller
             abort(403);
         }
 
-        $order->load(['items', 'seller.sellerProfile']);
+        $order->load(['items', 'seller.sellerProfile', 'events']);
 
         return view('Buyer.orders.show', compact('order'));
     }
@@ -70,6 +70,7 @@ class OrderController extends Controller
         }
 
         $order->update(['status' => Order::STATUS_COMPLETED]);
+        $order->logStatusEvent();
 
         return back()->with('status', 'Thanks for confirming! Your order is now marked as completed.');
     }

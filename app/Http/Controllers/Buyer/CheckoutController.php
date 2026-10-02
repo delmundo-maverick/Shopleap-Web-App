@@ -55,6 +55,8 @@ class CheckoutController extends Controller
             foreach ($bySeller as $sellerId => $items) {
                 $orderTotal = $items->sum('line_total');
 
+                $profile = $buyer->buyerProfile;
+
                 $order = Order::create([
                     'seller_id' => $sellerId,
                     'buyer_id' => $buyer->id,
@@ -62,7 +64,14 @@ class CheckoutController extends Controller
                     'status' => Order::STATUS_PLACED,
                     'total_amount' => $orderTotal,
                     'commission_amount' => round($orderTotal * 0.10, 2),
+                    'ship_province' => $profile?->province,
+                    'ship_municipality' => $profile?->municipality,
+                    'ship_barangay' => $profile?->barangay,
+                    'ship_street' => $profile ? trim(($profile->house_number ?? '') . ' ' . ($profile->street ?? '')) : null,
+                    'ship_contact_no' => $profile?->contact_no,
                 ]);
+
+                $order->logStatusEvent(null, $buyer->id);
 
                 foreach ($items as $item) {
                     OrderItem::create([

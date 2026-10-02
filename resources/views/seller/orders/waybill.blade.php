@@ -126,7 +126,8 @@
 
     @php
         $sellerProfile = $order->seller->sellerProfile;
-        $buyerProfile = $order->buyer?->buyerProfile;
+        $buyerProfile = $order->buyer?->buyerProfile; // kept for any leftover references below
+        $ship = $order->ship_to;
         $maxItems = 5;
         $visibleItems = $order->items->take($maxItems);
         $hiddenCount = max(0, $order->items->count() - $maxItems);
@@ -147,11 +148,22 @@
 
     <div class="dest">
         <div class="dest-label">Deliver To</div>
-        @if ($buyerProfile)
-            <div class="dest-main">{{ $buyerProfile->municipality }}, {{ $buyerProfile->province }}</div>
-            <div style="font-size: 8px;">Brgy. {{ $buyerProfile->barangay }}</div>
+        @if ($ship['municipality'])
+            <div class="dest-main">{{ $ship['municipality'] }}, {{ $ship['province'] }}</div>
+            <div style="font-size: 8px;">Brgy. {{ $ship['barangay'] }}</div>
         @else
             <div class="dest-main">—</div>
+        @endif
+    </div>
+
+    <p class="section-title">Ship To (Buyer)</p>
+    <div class="box">
+        <div class="name">{{ $ship['name'] ?? '—' }}</div>
+        @if ($ship['municipality'])
+            {{ $ship['street'] }}, {{ $ship['barangay'] }}, {{ $ship['municipality'] }}, {{ $ship['province'] }}<br>
+            Contact: {{ $ship['contact_no'] }}
+        @else
+            —
         @endif
     </div>
 

@@ -20,6 +20,10 @@ export default defineConfig({
                 'resources/js/pages/buyer/message-widget.js',
                 'resources/js/pages/seller/reports.js',
                 'resources/js/pages/seller/account.js',
+                'resources/js/pages/logistics/areas.js',
+                'resources/js/pages/admin/buyers.js',
+                'resources/js/pages/admin/sellers.js',
+                'resources/js/pages/admin/logistics.js',
             ],
             refresh: true,
             fonts: [

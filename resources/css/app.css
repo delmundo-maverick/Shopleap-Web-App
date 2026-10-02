@@ -13,7 +13,34 @@
     --color-charcoal: #2E3A46;
     --color-leaf-green: #4CAF7D;
     --color-sale-red: #E4572E;
+    --color-warning: #F97316;
     --color-light-gray: #F5F7FA;
+
+    /* Seller workspace theme (teal) */
+    --color-seller: #0D9488;
+    --color-seller-soft: #E6F7F5;
+    --color-seller-bg: #F0FAF9;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Base
+|--------------------------------------------------------------------------
+*/
+@layer base {
+
+    /* Page accent. Default = buyers/primary; add class="theme-seller" to <body> for teal. */
+    :root {
+        --accent: var(--color-primary);
+    }
+
+    .theme-seller {
+        --accent: var(--color-seller);
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
 }
 
 /*
@@ -109,44 +136,117 @@
 
     .frost-input:focus {
         background: #FFFFFF;
-        border-color: var(--color-primary);
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
         outline: none;
     }
 
-    /* Base badge layout */
-    .acc-badge {
+    /* Inner card used for grouped details inside modals. */
+    .modal-section {
+        @apply rounded-2xl border border-white/60 bg-white/60 p-4;
+    }
+
+    .modal-section__title {
+        @apply text-xs font-semibold;
+        color: var(--accent);
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Status badges
+|--------------------------------------------------------------------------
+| One base class + a single --badge-color per status. Tint, text and border
+| are all derived from that colour, so adding a status is one line.
+| The dot is drawn by ::before, so markup is just the label text.
+|
+| Usage:  class="status-badge reg-badge--pending"
+|         class="status-badge acc-badge--active"
+*/
+@layer components {
+
+    .status-badge {
+        --badge-color: var(--color-charcoal);
+
         display: inline-flex;
         align-items: center;
         gap: 0.375rem;
         padding: 0.25rem 0.625rem;
+        border: 1px solid color-mix(in srgb, var(--badge-color) 30%, transparent);
         border-radius: 9999px;
+        background: color-mix(in srgb, var(--badge-color) 12%, transparent);
+        color: color-mix(in srgb, var(--badge-color) 80%, black);
         font-size: 0.75rem;
+        line-height: 1rem;
         font-weight: 500;
         text-transform: capitalize;
-        border: 1px solid transparent;
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
     }
 
-    /* Active status badge (Refactored to theme palette) */
+    .status-badge::before {
+        content: "";
+        width: 0.375rem;
+        height: 0.375rem;
+        border-radius: 9999px;
+        background: currentColor;
+    }
+
+    /* Success */
+    .reg-badge--approved,
     .acc-badge--active {
-        background: color-mix(in srgb, var(--color-leaf-green) 12%, transparent);
-        color: color-mix(in srgb, var(--color-leaf-green) 80%, black);
-        border-color: color-mix(in srgb, var(--color-leaf-green) 30%, transparent);
+        --badge-color: var(--color-leaf-green);
     }
 
-    /* Inactive / Disabled status badge */
-    .acc-badge--inactive {
-        background: color-mix(in srgb, var(--color-charcoal) 8%, transparent);
-        color: color-mix(in srgb, var(--color-charcoal) 70%, transparent);
-        border-color: color-mix(in srgb, var(--color-charcoal) 15%, transparent);
-    }
-
-    /* Suspended / Flagged status badge */
+    /* Warning */
+    .reg-badge--pending,
     .acc-badge--suspended {
-        background: color-mix(in srgb, var(--color-sale-red) 12%, transparent);
-        color: color-mix(in srgb, var(--color-sale-red) 85%, black);
-        border-color: color-mix(in srgb, var(--color-sale-red) 30%, transparent);
+        --badge-color: var(--color-warning);
+    }
+
+    /* Danger */
+    .reg-badge--rejected {
+        --badge-color: var(--color-sale-red);
+    }
+
+    /* Neutral (default colour, listed for clarity) */
+    .acc-badge--deactivated,
+    .acc-badge--inactive {
+        --badge-color: var(--color-charcoal);
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Laravel pagination (restyled to match the frosted theme)
+|--------------------------------------------------------------------------
+| !important is needed to beat the utility classes in Laravel's default
+| pagination views.
+*/
+@layer components {
+
+    .pagination-frost nav {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .pagination-frost span,
+    .pagination-frost a {
+        border-radius: 0.65rem !important;
+        border-color: color-mix(in srgb, white 70%, transparent) !important;
+        background: color-mix(in srgb, white 70%, transparent) !important;
+        color: var(--color-charcoal) !important;
+    }
+
+    .pagination-frost a:hover {
+        background: color-mix(in srgb, var(--accent) 10%, white) !important;
+        color: var(--accent) !important;
+    }
+
+    .pagination-frost span[aria-current="page"] span {
+        background: var(--accent) !important;
+        border-color: var(--accent) !important;
+        color: #fff !important;
     }
 }

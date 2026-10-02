@@ -117,6 +117,29 @@
                                 ₱{{ number_format($order->total_amount, 2) }}</span>
                         </div>
 
+                        @php $timeline = $order->events->whereNotNull('status')->sortByDesc('id'); @endphp
+                        @if ($timeline->isNotEmpty())
+                            <div class="mt-6 border-t border-light-gray pt-5">
+                                <h3 class="mb-4 text-sm font-bold text-charcoal">Shipment Tracking</h3>
+                                <ol class="space-y-5 border-l-2 border-light-gray pl-5">
+                                    @foreach ($timeline as $event)
+                                        <li class="relative">
+                                            <span
+                                                class="absolute -left-[1.7rem] top-1 h-3 w-3 rounded-full ring-4 ring-white {{ $loop->first ? 'bg-primary' : 'bg-charcoal/25' }}"></span>
+                                            <p
+                                                class="text-sm {{ $loop->first ? 'font-bold text-charcoal' : 'text-charcoal/70' }}">
+                                                {{ $event->title }}</p>
+                                            @if ($event->note)
+                                                <p class="text-xs text-charcoal/50">{{ $event->note }}</p>
+                                            @endif
+                                            <p class="text-[11px] text-charcoal/40">
+                                                {{ $event->created_at->format('M d, Y · g:i A') }}</p>
+                                        </li>
+                                    @endforeach
+                                </ol>
+                            </div>
+                        @endif
+
                         @if ($order->status === \App\Models\Order::STATUS_DELIVERED)
                             <div class="mt-3 flex justify-end">
                                 <a href="{{ route('buyer.orders.show', $order) }}"
@@ -179,7 +202,8 @@
             <div class="flex gap-1.5">
                 @for ($i = 0; $i < 5; $i++)
                     <button type="button" class="star-btn rounded p-0.5">
-                        <svg class="h-8 w-8" fill="none" stroke="#94A3B8" stroke-width="1.5" viewBox="0 0 24 24">
+                        <svg class="h-8 w-8" fill="none" stroke="#94A3B8" stroke-width="1.5"
+                            viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.539 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.784.57-1.838-.196-1.539-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                         </svg>

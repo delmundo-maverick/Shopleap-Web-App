@@ -12,7 +12,7 @@ class IncomingParcelController extends Controller
     {
         $logisticsProfileId = $request->user()->logisticsProfile->id;
 
-        $query = Order::with(['items', 'seller.sellerProfile', 'assignedRider'])
+        $query = Order::with(['items', 'seller.sellerProfile', 'pickupRider'])
             ->where('logistics_profile_id', $logisticsProfileId)
             ->where('status', Order::STATUS_PICKED_UP)
             ->latest();
@@ -39,6 +39,7 @@ class IncomingParcelController extends Controller
         }
 
         $order->update(['status' => Order::STATUS_AT_SORTING_CENTER]);
+        $order->logStatusEvent();
 
         return back()->with('status', "Order #{$order->id} logged as arrived at the sorting center.");
     }

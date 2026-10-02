@@ -1,142 +1,139 @@
-<!DOCTYPE html>
-<html lang="en">
+@php $today = now()->startOfDay(); @endphp
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<x-logistics.layout title="Pickup Requests" :subtitle="$orders->total() . ' request(s) in this view'" active="pickups">
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-
-    <title>Pickup Requests | Shopleap Logistics</title>
-</head>
-
-<body class="min-h-screen text-charcoal">
-    <div class="frost-surface"></div>
-
-    <div class="flex min-h-screen">
-        <x-navbars.logistics active="pickups" />
-
-        <div class="flex flex-1 flex-col">
-            <header
-                class="frost-panel-solid sticky top-0 z-30 flex h-20 items-center justify-between border-b border-white/50 px-6">
-                <div class="flex items-center gap-3">
-                    <button type="button" @click="$store.sidebar.open = true"
-                        class="frost-btn rounded-xl p-2 text-charcoal/60 transition hover:text-primary lg:hidden">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
-                    <div>
-                        <h2 class="text-xl font-bold text-charcoal">Pickup Requests</h2>
-                        <p class="text-sm text-charcoal/55">{{ $orders->total() }} order(s) ready for pickup</p>
-                    </div>
-                </div>
-            </header>
-
-            <main class="flex-1 space-y-5 p-6">
-
-                @if (session('status'))
-                    <div
-                        class="frost-panel rounded-2xl border border-leaf-green/20 bg-leaf-green/10 px-4 py-3 text-sm text-leaf-green">
-                        {{ session('status') }}
-                    </div>
-                @endif
-
-                @if ($availableRiders->isEmpty())
-                    <div
-                        class="frost-panel rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
-                        You have no active approved riders yet. Approve and activate riders under Rider Applications
-                        before assigning pickups.
-                    </div>
-                @endif
-
-                @if ($orders->isEmpty())
-                    <div
-                        class="frost-panel-solid flex h-64 flex-col items-center justify-center rounded-2xl text-center">
-                        <p class="text-sm font-semibold text-charcoal">No pickup requests right now</p>
-                        <p class="mt-1 text-xs text-charcoal/50">Orders marked "Ready for Pickup" by sellers will appear
-                            here.</p>
-                    </div>
-                @else
-                    <div class="space-y-4">
-                        @foreach ($orders as $order)
-                            <div class="frost-panel-solid rounded-2xl p-5">
-
-                                <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
-                                    <div>
-                                        <p class="text-sm font-bold text-charcoal">Order #{{ $order->id }}</p>
-                                        <p class="text-xs text-charcoal/50">
-                                            Seller:
-                                            {{ $order->seller->sellerProfile->business_name ?? $order->seller->name }}
-                                        </p>
-                                        <p class="mt-1 text-xs text-charcoal/50">
-                                            {{ $order->items->sum('quantity') }} item(s) ·
-                                            ₱{{ number_format($order->total_amount, 2) }}
-                                        </p>
-                                    </div>
-
-                                    @if ($order->logistics_profile_id)
-                                        <span
-                                            class="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                                            Claimed by your hub
-                                        </span>
-                                    @else
-                                        <span
-                                            class="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-600">
-                                            Unclaimed
-                                        </span>
-                                    @endif
-                                </div>
-
-                                @if (!$order->assigned_rider_id)
-                                    <form method="POST" action="{{ route('logistics.pickups.assign-rider', $order) }}"
-                                        class="flex flex-wrap items-center gap-3 border-t border-white/50 pt-3">
-                                        @csrf
-                                        <select name="rider_id" required
-                                            class="frost-input rounded-xl px-3.5 py-2.5 text-sm outline-none transition focus:ring-4 focus:ring-primary/10">
-                                            <option value="" disabled selected>Assign a rider…</option>
-                                            @foreach ($availableRiders as $rider)
-                                                <option value="{{ $rider->id }}">{{ $rider->full_name }} —
-                                                    {{ $rider->vehicle_type }} ({{ $rider->plate_number }})</option>
-                                            @endforeach
-                                        </select>
-                                        <button type="submit" @if ($availableRiders->isEmpty()) disabled @endif
-                                            class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:opacity-50">
-                                            Assign for Pickup
-                                        </button>
-                                    </form>
-                                @else
-                                    <div
-                                        class="flex flex-wrap items-center justify-between gap-3 border-t border-white/50 pt-3">
-                                        <p class="text-sm text-charcoal/70">
-                                            Assigned to <span
-                                                class="font-semibold text-charcoal">{{ $order->assignedRider->full_name }}</span>
-                                            — {{ $order->assignedRider->vehicle_type }}
-                                            ({{ $order->assignedRider->plate_number }})
-                                        </p>
-
-                                        <form method="POST" action="{{ route('logistics.pickups.confirm', $order) }}">
-                                            @csrf
-                                            <button type="submit"
-                                                class="rounded-xl bg-leaf-green px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110">
-                                                Confirm Picked Up
-                                            </button>
-                                        </form>
-                                    </div>
-                                @endif
-
-                            </div>
-                        @endforeach
-                    </div>
-
-                    <div>{{ $orders->links() }}</div>
-                @endif
-
-            </main>
+    @if ($riders->isEmpty())
+        <div class="frost-panel rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
+            You have no active approved riders yet. Approve and activate riders under Rider Applications first.
         </div>
+    @endif
+
+    <div class="frost-panel rounded-2xl px-4 py-3 text-xs text-charcoal/60">
+        Until the rider app is live, staff use <b>Confirm Picked Up</b> on the rider's behalf once they collect the
+        parcel.
     </div>
 
-</body>
+    <div class="frost-panel-solid flex rounded-2xl">
+        @foreach (['to_assign' => 'To Assign', 'scheduled' => 'Scheduled'] as $key => $label)
+            <a href="{{ route('logistics.pickups.index', ['tab' => $key]) }}"
+                class="flex flex-1 items-center justify-center gap-1.5 border-b-2 px-3 py-3.5 text-sm font-semibold transition
+                    {{ $tab === $key ? 'border-primary text-primary' : 'border-transparent text-charcoal/50 hover:text-charcoal' }}">
+                {{ $label }}
+                @if ($counts[$key] > 0)
+                    <span
+                        class="rounded-full px-1.5 py-0.5 text-[10px] font-bold {{ $tab === $key ? 'bg-primary/10 text-primary' : 'bg-light-gray text-charcoal/50' }}">{{ $counts[$key] }}</span>
+                @endif
+            </a>
+        @endforeach
+    </div>
 
-</html>
+    @if ($orders->isEmpty())
+        <div class="frost-panel-solid flex h-56 flex-col items-center justify-center rounded-2xl text-center">
+            <p class="text-sm font-semibold text-charcoal">No pickup requests here</p>
+            <p class="mt-1 text-xs text-charcoal/50">Sellers choose your hub when they mark an order ready for pickup.
+            </p>
+        </div>
+    @else
+        <div class="space-y-4">
+            @foreach ($orders as $order)
+                @php
+                    $seller = $order->seller->sellerProfile;
+                    $due = $order->pickup_date;
+                    if (!$due) {
+                        $badge = ['No date', 'bg-light-gray text-charcoal/60'];
+                    } elseif ($due->lt($today)) {
+                        $badge = ['Overdue', 'bg-sale-red/10 text-sale-red'];
+                    } elseif ($due->isSameDay($today)) {
+                        $badge = ['Today', 'bg-orange-100 text-orange-600'];
+                    } elseif ($due->isSameDay($today->copy()->addDay())) {
+                        $badge = ['Tomorrow', 'bg-blue-100 text-blue-600'];
+                    } else {
+                        $badge = [$due->format('M d'), 'bg-primary/10 text-primary'];
+                    }
+                @endphp
+
+                <div class="frost-panel-solid rounded-2xl p-5">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="text-sm font-bold text-charcoal">Order #{{ $order->id }} ·
+                                {{ $seller->business_name ?? $order->seller->name }}</p>
+                            <p class="mt-0.5 text-xs text-charcoal/60">
+                                {{ $seller?->street_address }}, {{ $seller?->barangay }}, {{ $seller?->municipality }},
+                                {{ $seller?->province }}
+                            </p>
+                            <p class="text-xs text-charcoal/60">Contact: {{ $seller?->contact_no ?? '—' }}</p>
+                            <p class="mt-1 text-xs text-charcoal/50">
+                                {{ $order->items->sum('quantity') }} item(s) ·
+                                Waybill {{ $order->waybill_printed_at ? 'printed' : 'not printed yet' }}
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <span
+                                class="rounded-full px-3 py-1 text-xs font-bold {{ $badge[1] }}">{{ $badge[0] }}</span>
+                            <p class="mt-1.5 text-xs text-charcoal/60">
+                                {{ $order->pickup_date?->format('D, M d') }}<br>
+                                {{ \App\Models\Order::PICKUP_SLOTS[$order->pickup_time_slot] ?? '' }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 border-t border-white/50 pt-4">
+                        @if (!$order->pickup_rider_id)
+                            @include('logistics.pickups._assign_form', [
+                                'order' => $order,
+                                'riders' => $riders,
+                                'submitLabel' => 'Assign Rider',
+                            ])
+
+                            <details class="mt-3">
+                                <summary
+                                    class="cursor-pointer text-xs font-semibold text-sale-red/80 hover:text-sale-red">
+                                    Can't serve this pickup?</summary>
+                                <form method="POST" action="{{ route('logistics.pickups.decline', $order) }}"
+                                    class="mt-2 flex flex-wrap gap-2">
+                                    @csrf
+                                    <input type="text" name="reason" required maxlength="255"
+                                        placeholder="Reason (the seller will see this)"
+                                        class="frost-input min-w-[16rem] flex-1 rounded-xl px-3 py-2 text-sm outline-none focus:ring-4 focus:ring-primary/10">
+                                    <button type="submit"
+                                        class="rounded-xl bg-sale-red px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110">Decline</button>
+                                </form>
+                            </details>
+                        @else
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <p class="text-sm text-charcoal/70">
+                                    Rider: <span
+                                        class="font-semibold text-charcoal">{{ $order->pickupRider->full_name }}</span>
+                                    — {{ $order->pickupRider->vehicle_type }}
+                                    ({{ $order->pickupRider->plate_number }})
+                                </p>
+                                <form method="POST" action="{{ route('logistics.pickups.confirm', $order) }}">
+                                    @csrf
+                                    <button type="submit"
+                                        class="rounded-xl bg-leaf-green px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110">
+                                        Confirm Picked Up
+                                    </button>
+                                </form>
+                            </div>
+
+                            <details class="mt-3">
+                                <summary class="cursor-pointer text-xs font-semibold text-primary hover:underline">
+                                    Change rider or reschedule</summary>
+                                <div class="mt-2">
+                                    @include('logistics.pickups._assign_form', [
+                                        'order' => $order,
+                                        'riders' => $riders,
+                                        'submitLabel' => 'Update',
+                                    ])
+                                </div>
+                            </details>
+                        @endif
+                    </div>
+                </div>
+            @endforeach
+        </div>
+
+        <div>{{ $orders->links() }}</div>
+    @endif
+
+</x-logistics.layout>

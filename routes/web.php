@@ -17,6 +17,9 @@ use App\Http\Controllers\Logistics\DashboardController as LogisticsDashboardCont
 use App\Http\Controllers\Logistics\RiderController;
 use App\Http\Controllers\Logistics\PickupController;
 use App\Http\Controllers\Logistics\IncomingParcelController;
+use App\Http\Controllers\Logistics\ServiceAreaController;
+use App\Http\Controllers\Logistics\SortingController;
+use App\Http\Controllers\Logistics\DeliveryController;
 
 use App\Http\Controllers\Seller\DashboardController as SellerDashboardController;
 use App\Http\Controllers\Seller\ProductController as SellerProductController;
@@ -151,11 +154,31 @@ Route::middleware(['auth', 'logistics'])->prefix('logistics')->name('logistics.'
 
     Route::post('/riders/{rider}/toggle-active', [RiderController::class, 'toggleActive'])->name('riders.toggle-active');
     Route::get('/pickups', [PickupController::class, 'index'])->name('pickups.index');
-    Route::post('/pickups/{order}/assign-rider', [PickupController::class, 'assignRider'])->name('pickups.assign-rider');
     Route::post('/pickups/{order}/confirm', [PickupController::class, 'confirmPickup'])->name('pickups.confirm');
 
     Route::get('/incoming', [IncomingParcelController::class, 'index'])->name('incoming.index');
     Route::post('/incoming/{order}/confirm-arrival', [IncomingParcelController::class, 'confirmArrival'])->name('incoming.confirm-arrival');
+
+    Route::post('/pickups/{order}/assign', [PickupController::class, 'assign'])->name('pickups.assign');
+    Route::post('/pickups/{order}/decline', [PickupController::class, 'decline'])->name('pickups.decline');
+
+    Route::get('/areas', [ServiceAreaController::class, 'index'])->name('areas.index');
+    Route::post('/areas', [ServiceAreaController::class, 'store'])->name('areas.store');
+    Route::post('/areas/{area}', [ServiceAreaController::class, 'update'])->name('areas.update');
+    Route::delete('/areas/{area}', [ServiceAreaController::class, 'destroy'])->name('areas.destroy');
+
+    Route::get('/sorting', [SortingController::class, 'index'])->name('sorting.index');
+    Route::post('/sorting/sort-all', [SortingController::class, 'sortAll'])->name('sorting.sort-all');
+    Route::post('/sorting/assign-area', [SortingController::class, 'assignArea'])->name('sorting.assign-area');
+    Route::post('/sorting/{order}/sort', [SortingController::class, 'sort'])->name('sorting.sort');
+    Route::post('/sorting/{order}/assign', [SortingController::class, 'assign'])->name('sorting.assign');
+
+    Route::get('/deliveries', [DeliveryController::class, 'index'])->name('deliveries.index');
+    Route::post('/deliveries/{order}/out', [DeliveryController::class, 'outForDelivery'])->name('deliveries.out');
+    Route::post('/deliveries/{order}/delivered', [DeliveryController::class, 'delivered'])->name('deliveries.delivered');
+    Route::post('/deliveries/{order}/failed', [DeliveryController::class, 'failed'])->name('deliveries.failed');
+    Route::post('/deliveries/{order}/reschedule', [DeliveryController::class, 'reschedule'])->name('deliveries.reschedule');
+    Route::post('/deliveries/{order}/return', [DeliveryController::class, 'returnToSeller'])->name('deliveries.return');
 });
 
 
@@ -192,6 +215,9 @@ Route::middleware(['auth', 'seller'])->prefix('seller')->name('seller.')->group(
     Route::delete('/account/avatar', [SellerAccountController::class, 'destroyAvatar'])->name('account.avatar.destroy');
     Route::post('/account/address', [SellerAccountController::class, 'updateAddress'])->name('account.address');
     Route::post('/account/password', [SellerAccountController::class, 'updatePassword'])->name('account.password');
+
+    Route::post('/orders/{order}/request-pickup', [SellerOrderController::class, 'requestPickup'])->name('orders.request-pickup');
+    Route::post('/orders/{order}/cancel-pickup', [SellerOrderController::class, 'cancelPickup'])->name('orders.cancel-pickup');
 });
 
 

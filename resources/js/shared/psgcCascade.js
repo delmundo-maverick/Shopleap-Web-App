@@ -16,10 +16,9 @@ export function initPsgcCascade({ province, municipality, barangay, helpEl = nul
             url: (code) => `${PSGC_BASE}/provinces/${code}/cities-municipalities/`, initial: initial.municipality, token: 0,
         },
         {
-            select: barangay, placeholder: 'Select barangay', resetText: 'Select a municipality first',
             url: (code) => `${PSGC_BASE}/cities-municipalities/${code}/barangays/`, initial: initial.barangay, token: 0,
         },
-    ];
+    ].filter((level) => level.select);
 
     const setHelp = (text) => { if (helpEl) helpEl.textContent = text; };
 

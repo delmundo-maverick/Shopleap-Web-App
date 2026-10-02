@@ -5,95 +5,144 @@ namespace App\Http\Controllers\Logistics;
 use App\Http\Controllers\Controller;
 use App\Models\CourierProfile;
 use App\Models\Order;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class PickupController extends Controller
 {
     public function index(Request $request)
     {
-        $logisticsProfile = $request->user()->logisticsProfile;
+        $hub = $request->user()->logisticsProfile;
+        $tab = $request->get('tab') === 'scheduled' ? 'scheduled' : 'to_assign';
 
-        // Unclaimed pool (any hub can pick these up) + anything this
-        // hub has already claimed but not yet confirmed picked up.
-        $orders = Order::with(['items', 'seller.sellerProfile', 'assignedRider'])
-            ->where('status', Order::STATUS_READY_FOR_PICKUP)
-            ->where(function ($q) use ($logisticsProfile) {
-                $q->whereNull('logistics_profile_id')
-                    ->orWhere('logistics_profile_id', $logisticsProfile->id);
-            })
-            ->latest()
+        $base = Order::where('logistics_profile_id', $hub->id)
+            ->where('status', Order::STATUS_READY_FOR_PICKUP);
+
+        $counts = [
+            'to_assign' => (clone $base)->whereNull('pickup_rider_id')->count(),
+            'scheduled' => (clone $base)->whereNotNull('pickup_rider_id')->count(),
+        ];
+
+        $orders = (clone $base)
+            ->with(['items', 'seller.sellerProfile', 'pickupRider'])
+            ->when(
+                $tab === 'scheduled',
+                fn($q) => $q->whereNotNull('pickup_rider_id'),
+                fn($q) => $q->whereNull('pickup_rider_id')
+            )
+            ->orderBy('pickup_date')
+            ->orderBy('id')
             ->paginate(15)
             ->withQueryString();
 
-        $availableRiders = CourierProfile::where('logistics_profile_id', $logisticsProfile->id)
-            ->where('status', 'approved')
-            ->where('is_active', true)
-            ->orderBy('first_name')
-            ->get();
+        $riders = $this->activeRiders($hub->id);
 
-        return view('logistics.pickups.index', compact('orders', 'availableRiders'));
+        return view('logistics.pickups.index', compact('orders', 'riders', 'tab', 'counts'));
     }
 
-    /**
-     * Claim this order for the current hub and assign a rider to
-     * physically collect it from the seller.
-     */
-    public function assignRider(Request $request, Order $order)
+    /** Assign (or reassign) the pickup rider and confirm the date/window. */
+    public function assign(Request $request, Order $order)
     {
-        $this->authorizeClaim($request, $order);
+        $hub = $request->user()->logisticsProfile;
+        $this->authorizeOwnership($order, $hub->id);
 
-        $request->validate([
+        if ($order->status !== Order::STATUS_READY_FOR_PICKUP) {
+            return back()->withErrors(['action' => 'This order is no longer awaiting pickup.']);
+        }
+
+        $validated = $request->validate([
             'rider_id' => ['required', 'integer'],
+            'pickup_date' => ['required', 'date', 'after_or_equal:today'],
+            'pickup_time_slot' => ['required', Rule::in(array_keys(Order::PICKUP_SLOTS))],
         ]);
 
-        $rider = CourierProfile::where('logistics_profile_id', $request->user()->logisticsProfile->id)
-            ->where('status', 'approved')
-            ->where('is_active', true)
-            ->findOrFail($request->rider_id);
+        $rider = $this->activeRiders($hub->id)->firstWhere('id', (int) $validated['rider_id']);
 
-        $order->update([
-            'logistics_profile_id' => $request->user()->logisticsProfile->id,
-            'assigned_rider_id' => $rider->id,
-        ]);
+        if (! $rider) {
+            return back()->withErrors(['rider_id' => 'Choose one of your active, approved riders.']);
+        }
+
+        $changed = $order->pickup_date?->toDateString() !== $validated['pickup_date']
+            || $order->pickup_time_slot !== $validated['pickup_time_slot'];
+
+        DB::transaction(function () use ($order, $rider, $validated, $changed) {
+            $order->update([
+                'pickup_rider_id' => $rider->id,
+                'pickup_status' => 'accepted',
+                'pickup_date' => $validated['pickup_date'],
+                'pickup_time_slot' => $validated['pickup_time_slot'],
+            ]);
+
+            $order->logInternalEvent(
+                'Pickup scheduled' . ($changed ? ' (schedule adjusted by sorting center)' : ''),
+                "{$rider->full_name} · " . Carbon::parse($validated['pickup_date'])->format('M d, Y') . ' · ' . Order::PICKUP_SLOTS[$validated['pickup_time_slot']]
+            );
+        });
 
         return back()->with('status', "Order #{$order->id} assigned to {$rider->full_name} for pickup.");
     }
 
+    /** Hub can't serve this pickup — send it back to the seller to choose another hub. */
+    public function decline(Request $request, Order $order)
+    {
+        $hub = $request->user()->logisticsProfile;
+        $this->authorizeOwnership($order, $hub->id);
+
+        if ($order->status !== Order::STATUS_READY_FOR_PICKUP || $order->pickup_rider_id) {
+            return back()->withErrors(['action' => 'Only requests without an assigned rider can be declined.']);
+        }
+
+        $validated = $request->validate(['reason' => ['required', 'string', 'max:255']]);
+
+        DB::transaction(function () use ($order, $hub, $validated) {
+            $order->update([
+                'status' => Order::STATUS_PREPARING,
+                'logistics_profile_id' => null,
+                'pickup_status' => 'declined',
+                'pickup_decline_reason' => $validated['reason'],
+                'pickup_date' => null,
+                'pickup_time_slot' => null,
+            ]);
+
+            $order->logStatusEvent('Seller is rearranging the pickup.');
+            $order->logInternalEvent("Pickup declined by {$hub->business_name}", $validated['reason']);
+        });
+
+        return back()->with('status', "Order #{$order->id} returned to the seller.");
+    }
+
     /**
-     * Stand-in for the rider's own "Scan/Confirm Parcel" action from the
-     * ERP flow, until the Courier mobile app exists. Moves the order to
-     * PICKED_UP once the rider has physically collected it from the seller.
+     * STAND-IN for the rider's own "Scan/Confirm Parcel" action, until the
+     * Courier mobile app exists. Remove when the app ships.
      */
     public function confirmPickup(Request $request, Order $order)
     {
-        $this->authorizeOwnership($request, $order);
+        $hub = $request->user()->logisticsProfile;
+        $this->authorizeOwnership($order, $hub->id);
 
-        if (! $order->assigned_rider_id) {
-            return back()->with('status', 'Assign a rider before confirming pickup.');
+        if ($order->status !== Order::STATUS_READY_FOR_PICKUP || ! $order->pickup_rider_id) {
+            return back()->withErrors(['action' => 'Assign a rider before confirming pickup.']);
         }
 
-        if ($order->status !== Order::STATUS_READY_FOR_PICKUP) {
-            return back()->with('status', 'This order is no longer awaiting pickup.');
-        }
-
-        $order->update(['status' => Order::STATUS_PICKED_UP]);
+        DB::transaction(function () use ($order) {
+            $order->update(['status' => Order::STATUS_PICKED_UP]);
+            $order->logStatusEvent('Collected from the seller.');
+        });
 
         return back()->with('status', "Order #{$order->id} confirmed picked up.");
     }
 
-    private function authorizeClaim(Request $request, Order $order): void
+    private function activeRiders(int $hubId)
     {
-        $logisticsProfileId = $request->user()->logisticsProfile->id;
-
-        if ($order->logistics_profile_id !== null && $order->logistics_profile_id !== $logisticsProfileId) {
-            abort(403, 'This order has already been claimed by another sorting center.');
-        }
+        return CourierProfile::where('logistics_profile_id', $hubId)
+            ->where('status', 'approved')->where('is_active', true)
+            ->orderBy('first_name')->get();
     }
 
-    private function authorizeOwnership(Request $request, Order $order): void
+    private function authorizeOwnership(Order $order, int $hubId): void
     {
-        if ($order->logistics_profile_id !== $request->user()->logisticsProfile->id) {
-            abort(403, 'You do not have access to this order.');
-        }
+        abort_unless($order->logistics_profile_id === $hubId, 403, 'This order is not assigned to your sorting center.');
     }
 }
