@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BuyerProfile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use App\Services\ActivityLogger;
 
 class BuyerManagementController extends Controller
 {
@@ -66,6 +67,8 @@ class BuyerManagementController extends Controller
             'rejection_reason' => null,
         ]);
 
+        ActivityLogger::log('buyer.approved', 'User Management', "Buyer registration approved: {$buyerProfile->first_name} {$buyerProfile->last_name}.", $buyerProfile);
+
         // TODO: send approval email notification
 
         return response()->json([
@@ -87,6 +90,8 @@ class BuyerManagementController extends Controller
             'reviewed_at' => now(),
             'rejection_reason' => $request->rejection_reason,
         ]);
+
+        ActivityLogger::log('buyer.rejected', 'User Management', "Buyer registration rejected: {$buyerProfile->first_name} {$buyerProfile->last_name} — {$request->rejection_reason}", $buyerProfile);
 
         // TODO: send rejection email notification with reason
 
@@ -112,6 +117,8 @@ class BuyerManagementController extends Controller
         }
 
         $buyerProfile->user->update(['account_status' => $request->status]);
+
+        ActivityLogger::log('buyer.account_status_changed', 'User Management', "{$buyerProfile->first_name} {$buyerProfile->last_name}'s account set to {$request->status}.", $buyerProfile);
 
         return response()->json([
             'success' => true,

@@ -8,6 +8,7 @@ use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use App\Services\ActivityLogger;
 
 /**
  * NOTE: the out / delivered / failed actions are STAND-INS for the rider's
@@ -173,6 +174,8 @@ class DeliveryController extends Controller
             $order->restoreStock();
             $order->logStatusEvent('The parcel is being sent back to the seller.');
         });
+
+        ActivityLogger::log('order.returned', 'Orders', "Order #{$order->id} returned to seller after {$order->delivery_attempts} failed delivery attempt(s).", $order);
 
         return back()->with('status', "Order #{$order->id} marked as returned to the seller.");
     }

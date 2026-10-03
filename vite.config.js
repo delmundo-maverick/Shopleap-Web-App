@@ -24,6 +24,7 @@ export default defineConfig({
                 'resources/js/pages/admin/buyers.js',
                 'resources/js/pages/admin/sellers.js',
                 'resources/js/pages/admin/logistics.js',
+                'resources/js/pages/admin/transactions.js',
             ],
             refresh: true,
             fonts: [

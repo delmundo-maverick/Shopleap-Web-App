@@ -182,7 +182,7 @@
             </p>
 
 
-            <a href="#" title="All Transactions"
+            <a href="{{ route('admin.transactions.index') }}" title="All Transactions"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'transactions'
                     ? 'frost-chip text-primary font-semibold'
@@ -197,7 +197,7 @@
             </a>
 
 
-            <a href="#" title="System Activity Logs"
+            <a href="{{ route('admin.logs.index') }}" title="System Activity Logs"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'logs'
                     ? 'frost-chip text-primary font-semibold'

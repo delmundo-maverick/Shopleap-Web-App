@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\LogisticsProfile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use App\Services\ActivityLogger;
 
 class LogisticsManagementController extends Controller
 {
@@ -67,6 +68,8 @@ class LogisticsManagementController extends Controller
             'rejection_reason' => null,
         ]);
 
+        ActivityLogger::log('logistics.approved', 'User Management', "Logistics registration approved: {$logisticsProfile->business_name}.", $logisticsProfile);
+
         // TODO: send approval email notification
 
         return response()->json([
@@ -88,6 +91,8 @@ class LogisticsManagementController extends Controller
             'reviewed_at' => now(),
             'rejection_reason' => $request->rejection_reason,
         ]);
+
+        ActivityLogger::log('logistics.rejected', 'User Management', "Logistics registration rejected: {$logisticsProfile->business_name} — {$request->rejection_reason}", $logisticsProfile);
 
         // TODO: send rejection email notification with reason
 
@@ -113,6 +118,8 @@ class LogisticsManagementController extends Controller
         }
 
         $logisticsProfile->user->update(['account_status' => $request->status]);
+
+        ActivityLogger::log('logistics.account_status_changed', 'User Management', "{$logisticsProfile->business_name}'s account set to {$request->status}.", $logisticsProfile);
 
         return response()->json([
             'success' => true,

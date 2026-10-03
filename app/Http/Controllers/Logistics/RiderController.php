@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Logistics;
 use App\Http\Controllers\Controller;
 use App\Models\CourierProfile;
 use Illuminate\Http\Request;
+use App\Services\ActivityLogger;
 
 class RiderController extends Controller
 {
@@ -52,6 +53,8 @@ class RiderController extends Controller
             'rejection_reason' => null,
         ]);
 
+        ActivityLogger::log('rider.approved', 'Logistics', "{$rider->full_name} approved as a rider under {$rider->logisticsProfile->business_name}.", $rider);
+
         // TODO: notify rider by email once that system exists
 
         return back()->with('status', "{$rider->full_name} has been approved.");
@@ -71,6 +74,8 @@ class RiderController extends Controller
             'reviewed_at' => now(),
             'rejection_reason' => $request->rejection_reason,
         ]);
+
+        ActivityLogger::log('rider.rejected', 'Logistics', "{$rider->full_name}'s rider application rejected: {$request->rejection_reason}", $rider);
 
         return back()->with('status', "{$rider->full_name}'s application was rejected.");
     }

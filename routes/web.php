@@ -12,6 +12,8 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\SellerManagementController;
 use App\Http\Controllers\Admin\BuyerManagementController;
 use App\Http\Controllers\Admin\LogisticsManagementController;
+use App\Http\Controllers\Admin\TransactionController;
+use App\Http\Controllers\Admin\ActivityLogController;
 
 use App\Http\Controllers\Logistics\DashboardController as LogisticsDashboardController;
 use App\Http\Controllers\Logistics\RiderController;
@@ -135,6 +137,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::post('/{logisticsProfile}/reject', [LogisticsManagementController::class, 'reject'])->name('reject');
         Route::post('/{logisticsProfile}/account-status', [LogisticsManagementController::class, 'updateAccountStatus'])->name('accountStatus');
     });
+
+    Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
+    Route::get('/transactions/export/csv', [TransactionController::class, 'exportCsv'])->name('transactions.export.csv');
+
+    Route::get('/logs', [ActivityLogController::class, 'index'])->name('logs.index');
 });
 
 

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SellerProfile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use App\Services\ActivityLogger;
 
 class SellerManagementController extends Controller
 {
@@ -72,6 +73,8 @@ class SellerManagementController extends Controller
             'rejection_reason' => null,
         ]);
 
+        ActivityLogger::log('seller.approved', 'User Management', "Seller registration approved: {$sellerProfile->business_name}.", $sellerProfile);
+
         // TODO: send approval email notification
 
         return response()->json([
@@ -93,6 +96,8 @@ class SellerManagementController extends Controller
             'reviewed_at' => now(),
             'rejection_reason' => $request->rejection_reason,
         ]);
+
+        ActivityLogger::log('seller.rejected', 'User Management', "Seller registration rejected: {$sellerProfile->business_name} — {$request->rejection_reason}", $sellerProfile);
 
         // TODO: send rejection email notification with reason
 
@@ -122,6 +127,8 @@ class SellerManagementController extends Controller
         }
 
         $sellerProfile->user->update(['account_status' => $request->status]);
+
+        ActivityLogger::log('seller.account_status_changed', 'User Management', "{$sellerProfile->business_name}'s account set to {$request->status}.", $sellerProfile);
 
         return response()->json([
             'success' => true,
