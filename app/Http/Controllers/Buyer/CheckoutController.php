@@ -63,7 +63,7 @@ class CheckoutController extends Controller
                     'buyer_name' => $buyer->name,
                     'status' => Order::STATUS_PLACED,
                     'total_amount' => $orderTotal,
-                    'commission_amount' => round($orderTotal * 0.10, 2),
+                    'commission_amount' => round($orderTotal * \App\Models\PlatformSetting::commissionRate(), 2),
                     'ship_province' => $profile?->province,
                     'ship_municipality' => $profile?->municipality,
                     'ship_barangay' => $profile?->barangay,

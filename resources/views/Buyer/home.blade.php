@@ -22,6 +22,8 @@
     ====================================================== -->
     <main class="mx-auto max-w-7xl px-5 py-6 sm:px-8">
 
+        <x-announcement-banner audience="buyer" variant="flat" />
+
         <!-- BANNER -->
         <div class="mb-6 h-40 overflow-hidden rounded-lg bg-gradient-to-r from-primary to-sky-blue sm:h-56">
             <div class="flex h-full items-center px-8 text-white">

@@ -59,8 +59,10 @@
             <!-- CONTENT -->
             <main class="flex-1 space-y-5 p-4 sm:space-y-6 sm:p-6">
 
+                <x-announcement-banner audience="super_admin" />
+
                 <!-- STAT CARDS (real data) -->
-                <div class="grid grid-cols-1 gap-4 xs:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+                <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 
                     <div class="frost-panel rounded-2xl p-4 sm:p-5">
                         <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/45">Pending Approvals</p>

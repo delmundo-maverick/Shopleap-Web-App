@@ -14,6 +14,8 @@ use App\Http\Controllers\Admin\BuyerManagementController;
 use App\Http\Controllers\Admin\LogisticsManagementController;
 use App\Http\Controllers\Admin\TransactionController;
 use App\Http\Controllers\Admin\ActivityLogController;
+use App\Http\Controllers\Admin\PlatformSettingController;
+use App\Http\Controllers\PolicyController;
 
 use App\Http\Controllers\Logistics\DashboardController as LogisticsDashboardController;
 use App\Http\Controllers\Logistics\RiderController;
@@ -74,6 +76,8 @@ Route::post('/register/seller', [SellerRegistrationController::class, 'store']);
 // Logistics Registration (Fixed duplicate route definition)
 Route::get('/register/logistics', [LogisticsRegistrationController::class, 'create'])->name('register.logistics');
 Route::post('/register/logistics', [LogisticsRegistrationController::class, 'store']);
+
+Route::get('/policies/{policy}', [PolicyController::class, 'show'])->name('policies.show');
 
 /*
 |--------------------------------------------------------------------------
@@ -142,6 +146,14 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/transactions/export/csv', [TransactionController::class, 'exportCsv'])->name('transactions.export.csv');
 
     Route::get('/logs', [ActivityLogController::class, 'index'])->name('logs.index');
+
+    Route::get('/settings', [PlatformSettingController::class, 'index'])->name('settings.index');
+    Route::post('/settings/general', [PlatformSettingController::class, 'updateGeneral'])->name('settings.general');
+    Route::post('/settings/announcements', [PlatformSettingController::class, 'storeAnnouncement'])->name('settings.announcements.store');
+    Route::post('/settings/announcements/{announcement}', [PlatformSettingController::class, 'updateAnnouncement'])->name('settings.announcements.update');
+    Route::post('/settings/announcements/{announcement}/toggle', [PlatformSettingController::class, 'toggleAnnouncement'])->name('settings.announcements.toggle');
+    Route::delete('/settings/announcements/{announcement}', [PlatformSettingController::class, 'destroyAnnouncement'])->name('settings.announcements.destroy');
+    Route::post('/settings/policies/{policy}', [PlatformSettingController::class, 'updatePolicy'])->name('settings.policies.update');
 });
 
 

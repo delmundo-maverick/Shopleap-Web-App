@@ -60,6 +60,8 @@
 
             <!-- CONTENT -->
             <main class="flex-1 space-y-6 p-6">
+                
+                <x-announcement-banner audience="seller" />
 
                 <!-- STAT CARDS (real data) -->
                 <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">

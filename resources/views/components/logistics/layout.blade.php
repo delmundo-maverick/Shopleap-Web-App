@@ -44,6 +44,8 @@
             </header>
 
             <main class="flex-1 space-y-5 p-6">
+                <x-announcement-banner audience="logistics" />
+
                 @if (session('status'))
                     <div
                         class="frost-panel rounded-2xl border border-leaf-green/20 bg-leaf-green/10 px-4 py-3 text-sm text-leaf-green">

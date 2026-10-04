@@ -15,11 +15,6 @@
     --color-sale-red: #E4572E;
     --color-warning: #F97316;
     --color-light-gray: #F5F7FA;
-
-    /* Seller workspace theme (teal) */
-    --color-seller: #0D9488;
-    --color-seller-soft: #E6F7F5;
-    --color-seller-bg: #F0FAF9;
 }
 
 /*
@@ -34,12 +29,22 @@
         --accent: var(--color-primary);
     }
 
-    .theme-seller {
-        --accent: var(--color-seller);
-    }
-
     [x-cloak] {
         display: none !important;
+    }
+}
+
+@layer components {
+    .text-page-title {
+        @apply text-xl font-bold text-charcoal;
+    }
+
+    .text-section-label {
+        @apply text-xs font-bold uppercase tracking-wide text-primary;
+    }
+
+    .text-card-label {
+        @apply text-xs font-semibold uppercase tracking-wide text-charcoal/45;
     }
 }
 

@@ -217,7 +217,7 @@
             </p>
 
 
-            <a href="#" title="Global Platform Settings"
+            <a href="{{ route('admin.settings.index') }}" title="Global Platform Settings"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                 {{ $active === 'settings'
                     ? 'frost-chip text-primary font-semibold'
