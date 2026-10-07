@@ -67,8 +67,6 @@ RUN chmod +x /entrypoint.sh
 # Make sure Laravel's writable folders exist, cache routes and views,
 # then fix permissions. config:cache runs at startup so Render's env vars are used.
 RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
-    && php artisan route:cache \
-    && php artisan view:cache \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
