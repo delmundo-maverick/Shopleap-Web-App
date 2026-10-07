@@ -67,7 +67,8 @@
 
                 <a href="/" class="flex shrink-0 items-center gap-3">
                     <div class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-light-gray">
-                        <img src="{{ $logo }}" alt="Shopleap" class="h-full w-full object-contain">
+                        <img src="{{ asset('images/shopleap-logo.png') }}" alt="Shopleap"
+                            class="h-full w-full object-contain">
                     </div>
                     <div class="hidden sm:block">
                         <p class="font-display text-xl font-bold leading-none tracking-tight text-charcoal">Shopleap</p>
