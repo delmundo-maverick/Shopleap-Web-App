@@ -122,7 +122,7 @@
 
             <div class="sidebar-header-inner flex min-w-0 items-center gap-3">
 
-                <img src="{{ asset('storage/images/Shopleap Logo.png') }}" alt="Shopleap logo"
+                <img src="{{ asset('images/shopleap-logo.png') }}" alt="Shopleap logo"
                     class="h-11 w-11 shrink-0 rounded-xl object-contain">
 
                 <div class="brand-text min-w-0 flex-1">

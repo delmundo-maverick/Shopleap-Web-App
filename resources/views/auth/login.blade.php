@@ -21,28 +21,11 @@
         <div class="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
 
             <!-- BRAND -->
-
             <a href="{{ route('home') }}" class="flex items-center gap-3">
-
-                <!-- LOGO PLACEHOLDER -->
-
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ice-blue">
-
-                    <!--
-                    Add your logo later:
-
-                    <img
-                        src="{{ asset('images/logo.png') }}"
-                        alt="Shopleap Logo"
-                        class="h-full w-full rounded-xl object-contain"
-                    >
-                    -->
-
+                <div class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white/10">
+                    <img src="{{ asset('images/shopleap-logo.png') }}" alt="Shopleap"
+                        class="h-full w-full object-contain">
                 </div>
-
-
-                <!-- BRAND NAME -->
-
                 <div>
 
                     <h1 class="text-lg font-bold leading-tight text-primary">
@@ -97,18 +80,10 @@
 
                 <div class="px-6 pb-2 pt-8 text-center sm:px-8">
 
-                    <!-- LOGIN ICON -->
-
                     <div
-                        class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/20">
-
-                        <svg class="h-7 w-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                                d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5m5 5H3" />
-
-                        </svg>
-
+                        class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 shadow-lg shadow-primary/20">
+                            <img src="{{ asset('images/shopleap-logo.png') }}" alt="Shopleap"
+                                class="h-full w-full object-contain">
                     </div>
 
 

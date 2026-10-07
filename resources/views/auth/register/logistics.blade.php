@@ -31,16 +31,17 @@
     <header class="border-b border-light-gray bg-white">
         <div class="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
             <a href="{{ route('home') }}" class="flex items-center gap-3">
-                <div
-                    class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary shadow-md shadow-primary/20">
-                    <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" stroke-width="2.2"
-                        viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                    </svg>
+                <div class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white/10">
+                    <img src="{{ asset('images/shopleap-logo.png') }}" alt="Shopleap"
+                        class="h-full w-full object-contain">
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold leading-tight text-primary">Shopleap</h1>
-                    <p class="text-xs text-charcoal/60">Shop Smart. Shop Simple.</p>
+                    <h1 class="text-lg font-bold leading-tight text-primary">
+                        Shopleap
+                    </h1>
+                    <p class="text-xs text-charcoal/60">
+                        Shop Smart. Shop Simple.
+                    </p>
                 </div>
             </a>
             <div class="flex items-center gap-2 text-sm">

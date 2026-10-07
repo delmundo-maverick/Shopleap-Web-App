@@ -23,35 +23,18 @@
             <!-- BRAND -->
 
             <a href="{{ route('home') }}" class="flex items-center gap-3">
-
-                <!-- LOGO PLACEHOLDER -->
-
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ice-blue">
-
-                    <!--
-                    Add your logo later:
-
-                    <img
-                        src="{{ asset('images/logo.png') }}"
-                        alt="Shopleap Logo"
-                        class="h-full w-full rounded-xl object-contain"
-                    >
-                    -->
-
+                <div class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white/10">
+                    <img src="{{ asset('images/shopleap-logo.png') }}" alt="Shopleap"
+                        class="h-full w-full object-contain">
                 </div>
-
                 <div>
-
                     <h1 class="text-lg font-bold leading-tight text-primary">
                         Shopleap
                     </h1>
-
                     <p class="text-xs text-charcoal/60">
                         Shop Smart. Shop Simple.
                     </p>
-
                 </div>
-
             </a>
 
 
