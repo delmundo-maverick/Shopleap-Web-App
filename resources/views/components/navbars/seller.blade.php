@@ -40,7 +40,7 @@
         <div class="flex h-20 shrink-0 items-center justify-between gap-2 border-b border-white/50 px-4">
 
             <div class="sidebar-header-inner flex min-w-0 items-center gap-3">
-                <img src="{{ asset('images/shopleap-logo.png') }}" alt="Shopleap logo"
+                <img src="{{ asset('images/Shopleap-Logo.png') }}" alt="Shopleap logo"
                     class="h-11 w-11 shrink-0 rounded-xl object-contain">
 
                 <div class="brand-text min-w-0 flex-1">

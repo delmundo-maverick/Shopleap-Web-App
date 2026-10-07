@@ -32,7 +32,7 @@
         <div class="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
             <a href="{{ route('home') }}" class="flex items-center gap-3">
                 <div class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white/10">
-                    <img src="{{ asset('images/shopleap-logo.png') }}" alt="Shopleap"
+                    <img src="{{ asset('images/Shopleap-Logo.png') }}" alt="Shopleap"
                         class="h-full w-full object-contain">
                 </div>
                 <div>
