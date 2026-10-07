@@ -18,8 +18,7 @@
             <!-- LOGO -->
             <a href="{{ route('buyer.home') }}" class="flex shrink-0 items-center gap-2">
                 <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    <!-- LOGO PLACEHOLDER — replace /public/images/shopleap-logo.png with the real logo -->
-                    <img src="{{ asset('images/shopleap-logo.png') }}" alt="Shopleap"
+                    <img src="{{ asset('images/Shopleap-Logo.png') }}" alt="Shopleap"
                         class="h-full w-full rounded-lg object-contain">
                 </div>
                 <span class="text-xl font-extrabold tracking-tight text-primary">Shopleap</span>
@@ -73,6 +72,7 @@
 
         <form method="POST" action="{{ route('buyer.checkout.store') }}">
             @csrf
+            <input type="hidden" name="items" value="{{ $itemIds ?? request('items') }}">
 
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 

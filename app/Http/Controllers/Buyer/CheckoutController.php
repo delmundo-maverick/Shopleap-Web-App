@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
+use App\Models\CartItem;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PlatformSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -12,30 +14,31 @@ class CheckoutController extends Controller
 {
     public function index(Request $request)
     {
-        $cartItems = $request->user()->cartItems()
-            ->with('product.seller.sellerProfile', 'variant')
-            ->get();
+        $cartItems = $this->selectedCartItems($request);
 
         if ($cartItems->isEmpty()) {
             return redirect()->route('buyer.cart.index');
         }
 
         $groupedBySeller = $cartItems->groupBy('product.seller_id');
-
         $total = $cartItems->sum('line_total');
+        $itemIds = $cartItems->pluck('id')->implode(',');
 
-        return view('Buyer.checkout.index', compact('groupedBySeller', 'total'));
+        return view('Buyer.checkout.index', [
+            'groupedBySeller' => $groupedBySeller,
+            'total' => $total,
+            'itemIds' => $itemIds,
+        ]);
     }
 
     public function store(Request $request)
     {
-        $cartItems = $request->user()->cartItems()->with('product', 'variant')->get();
+        $cartItems = $this->selectedCartItems($request, withLock: true);
 
         if ($cartItems->isEmpty()) {
             return redirect()->route('buyer.cart.index')->with('status', 'Your cart is empty.');
         }
 
-        // Verify stock is still available for everything before committing to anything
         foreach ($cartItems as $item) {
             $availableStock = $item->variant?->stock_quantity ?? $item->product?->stock_quantity;
 
@@ -47,15 +50,12 @@ class CheckoutController extends Controller
         }
 
         $buyer = $request->user();
-        $createdOrderIds = [];
 
-        DB::transaction(function () use ($cartItems, $buyer, &$createdOrderIds) {
+        DB::transaction(function () use ($cartItems, $buyer) {
             $bySeller = $cartItems->groupBy('product.seller_id');
 
             foreach ($bySeller as $sellerId => $items) {
                 $orderTotal = $items->sum('line_total');
-
-                $profile = $buyer->buyerProfile;
 
                 $order = Order::create([
                     'seller_id' => $sellerId,
@@ -63,12 +63,14 @@ class CheckoutController extends Controller
                     'buyer_name' => $buyer->name,
                     'status' => Order::STATUS_PLACED,
                     'total_amount' => $orderTotal,
-                    'commission_amount' => round($orderTotal * \App\Models\PlatformSetting::commissionRate(), 2),
-                    'ship_province' => $profile?->province,
-                    'ship_municipality' => $profile?->municipality,
-                    'ship_barangay' => $profile?->barangay,
-                    'ship_street' => $profile ? trim(($profile->house_number ?? '') . ' ' . ($profile->street ?? '')) : null,
-                    'ship_contact_no' => $profile?->contact_no,
+                    'commission_amount' => round($orderTotal * PlatformSetting::commissionRate(), 2),
+                    'ship_province' => $buyer->buyerProfile?->province,
+                    'ship_municipality' => $buyer->buyerProfile?->municipality,
+                    'ship_barangay' => $buyer->buyerProfile?->barangay,
+                    'ship_street' => $buyer->buyerProfile
+                        ? trim(($buyer->buyerProfile->house_number ?? '') . ' ' . ($buyer->buyerProfile->street ?? ''))
+                        : null,
+                    'ship_contact_no' => $buyer->buyerProfile?->contact_no,
                 ]);
 
                 $order->logStatusEvent(null, $buyer->id);
@@ -91,14 +93,39 @@ class CheckoutController extends Controller
                         $item->product->decrement('stock_quantity', $item->quantity);
                     }
                 }
-
-                $createdOrderIds[] = $order->id;
             }
 
-            $buyer->cartItems()->delete();
+            // Only remove the items that were actually checked out.
+            $cartItems->pluck('id')->chunk(500)->each(
+                fn($chunk) => CartItem::whereIn('id', $chunk)->delete()
+            );
         });
 
         return redirect()->route('buyer.orders.index')
             ->with('status', 'Order placed successfully! You can track its status here.');
+    }
+
+    /**
+     * Cart items to check out. If an `items` param (comma-separated cart_item
+     * IDs) is present, only those. Always scoped to the current buyer.
+     * Falls back to the whole cart if no selection is given.
+     */
+    private function selectedCartItems(Request $request, bool $withLock = false)
+    {
+        $query = $request->user()->cartItems()->with('product.seller.sellerProfile', 'variant');
+
+        if ($withLock) {
+            $query->lockForUpdate();
+        }
+
+        if ($request->filled('items')) {
+            $ids = is_array($request->items)
+                ? $request->items
+                : explode(',', $request->items);
+
+            $query->whereIn('id', array_filter($ids, 'is_numeric'));
+        }
+
+        return $query->get();
     }
 }

@@ -102,7 +102,7 @@
         {{-- LOGO --}}
         <a href="{{ route('buyer.home') }}" class="flex shrink-0 items-center gap-2">
             <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
-                <img src="{{ asset('images/shopleap-logo.png') }}" alt="Shopleap"
+                <img src="{{ asset('images/Shopleap-Logo.png') }}" alt="Shopleap"
                     class="h-full w-full rounded-lg object-contain">
             </div>
             <span class="hidden text-xl font-extrabold tracking-tight sm:block">Shopleap</span>

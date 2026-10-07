@@ -17,6 +17,16 @@
 
     <main class="mx-auto max-w-7xl px-5 py-6 sm:px-8">
 
+        <!-- BREADCRUMB -->
+        <nav class="mb-4 flex items-center gap-2 text-xs text-charcoal/50">
+            <a href="{{ route('buyer.products.index') }}" class="shrink-0 hover:text-primary">All Products</a>
+            <span>/</span>
+            <a href="{{ route('buyer.products.index', ['category' => $product->category]) }}"
+                class="shrink-0 hover:text-primary">{{ $product->category }}</a>
+            <span>/</span>
+            <span class="truncate text-charcoal/70">{{ $product->name }}</span>
+        </nav>
+
         <!-- MAIN PRODUCT CARD -->
         <div class="grid grid-cols-1 gap-8 rounded-lg bg-white p-6 shadow-sm shadow-charcoal/5 lg:grid-cols-2">
 
@@ -50,8 +60,18 @@
 
             <!-- DETAILS -->
             <div>
-                <span class="rounded bg-leaf-green/10 px-2 py-1 text-xs font-semibold text-leaf-green">New
-                    Arrival</span>
+                <!-- BADGES -->
+                <div class="flex flex-wrap items-center gap-2">
+                    @if ($product->created_at?->gt(now()->subDays(14)))
+                        <span class="rounded bg-leaf-green/10 px-2 py-1 text-xs font-semibold text-leaf-green">New
+                            Arrival</span>
+                    @endif
+                    @if ($product->was_price && $product->was_price > $product->display_price)
+                        <span class="rounded bg-sale-red/10 px-2 py-1 text-xs font-semibold text-sale-red">
+                            -{{ round((1 - $product->display_price / $product->was_price) * 100) }}% OFF
+                        </span>
+                    @endif
+                </div>
 
                 <h1 class="mt-3 text-2xl font-bold text-charcoal">{{ $product->name }}</h1>
 
@@ -69,7 +89,13 @@
                 </div>
 
                 <div class="mt-4 flex items-center gap-4 text-xs text-charcoal/50">
-                    <span>{{ $product->stock_quantity }} in stock</span>
+                    @if ($product->stock_quantity < 1)
+                        <span class="font-semibold text-sale-red">Out of stock</span>
+                    @elseif ($product->stock_quantity <= 5)
+                        <span class="font-semibold text-sale-red">Only {{ $product->stock_quantity }} left</span>
+                    @else
+                        <span>{{ $product->stock_quantity }} in stock</span>
+                    @endif
                     <span>·</span>
                     <span>{{ $product->category }}{{ $product->subcategory ? ' — ' . $product->subcategory : '' }}</span>
                 </div>
@@ -93,13 +119,14 @@
                     <div class="rounded-xl border border-light-gray bg-ice-blue/40 p-4">
                         <p class="text-sm font-semibold text-charcoal">This product has options</p>
                         <p class="mt-1 text-xs text-charcoal/50">
-                            Choose {{ $product->options->pluck('name')->implode(', ') }} when you add it to your cart.
+                            Choose {{ $product->options->pluck('name')->implode(', ') }} when you add to cart or buy
+                            now.
                         </p>
                     </div>
 
                     <div class="my-5 h-px bg-light-gray"></div>
                 @else
-                    <!-- No options: quantity stays inline as before -->
+                    <!-- No options: quantity stays inline -->
                     <div class="flex items-center gap-4">
                         <span class="text-sm font-semibold text-charcoal">Quantity</span>
                         <div class="flex items-center rounded-lg border border-light-gray">
@@ -116,18 +143,18 @@
 
                 <!-- ACTIONS -->
                 <div class="mt-6 flex gap-3">
-                    <button type="button" id="addToCartBtn"
-                        class="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-primary bg-white px-6 py-3.5 text-sm font-bold text-primary transition hover:bg-primary/5">
-                        <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button type="button" id="addToCartBtn" @disabled($product->stock_quantity < 1)
+                        class="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-primary bg-white px-6 py-3.5 text-sm font-bold text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                 d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
-                        {{ $product->options->isNotEmpty() ? 'Select Options' : 'Add to Cart' }}
+                        Add to Cart
                     </button>
-                    <a href="{{ route('buyer.cart.index') }}"
-                        class="flex flex-1 items-center justify-center rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue">
-                        View Cart
-                    </a>
+                    <button type="button" id="buyNowBtn" @disabled($product->stock_quantity < 1)
+                        class="flex flex-1 items-center justify-center rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:opacity-50">
+                        Buy Now
+                    </button>
                 </div>
             </div>
 
@@ -135,34 +162,54 @@
 
         <!-- SELLER PROFILE BAR -->
         @if ($product->seller?->sellerProfile)
+            @php $shop = $product->seller->sellerProfile; @endphp
             <div
-                class="mt-4 flex flex-col items-center gap-4 rounded-lg bg-white p-5 shadow-sm shadow-charcoal/5 sm:flex-row sm:justify-between">
-                <div class="flex items-center gap-4">
+                class="mt-4 flex flex-col gap-4 rounded-lg bg-white p-5 shadow-sm shadow-charcoal/5 sm:flex-row sm:items-center sm:justify-between">
+
+                <!-- Seller info (clickable, goes to the shop) -->
+                <a href="{{ route('buyer.shop.show', $product->seller) }}"
+                    class="group flex min-w-0 items-center gap-4">
                     <x-avatar :user="$product->seller" size="lg" />
-                    <div>
-                        <p class="text-base font-bold text-charcoal">
-                            {{ $product->seller->sellerProfile->shop_name }}</p>
-                        <p class="text-xs text-charcoal/50">
-                            {{ $product->seller->sellerProfile->line_of_business }}</p>
-                        @if ($product->seller->sellerProfile->location)
-                            <p class="mt-0.5 text-xs text-charcoal/40">
-                                {{ $product->seller->sellerProfile->location }}</p>
+                    <div class="min-w-0">
+                        <p class="truncate text-base font-bold text-charcoal transition group-hover:text-primary">
+                            {{ $shop->shop_name }}</p>
+                        @if ($shop->line_of_business)
+                            <p class="truncate text-xs text-charcoal/50">{{ $shop->line_of_business }}</p>
+                        @endif
+                        @if ($shop->location)
+                            <p class="mt-0.5 flex items-center gap-1 truncate text-xs text-charcoal/40">
+                                <svg class="h-3 w-3 shrink-0" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                {{ $shop->location }}
+                            </p>
                         @endif
                     </div>
+                </a>
+
+                <!-- Buttons grouped together -->
+                <div class="grid grid-cols-2 gap-3 sm:flex sm:shrink-0">
+                    <a href="{{ route('messages.index') }}?contact={{ $product->seller_id }}&product={{ $product->id }}"
+                        class="flex items-center justify-center gap-2 rounded-xl border-2 border-primary px-5 py-2.5 text-sm font-bold text-primary transition hover:bg-primary/5">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M8 10h8M8 14h5m-9 6l2.4-3.2A8 8 0 1112 20H4z" />
+                        </svg>
+                        Message Seller
+                    </a>
+                    <a href="{{ route('buyer.shop.show', $product->seller) }}"
+                        class="flex items-center justify-center gap-2 rounded-xl bg-ice-blue px-5 py-2.5 text-sm font-bold text-charcoal transition hover:bg-primary/10 hover:text-primary">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 9l1.5-5h15L21 9M3 9v11h18V9M3 9h18M9 20v-6h6v6" />
+                        </svg>
+                        View Shop
+                    </a>
                 </div>
-
-                <a href="{{ route('buyer.shop.show', $product->seller) }}"
-                    class="flex shrink-0 items-center justify-center gap-1.5 rounded-xl border-2 border-primary px-6 py-2.5 text-sm font-bold text-primary transition hover:bg-primary/5">
-                    View Shop
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                    </svg>
-                </a>
-
-                <a href="{{ route('messages.index') }}?contact={{ $product->seller_id }}&product={{ $product->id }}"
-                    class="flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white transition hover:bg-sky-blue">
-                    Message Seller
-                </a>
             </div>
         @endif
 
@@ -363,6 +410,7 @@
         </div>
     </div>
 
+    <div id="productPageData" data-checkout-route="{{ route('buyer.checkout.index') }}"></div>
 
     @php
         $productDataForJs = [

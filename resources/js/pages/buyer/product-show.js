@@ -3,6 +3,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const { productId, basePrice, baseStock, variants, hasOptions } = productData;
 
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    const checkoutRoute = document.getElementById('productPageData')?.dataset.checkoutRoute;
+
+    let modalIntent = 'cart';
 
     // ---------------------------------------------------
     // THUMBNAIL SWITCHING
@@ -51,8 +54,12 @@ document.addEventListener('DOMContentLoaded', () => {
         updateModalPriceStock();
     }
 
-    function openVariantModal() {
+    function openVariantModal(intent = 'cart') {
+        modalIntent = intent;
         resetVariantSelection();
+        if (modalConfirmBtn) {
+            modalConfirmBtn.textContent = intent === 'buyNow' ? 'Buy Now' : 'Add to Cart';
+        }
         variantModalOverlay.classList.remove('hidden');
         variantModalOverlay.classList.add('flex');
     }
@@ -153,7 +160,21 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => toast.classList.add('hidden'), 3000);
     }
 
-    async function addToCart(quantity, variantId, options) {
+    const addBtn = document.getElementById('addToCartBtn');
+    const buyBtn = document.getElementById('buyNowBtn');
+
+    function setBusy(busy) {
+        if (addBtn) addBtn.disabled = busy;
+        if (buyBtn) buyBtn.disabled = busy;
+        if (modalConfirmBtn) {
+            modalConfirmBtn.disabled = busy || !selectedVariant || selectedVariant.stock_quantity < 1;
+        }
+        [addBtn, buyBtn].forEach(b => b?.classList.toggle('opacity-60', busy));
+    }
+
+    async function addToCart(quantity, variantId, options, buyNow = false) {
+        let redirecting = false;
+        setBusy(true);
         try {
             const res = await fetch(`/buyer/cart/${productId}`, {
                 method: 'POST',
@@ -175,30 +196,52 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const badge = document.getElementById('buyerCartBadge');
+            if (badge) badge.textContent = data.cart_count;
+
+            if (buyNow) {
+                if (!checkoutRoute || !data.cart_item_id) {
+                    showToast('Added to cart, but could not proceed to checkout automatically.', true);
+                    closeVariantModal();
+                    return;
+                }
+                redirecting = true;
+                window.location.href = `${checkoutRoute}?items=${data.cart_item_id}`;
+                return;
+            }
+
             document.getElementById('cartModalQty').textContent = `Qty: ${quantity}`;
             closeVariantModal();
             openCartModal();
-
-            const badge = document.getElementById('buyerCartBadge');
-            if (badge) badge.textContent = data.cart_count;
         } catch (err) {
             showToast('Network error — please try again.', true);
+        } finally {
+            if (!redirecting) setBusy(false);
         }
     }
 
     document.getElementById('addToCartBtn')?.addEventListener('click', function () {
         if (hasOptions) {
-            openVariantModal();
+            openVariantModal('cart');
             return;
         }
-        const quantity = parseInt(qtyInput.value || 1);
-        addToCart(quantity, null, null);
+        const quantity = Math.max(1, Math.min(parseInt(qtyInput.max), parseInt(qtyInput.value || 1)));
+        addToCart(quantity, null, null, false);
+    });
+
+    document.getElementById('buyNowBtn')?.addEventListener('click', function () {
+        if (hasOptions) {
+            openVariantModal('buyNow');
+            return;
+        }
+        const quantity = Math.max(1, Math.min(parseInt(qtyInput.max), parseInt(qtyInput.value || 1)));
+        addToCart(quantity, null, null, true);
     });
 
     modalConfirmBtn?.addEventListener('click', function () {
         if (!selectedVariant) return;
         const quantity = parseInt(modalQtyInput.value || 1);
-        addToCart(quantity, selectedVariant.id, selectedOptions);
+        addToCart(quantity, selectedVariant.id, selectedOptions, modalIntent === 'buyNow');
     });
 
     // ---------------------------------------------------

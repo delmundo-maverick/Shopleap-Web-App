@@ -87,15 +87,11 @@ class CartController extends Controller
             'success' => true,
             'message' => "{$product->name} added to cart.",
             'cart_count' => $cartCount,
+            'cart_item_id' => $cartItem->id,
         ]);
     }
 
-    /**
-     * AJAX — change quantity and/or variant for an existing cart line.
-     * Changing the variant re-points the row at a different ProductVariant
-     * and re-snapshots its options; quantity is re-validated against
-     * whichever stock figure now applies.
-     */
+
     public function update(Request $request, CartItem $cartItem)
     {
         $this->authorizeOwnership($request, $cartItem);

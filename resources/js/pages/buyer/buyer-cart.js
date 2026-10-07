@@ -120,9 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------
     document.getElementById('checkoutBtn')?.addEventListener('click', () => {
         if (selectedIds.size === 0) return;
-        const params = new URLSearchParams();
-        selectedIds.forEach(id => params.append('items[]', id));
-        window.location.href = `${checkoutRoute}?${params.toString()}`;
+        window.location.href = `${checkoutRoute}?items=${Array.from(selectedIds).join(',')}`;
     });
 
     // -----------------------------------------------------
