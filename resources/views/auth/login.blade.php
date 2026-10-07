@@ -82,7 +82,7 @@
 
                     <div
                         class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 shadow-lg shadow-primary/20">
-                            <img src="{{ asset('images/shopleap-logo.png') }}" alt="Shopleap"
+                            <img src="{{ asset('images/Shopleap-Logo.png') }}" alt="Shopleap"
                                 class="h-full w-full object-contain">
                     </div>
 
