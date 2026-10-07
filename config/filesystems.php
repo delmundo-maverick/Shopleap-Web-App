@@ -55,7 +55,7 @@ return [
             'bucket' => env('R2_PRIVATE_BUCKET'),
             'endpoint' => env('R2_ENDPOINT'),
             'use_path_style_endpoint' => false,
-            'throw' => false,
+            'throw' => true,
             'visibility' => 'private',
         ],
 

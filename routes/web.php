@@ -268,6 +268,7 @@ Route::middleware(['auth', 'buyer'])->prefix('buyer')->name('buyer.')->group(fun
     Route::post('/orders/{order}/confirm', [BuyerOrderController::class, 'confirmReceived'])->name('orders.confirm');
 
     Route::get('/products/{product}', [BuyerProductController::class, 'show'])->name('products.show');
+    Route::get('/products', [BuyerProductController::class, 'index'])->name('products.index');
     Route::get('/shop/{seller}', [ShopController::class, 'show'])->name('shop.show');
 });
 

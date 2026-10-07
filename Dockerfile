@@ -1,47 +1,77 @@
+# -----------------------------------------------
+# Stage 1: Build Frontend Assets (Vite + Tailwind)
+# -----------------------------------------------
+FROM node:20-alpine AS frontend
+WORKDIR /app
+
+# Cache node modules layer
+COPY package*.json ./
+RUN npm ci
+
+# Copy application source & compile production assets
+COPY . .
+RUN npm run build
+
+# -----------------------------------------------
+# Stage 2: Production PHP-FPM & Nginx Environment
+# -----------------------------------------------
 FROM php:8.4-fpm
 
-# Install system dependencies (including Node.js & NPM)
+# Install essential runtime dependencies only (no nodejs/npm in runtime)
 RUN apt-get update && apt-get install -y \
-    git \
-    curl \
+    nginx \
+    supervisor \
     libpng-dev \
-    libonig-dev \
-    libxml2-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
     libzip-dev \
     libpq-dev \
     libicu-dev \
-    zip \
+    libonig-dev \
     unzip \
-    nodejs \
-    npm \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Configure and install PHP extensions
+# Configure & Install PHP extensions required by your composer.json
 RUN docker-php-ext-configure intl \
-    && docker-php-ext-install pdo pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip intl
-
-RUN apt-get update && apt-get install -y libpng-dev libjpeg-dev libfreetype6-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install gd
+    && docker-php-ext-install pdo pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip intl opcache
 
-# Get official Composer executable
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Copy production OPcache and PHP settings (zz- prefix loads last, so it overrides defaults)
+COPY docker/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
+COPY docker/php.ini /usr/local/etc/php/conf.d/zz-custom.ini
+
+# Install official Composer executable
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www
 
+# Step A: Install composer dependencies without scripts/autoloader for layer caching
+COPY composer.json composer.lock ./
+RUN COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --no-scripts --no-autoloader --prefer-dist
+
+# Step B: Copy application codebase
 COPY . .
 
-# Set permissions for storage and cache
-RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache \
-    && chmod -R 775 /var/www/storage /var/www/bootstrap/cache
+# Step C: Dump optimized autoloader (also runs package:discover via composer script)
+RUN composer dump-autoload --optimize --classmap-authoritative --no-dev
 
-# Install PHP dependencies
-RUN COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --optimize-autoloader --no-scripts
+# Step D: Copy compiled Vite build artifacts from Stage 1
+COPY --from=frontend /app/public/build ./public/build
 
-# Install Node dependencies and compile Vite assets for production
-RUN npm ci || npm install
-RUN npm run build
+# Copy runtime server configurations
+COPY docker/nginx.conf /etc/nginx/sites-enabled/default
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Make sure Laravel's writable folders exist, cache routes and views,
+# then fix permissions. config:cache runs at startup so Render's env vars are used.
+RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+    && php artisan route:cache \
+    && php artisan view:cache \
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 10000
 
-CMD php artisan config:clear && php artisan package:discover --ansi && php artisan serve --host=0.0.0.0 --port=10000
+CMD ["/entrypoint.sh"]

@@ -1,3 +1,5 @@
+@vite('resources/js/components/buyer-header.js')
+
 @props([
     'cartCount' => 0,
     'cartPreviewItems' => collect(),
@@ -13,7 +15,8 @@
 
             {{-- LEFT: utility links --}}
             <div class="flex items-center gap-5">
-                <a href="#" class="hover:text-white">Track My Order</a>
+                <a href="{{ route('buyer.orders.index', ['tab' => 'to_deliver']) }}" class="hover:text-white">Track My
+                    Order</a>
             </div>
 
             {{-- RIGHT: notifications, help, profile --}}
@@ -23,14 +26,25 @@
                 <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                     <button type="button" @click="open = !open"
                         class="relative flex items-center gap-1.5 rounded-full py-1.5 pl-2 pr-3 transition hover:bg-white/10">
-                        <span class="relative">
-                            <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
-                                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                            </svg>
-                        </span>
+                        <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
+                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
                         <span>Notifications</span>
                     </button>
+
+                    <div x-show="open" x-cloak x-transition
+                        class="absolute right-0 mt-2 w-72 rounded-lg bg-white p-4 text-charcoal shadow-xl">
+                        <p class="mb-1 text-sm font-bold text-charcoal">Notifications</p>
+                        <div class="flex flex-col items-center py-6 text-center">
+                            <svg class="h-9 w-9 text-charcoal/20" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            </svg>
+                            <p class="mt-2 text-xs text-charcoal/50">No notifications yet</p>
+                        </div>
+                    </div>
                 </div>
 
                 {{-- Help --}}
@@ -57,10 +71,15 @@
 
                     <div x-show="open" x-cloak x-transition
                         class="absolute right-0 mt-2 w-52 overflow-hidden rounded-lg bg-white py-1.5 text-charcoal shadow-xl">
-                        <a href="#" class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My Account</a>
-                        <a href="#" class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My Orders</a>
-                        <a href="#" class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">Chat /
-                            Messages</a>
+                        <span class="flex items-center justify-between px-4 py-2.5 text-sm text-charcoal/40">
+                            My Account
+                            <span
+                                class="rounded-full bg-light-gray px-2 py-0.5 text-[10px] font-bold text-charcoal/50">Soon</span>
+                        </span>
+                        <a href="{{ route('buyer.orders.index') }}"
+                            class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My Orders</a>
+                        <a href="{{ route('messages.index') }}"
+                            class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">Chat / Messages</a>
                         <div class="my-1 h-px bg-light-gray"></div>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
@@ -91,9 +110,10 @@
 
         {{-- SEARCH BAR --}}
         <div class="relative flex-1" x-data="{ open: false }" @click.outside="open = false">
-            <form action="#" method="GET" class="flex overflow-hidden rounded-sm bg-white">
-                <input type="text" name="q" autocomplete="off" @focus="open = true"
-                    placeholder="Search products, brands, and categories"
+            <form id="buyerSearchForm" action="{{ route('buyer.products.index') }}" method="GET"
+                class="flex overflow-hidden rounded-sm bg-white">
+                <input type="text" id="buyerSearchInput" name="search" autocomplete="off" @focus="open = true"
+                    value="{{ request('search') }}" placeholder="Search products, brands, and categories"
                     class="w-full px-4 py-2.5 text-sm text-charcoal outline-none">
                 <button type="submit"
                     class="flex shrink-0 items-center justify-center bg-sky-blue px-5 text-white transition hover:brightness-105">
@@ -106,20 +126,21 @@
 
             <div x-show="open" x-cloak x-transition
                 class="absolute left-0 right-0 top-full mt-1.5 rounded-lg bg-white p-3 text-charcoal shadow-xl">
-                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-charcoal/40">Recent Searches</p>
-                <div class="mb-3 flex flex-wrap gap-2">
-                    @foreach (['wireless earbuds', 'running shoes', 'desk lamp', 'water bottle'] as $recent)
-                        <button type="button"
-                            class="rounded-full bg-ice-blue px-3 py-1 text-xs text-charcoal/70 transition hover:bg-primary/10 hover:text-primary">
-                            {{ $recent }}
-                        </button>
-                    @endforeach
+
+                <div id="recentSearchesSection" class="mb-3 hidden">
+                    <div class="mb-2 flex items-center justify-between">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/40">Recent Searches</p>
+                        <button type="button" id="clearRecentSearchesBtn"
+                            class="text-[11px] font-semibold text-primary hover:underline">Clear</button>
+                    </div>
+                    <div id="recentSearchesList" class="flex flex-wrap gap-2"></div>
                 </div>
+
                 <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-charcoal/40">Trending</p>
                 <div class="flex flex-wrap gap-2">
                     @foreach (['skincare set', 'mechanical keyboard', 'yoga mat', 'power bank'] as $trend)
                         <button type="button"
-                            class="rounded-full bg-ice-blue px-3 py-1 text-xs text-charcoal/70 transition hover:bg-primary/10 hover:text-primary">
+                            class="trending-search-chip rounded-full bg-ice-blue px-3 py-1 text-xs text-charcoal/70 transition hover:bg-primary/10 hover:text-primary">
                             {{ $trend }}
                         </button>
                     @endforeach

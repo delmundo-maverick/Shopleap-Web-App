@@ -63,7 +63,8 @@
                         ];
                         $iconPath = $icons[$category['icon']] ?? $icons['office'];
                     @endphp
-                    <a href="#" class="group flex flex-col items-center gap-2 text-center">
+                    <a href="{{ route('buyer.products.index', ['category' => $category['name']]) }}"
+                        class="group flex flex-col items-center gap-2 text-center">
                         <div
                             class="flex h-14 w-14 items-center justify-center rounded-full bg-ice-blue text-primary transition group-hover:bg-primary group-hover:text-white">
                             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,7 +83,8 @@
         <section class="mb-8">
             <div class="mb-3 flex items-center justify-between">
                 <h2 class="text-base font-bold text-charcoal">Top Products / Best Sellers</h2>
-                <a href="#" class="text-xs font-semibold text-primary hover:underline">See all</a>
+                <a href="{{ route('buyer.products.index', ['sort' => 'bestseller']) }}"
+                    class="text-xs font-semibold text-primary hover:underline">See all</a>
             </div>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
                 @foreach ($bestSellers as $product)
@@ -105,7 +107,7 @@
             </div>
 
             <!-- PAGINATION -->
-            <div class="mt-8 flex justify-center">
+            <div class="pagination-frost mt-8 flex justify-center">
                 {{ $recommended->onEachSide(1)->links() }}
             </div>
         </section>
@@ -125,14 +127,16 @@
                 <div class="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
                     @foreach ($categories as $category)
                         <div>
-                            <a href="#" class="mb-2 block text-xs font-bold text-charcoal hover:text-primary">
+                            <a href="{{ route('buyer.products.index', ['category' => $category['name']]) }}"
+                                class="mb-2 block text-xs font-bold text-charcoal hover:text-primary">
                                 {{ $category['name'] }}
                             </a>
+                            {{-- Subcategories are shown for reference only — the underlying field
+                                 is no longer set on any product (see tech doc §5), so these can't
+                                 filter results and are intentionally not links. --}}
                             <ul class="space-y-1.5">
                                 @foreach ($category['subcategories'] as $sub)
-                                    <li><a href="#"
-                                            class="text-xs text-charcoal/60 hover:text-primary">{{ $sub }}</a>
-                                    </li>
+                                    <li><span class="text-xs text-charcoal/50">{{ $sub }}</span></li>
                                 @endforeach
                             </ul>
                         </div>
@@ -145,11 +149,12 @@
                 <div>
                     <p class="mb-3 text-xs font-bold uppercase tracking-wide text-charcoal/50">Customer Service</p>
                     <ul class="space-y-2 text-xs text-charcoal/65">
-                        <li><a href="#" class="hover:text-primary">Help Center</a></li>
+                        <li><a href="{{ route('messages.support') }}" class="hover:text-primary">Help Center</a></li>
                         <li><a href="#" class="hover:text-primary">How to Buy</a></li>
                         <li><a href="#" class="hover:text-primary">Returns & Refunds</a></li>
-                        <li><a href="#" class="hover:text-primary">Contact Us</a></li>
-                        <li><a href="#" class="hover:text-primary">Track My Order</a></li>
+                        <li><a href="{{ route('messages.support') }}" class="hover:text-primary">Contact Us</a></li>
+                        <li><a href="{{ route('buyer.orders.index', ['tab' => 'to_deliver']) }}"
+                                class="hover:text-primary">Track My Order</a></li>
                     </ul>
                 </div>
 
@@ -161,7 +166,8 @@
                         <li><a href="{{ route('register.seller') }}" class="hover:text-primary">Sell on Shopleap</a>
                         </li>
                         <li><a href="#" class="hover:text-primary">Terms & Policies</a></li>
-                        <li><a href="#" class="hover:text-primary">Privacy Policy</a></li>
+                        <li><a href="{{ route('policies.show', 'privacy-policy') }}" class="hover:text-primary">Privacy
+                                Policy</a></li>
                     </ul>
                 </div>
 
@@ -195,40 +201,6 @@
 
         </div>
     </footer>
-
-
-    <script>
-        function wireDropdown(wrapperId, toggleId, menuId) {
-            const wrapper = document.getElementById(wrapperId);
-            const toggle = document.getElementById(toggleId);
-            const menu = document.getElementById(menuId);
-            if (!wrapper || !menu) return;
-
-            if (toggle) {
-                toggle.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    menu.classList.toggle('hidden');
-                });
-            }
-
-            document.addEventListener('click', function(e) {
-                if (!wrapper.contains(e.target)) menu.classList.add('hidden');
-            });
-        }
-
-        wireDropdown('notifWrapper', 'notifToggle', 'notifMenu');
-        wireDropdown('profileWrapper', 'profileToggle', 'profileMenu');
-
-        // Search suggestions — show on focus, hide on outside click
-        const searchWrapper = document.getElementById('searchWrapper');
-        const searchInput = document.getElementById('searchInput');
-        const searchSuggestions = document.getElementById('searchSuggestions');
-
-        searchInput.addEventListener('focus', () => searchSuggestions.classList.remove('hidden'));
-        document.addEventListener('click', function(e) {
-            if (!searchWrapper.contains(e.target)) searchSuggestions.classList.add('hidden');
-        });
-    </script>
 
     <x-Buyer.message-widget />
 </body>
