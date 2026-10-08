@@ -11,15 +11,15 @@
     <title>Messages | Shopleap Logistics</title>
 </head>
 
-<body class="min-h-screen text-charcoal" x-data="{}">
+<body class="h-dvh overflow-hidden text-charcoal" x-data="{}">
     <div class="frost-surface"></div>
 
-    <div class="flex min-h-screen">
+    <div class="flex h-dvh">
         <x-navbars.logistics active="messages" />
 
-        <div class="flex flex-1 flex-col">
+        <div class="flex h-dvh min-w-0 flex-1 flex-col">
             <header
-                class="frost-panel-solid sticky top-0 z-30 flex h-20 items-center justify-between border-b border-white/50 px-6">
+                class="frost-panel-solid z-30 flex h-16 shrink-0 items-center justify-between border-b border-charcoal/10 px-4 sm:px-6">
                 <div class="flex items-center gap-3">
                     <button type="button" @click="$store.sidebar.open = true"
                         class="frost-btn rounded-xl p-2 text-charcoal/60 transition hover:text-primary lg:hidden">
@@ -28,14 +28,14 @@
                                 d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </button>
-                    <div>
-                        <h2 class="text-xl font-bold text-charcoal">Messages</h2>
-                        <p class="text-sm text-charcoal/55">Admin, Sellers and Riders</p>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-bold leading-tight text-charcoal sm:text-xl">Messages</h2>
+                        <p class="truncate text-xs text-charcoal/55 sm:text-sm">Admin, Sellers and Riders</p>
                     </div>
                 </div>
             </header>
 
-            <main class="flex-1 p-6">
+            <main class="flex min-h-0 flex-1 flex-col p-3 sm:p-4">
                 @include('messaging._panel', ['variant' => 'frosted'])
             </main>
         </div>

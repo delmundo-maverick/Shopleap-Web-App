@@ -11,15 +11,15 @@
     <title>Messages | Shopleap Admin</title>
 </head>
 
-<body class="min-h-screen text-charcoal" x-data="{}">
+<body class="h-dvh overflow-hidden text-charcoal" x-data="{}">
     <div class="frost-surface"></div>
 
-    <div class="flex min-h-screen">
+    <div class="flex h-dvh">
         <x-navbars.admin active="messages" />
 
-        <div class="flex flex-1 flex-col">
+        <div class="flex h-dvh min-w-0 flex-1 flex-col">
             <header
-                class="frost-panel-solid sticky top-0 z-30 flex h-20 items-center justify-between border-b border-white/50 px-6">
+                class="frost-panel-solid z-30 flex h-16 shrink-0 items-center justify-between border-b border-charcoal/10 px-4 sm:px-6">
                 <div class="flex items-center gap-3">
                     <button type="button" data-sidebar-toggle
                         class="frost-btn rounded-lg p-2 text-charcoal/60 transition hover:bg-ice-blue hover:text-primary lg:hidden">
@@ -28,42 +28,47 @@
                                 d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </button>
-                    <div>
-                        <h2 class="text-xl font-bold text-charcoal">Messages</h2>
-                        <p class="text-sm text-charcoal/55">Help requests from Buyers, Sellers, and Logistics</p>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-bold leading-tight text-charcoal sm:text-xl">Messages</h2>
+                        <p class="truncate text-xs text-charcoal/55 sm:text-sm">Help requests from Buyers, Sellers, and
+                            Logistics</p>
                     </div>
                 </div>
             </header>
 
-            <main class="flex-1 space-y-4 p-6">
+            <main class="flex min-h-0 flex-1 flex-col gap-2 p-3 sm:p-4">
 
-                <!-- ROLE TABS -->
-                <div class="frost-panel-solid flex rounded-2xl">
-                    @foreach (['all' => 'All', 'buyer' => 'Buyers', 'seller' => 'Sellers', 'logistics' => 'Logistics'] as $key => $label)
-                        <a href="{{ route('messages.index', ['role' => $key, 'view' => $view]) }}"
-                            class="flex flex-1 items-center justify-center gap-1.5 border-b-2 px-3 py-3 text-center text-sm font-semibold transition
-                                {{ $role === $key ? 'border-primary text-primary' : 'border-transparent text-charcoal/50 hover:text-charcoal' }}">
-                            {{ $label }}
-                            @if (($roleCounts[$key] ?? 0) > 0)
-                                <span
-                                    class="rounded-full px-1.5 py-0.5 text-[10px] font-bold
-                                    {{ $role === $key ? 'bg-primary/10 text-primary' : 'bg-light-gray text-charcoal/50' }}">
-                                    {{ $roleCounts[$key] }}
-                                </span>
-                            @endif
-                        </a>
-                    @endforeach
-                </div>
+                <div class="flex shrink-0 flex-col gap-2 lg:flex-row lg:items-center">
 
-                <!-- STATUS SEGMENTED CONTROL -->
-                <div class="inline-flex rounded-xl border border-white/50 bg-white/40 p-1">
-                    @foreach (['open' => 'Open', 'resolved' => 'Resolved'] as $key => $label)
-                        <a href="{{ route('messages.index', ['role' => $role, 'view' => $key]) }}"
-                            class="rounded-lg px-4 py-1.5 text-xs font-semibold transition
-                                {{ $view === $key ? 'bg-primary text-white' : 'text-charcoal/60 hover:text-charcoal' }}">
-                            {{ $label }} ({{ $statusCounts[$key] ?? 0 }})
-                        </a>
-                    @endforeach
+                    <!-- ROLE TABS -->
+                    <div class="frost-panel-solid flex min-w-0 flex-1 overflow-x-auto rounded-2xl">
+                        @foreach (['all' => 'All', 'buyer' => 'Buyers', 'seller' => 'Sellers', 'logistics' => 'Logistics'] as $key => $label)
+                            <a href="{{ route('messages.index', ['role' => $key, 'view' => $view]) }}"
+                                class="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-center text-sm font-semibold transition
+                                    {{ $role === $key ? 'border-primary text-primary' : 'border-transparent text-charcoal/50 hover:text-charcoal' }}">
+                                {{ $label }}
+                                @if (($roleCounts[$key] ?? 0) > 0)
+                                    <span
+                                        class="rounded-full px-1.5 py-0.5 text-[10px] font-bold
+                                        {{ $role === $key ? 'bg-primary/10 text-primary' : 'bg-light-gray text-charcoal/50' }}">
+                                        {{ $roleCounts[$key] }}
+                                    </span>
+                                @endif
+                            </a>
+                        @endforeach
+                    </div>
+
+                    <!-- STATUS SEGMENTED CONTROL -->
+                    <div
+                        class="inline-flex shrink-0 self-start rounded-xl border border-charcoal/10 bg-white/40 p-1 lg:self-auto">
+                        @foreach (['open' => 'Open', 'resolved' => 'Resolved'] as $key => $label)
+                            <a href="{{ route('messages.index', ['role' => $role, 'view' => $key]) }}"
+                                class="rounded-lg px-4 py-1.5 text-xs font-semibold transition
+                                    {{ $view === $key ? 'bg-primary text-white' : 'text-charcoal/60 hover:text-charcoal' }}">
+                                {{ $label }} ({{ $statusCounts[$key] ?? 0 }})
+                            </a>
+                        @endforeach
+                    </div>
                 </div>
 
                 @include('messaging._panel', ['variant' => 'admin'])

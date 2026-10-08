@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const threadMessages = document.getElementById('threadMessages');
     const messageForm = document.getElementById('messageForm');
     const messageInput = document.getElementById('messageInput');
+    const threadBackBtn = document.getElementById('threadBackBtn');
     const threadClaimBtn = document.getElementById('threadClaimBtn');
     const threadResolveBtn = document.getElementById('threadResolveBtn');
     const threadHeaderAssigned = document.getElementById('threadHeaderAssigned');
@@ -40,17 +41,57 @@ document.addEventListener('DOMContentLoaded', () => {
         return div.innerHTML;
     }
 
+    function firstLetter(name) {
+        const trimmed = (name || '').trim();
+        return trimmed ? Array.from(trimmed)[0].toUpperCase() : '?';
+    }
+
+    // ---------------------------------------------------
+    // Layout helpers
+    // ---------------------------------------------------
+
+    // Mobile shows one pane at a time ("list" or "thread"); md+ ignores this.
+    function setView(view) {
+        app.dataset.view = view;
+    }
+
+    // Elements that use "hidden" to hide and "flex" to show.
+    function showFlex(el) {
+        el.classList.remove('hidden');
+        el.classList.add('flex');
+    }
+
+    function hideFlex(el) {
+        el.classList.add('hidden');
+        el.classList.remove('flex');
+    }
+
+    function isNearBottom() {
+        return threadMessages.scrollHeight - threadMessages.scrollTop - threadMessages.clientHeight < 80;
+    }
+
+    function scrollToBottom() {
+        threadMessages.scrollTop = threadMessages.scrollHeight;
+    }
+
+    function autoGrow() {
+        if (!messageInput) return;
+        messageInput.style.height = 'auto';
+        const borders = messageInput.offsetHeight - messageInput.clientHeight;
+        messageInput.style.height = `${Math.min(messageInput.scrollHeight + borders, 128)}px`;
+    }
+
     function renderMessage(msg) {
         const isMine = msg.sender_id === currentUserId;
         const wrapper = document.createElement('div');
-        wrapper.className = `group flex items-center gap-1.5 ${isMine ? 'justify-end' : 'justify-start'}`;
+        wrapper.className = `group flex min-w-0 items-center gap-1.5 ${isMine ? 'justify-end' : 'justify-start'}`;
         wrapper.dataset.messageId = msg.id;
 
         const bubble = document.createElement('div');
-        bubble.className = `max-w-[70%] rounded-2xl px-4 py-2.5 text-sm ${isMine ? 'bg-primary text-white' : 'bg-ice-blue text-charcoal'}`;
+        bubble.className = `min-w-0 max-w-[85%] break-words rounded-2xl px-3.5 py-2 text-sm [overflow-wrap:anywhere] sm:max-w-[70%] ${isMine ? 'bg-primary text-white' : 'bg-ice-blue text-charcoal'}`;
         bubble.innerHTML = `
                 ${msg.is_forwarded ? '<p class="mb-1 text-[10px] font-bold uppercase tracking-wide opacity-70">Forwarded</p>' : ''}
-                <p class="whitespace-pre-line">${escapeHtml(msg.body)}</p>
+                <p class="whitespace-pre-line break-words">${escapeHtml(msg.body)}</p>
                 <p class="mt-1 text-[10px] opacity-60">${msg.created_at}</p>
             `;
 
@@ -81,10 +122,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showThreadUI() {
-        threadHeader.classList.remove('hidden');
+        showFlex(threadHeader);
         threadEmptyState.classList.add('hidden');
         threadMessages.classList.remove('hidden');
-        messageForm.classList.remove('hidden');
+        showFlex(messageForm);
+        setView('thread');
     }
 
     function highlightActiveConversation() {
@@ -103,13 +145,13 @@ document.addEventListener('DOMContentLoaded', () => {
         highlightActiveConversation();
 
         const item = document.querySelector(`.conversation-item[data-conversation-id="${conversationId}"]`);
-        const name = headerName || item?.querySelector('p.font-semibold')?.textContent || 'Conversation';
+        const name = (headerName || item?.querySelector('p.font-semibold')?.textContent || 'Conversation').trim();
         threadHeaderName.textContent = name;
-        threadHeaderAvatar.textContent = name.charAt(0).toUpperCase();
+        threadHeaderAvatar.textContent = firstLetter(name);
 
         history.replaceState(null, '', `?conversation=${conversationId}`);
 
-        await fetchNewMessages();
+        await fetchNewMessages(true);
         restartPolling();
     }
 
@@ -119,13 +161,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!card) return;
 
         if (!product) {
-            card.classList.add('hidden');
-            card.classList.remove('flex');
+            hideFlex(card);
             return;
         }
 
-        card.classList.remove('hidden');
-        card.classList.add('flex');
+        showFlex(card);
         document.getElementById('threadProductImage').src = product.image || '';
         document.getElementById('threadProductName').textContent = product.name;
         document.getElementById('threadProductPrice').textContent = `₱${Number(product.price).toFixed(2)}`;
@@ -138,22 +178,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function fetchNewMessages() {
+    // forceScroll = true on first load of a thread; polling only scrolls
+    // when the reader is already near the bottom.
+    async function fetchNewMessages(forceScroll = false) {
         if (!activeConversationId) return;
+        const requestedId = activeConversationId;
         try {
-            const res = await fetch(`/messages/${activeConversationId}/messages?after=${lastMessageId}`, {
+            const res = await fetch(`/messages/${requestedId}/messages?after=${lastMessageId}`, {
                 headers: { 'Accept': 'application/json' },
             });
             if (!res.ok) return;
             const data = await res.json();
+
+            // Ignore a stale response if the user switched threads meanwhile.
+            if (requestedId !== activeConversationId) return;
+
+            const stickToBottom = forceScroll === true || isNearBottom();
+
             renderProductCard(data.product);
             updateAdminThreadControls(data);
             data.messages.forEach(msg => {
                 threadMessages.appendChild(renderMessage(msg));
                 lastMessageId = Math.max(lastMessageId, msg.id);
             });
-            if (data.messages.length > 0) {
-                threadMessages.scrollTop = threadMessages.scrollHeight;
+
+            if (data.messages.length > 0 && stickToBottom) {
+                requestAnimationFrame(scrollToBottom);
             }
         } catch (err) {
             console.error(err);
@@ -162,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function restartPolling() {
         if (pollTimer) clearInterval(pollTimer);
-        pollTimer = setInterval(fetchNewMessages, 4000);
+        pollTimer = setInterval(() => fetchNewMessages(), 4000);
     }
 
     conversationList?.addEventListener('click', (e) => {
@@ -170,18 +220,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!item) return;
 
         const id = parseInt(item.dataset.conversationId, 10);
-        if (!id || id === activeConversationId) return;
+        if (!id) return;
+
+        // Same thread already open (e.g. user pressed Back on mobile): just show it again.
+        if (id === activeConversationId) {
+            setView('thread');
+            return;
+        }
 
         loadThread(id);
     });
 
-    async function deleteConversation(id) {
-        try {
-            await fetch(`/messages/${id}/delete`, { method: 'POST', headers: jsonHeaders() });
-        } catch (err) {
-            console.error(err);
-        }
-    }
+    threadBackBtn?.addEventListener('click', () => setView('list'));
 
     async function deleteConversation(id) {
         try {
@@ -194,11 +244,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetToEmptyState() {
         activeConversationId = null;
         if (pollTimer) clearInterval(pollTimer);
-        threadHeader.classList.add('hidden');
+        hideFlex(threadHeader);
+        renderProductCard(null);
         threadEmptyState.classList.remove('hidden');
         threadMessages.classList.add('hidden');
         threadMessages.innerHTML = '';
-        messageForm.classList.add('hidden');
+        hideFlex(messageForm);
+        setView('list');
         history.replaceState(null, '', window.location.pathname);
     }
 
@@ -220,12 +272,22 @@ document.addEventListener('DOMContentLoaded', () => {
         resetToEmptyState();
     });
 
+    // Enter sends, Shift+Enter adds a new line. Textarea grows up to its max height.
+    messageInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+            e.preventDefault();
+            messageForm.requestSubmit();
+        }
+    });
+    messageInput?.addEventListener('input', autoGrow);
+
     messageForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const body = messageInput.value.trim();
         if (!body || !activeConversationId) return;
 
         messageInput.value = '';
+        messageInput.style.height = '';
 
         try {
             const res = await fetch(`/messages/${activeConversationId}/messages`, {
@@ -237,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 threadMessages.appendChild(renderMessage(data));
                 lastMessageId = Math.max(lastMessageId, data.id);
-                threadMessages.scrollTop = threadMessages.scrollHeight;
+                requestAnimationFrame(scrollToBottom);
             }
         } catch (err) {
             console.error(err);
@@ -261,7 +323,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openModal() {
         forwardingMessageId = null;
-        document.getElementById('newMessageModalTitle').textContent = 'New Message';
+        const title = document.getElementById('newMessageModalTitle');
+        if (title) title.textContent = 'New Message';
         modalOverlay.classList.remove('hidden');
         modalOverlay.classList.add('flex');
         searchInput.value = '';
@@ -281,7 +344,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openForwardModal(messageId) {
         forwardingMessageId = messageId;
-        document.getElementById('newMessageModalTitle').textContent = 'Forward Message';
+        const title = document.getElementById('newMessageModalTitle');
+        if (title) title.textContent = 'Forward Message';
         modalOverlay.classList.remove('hidden');
         modalOverlay.classList.add('flex');
         searchInput.value = '';
@@ -293,7 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showToastMessage(text, conversationId) {
         const toast = document.createElement('div');
         toast.className = 'fixed bottom-6 right-6 z-[100] flex items-center gap-3 rounded-xl bg-charcoal px-4 py-3 text-sm text-white shadow-xl';
-        toast.innerHTML = `<span>${text}</span><a href="?conversation=${conversationId}" class="font-bold text-sky-blue hover:underline">View</a>`;
+        toast.innerHTML = `<span>${escapeHtml(text)}</span><a href="?conversation=${conversationId}" class="font-bold text-sky-blue hover:underline">View</a>`;
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 4000);
     }
@@ -358,7 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.className = 'flex w-full items-center gap-3 rounded-lg p-2.5 text-left text-sm hover:bg-ice-blue';
                 btn.innerHTML = `
                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                        ${contact.name.charAt(0).toUpperCase()}
+                        ${escapeHtml(firstLetter(contact.name))}
                     </span>
                     <span>
                         <span class="block font-medium text-charcoal">${escapeHtml(contact.name)}</span>

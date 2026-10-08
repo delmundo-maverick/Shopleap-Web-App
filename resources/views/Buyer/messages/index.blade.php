@@ -11,29 +11,25 @@
     <title>Messages | Shopleap</title>
 </head>
 
-<body class="min-h-screen text-charcoal">
 
-    {{-- Ambient background used across the app --}}
+<body class="flex h-dvh flex-col overflow-hidden text-charcoal">
+
     <div class="frost-surface"></div>
 
-    <x-buyer.header :cart-count="$cartCount" :cart-preview-items="$cartPreviewItems" />
+    <div class="relative z-30 shrink-0">
+        <x-buyer.header :cart-count="$cartCount" :cart-preview-items="$cartPreviewItems" />
+    </div>
 
-    <main class="mx-auto max-w-6xl px-5 py-8 sm:px-8">
-        <div class="mb-6 flex items-end justify-between">
-            <div>
-                <h1 class="text-2xl font-bold tracking-tight text-charcoal">Messages</h1>
-                <p class="mt-1 text-sm text-charcoal/60">
-                    Conversations with sellers about your orders and inquiries.
-                </p>
-            </div>
+    <main class="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-2 px-3 py-3 sm:px-6 sm:py-4">
+        <div class="flex shrink-0 items-baseline gap-3">
+            <h1 class="text-lg font-bold tracking-tight text-charcoal sm:text-xl">Messages</h1>
+            <p class="hidden truncate text-sm text-charcoal/60 sm:block">
+                Conversations with sellers about your orders and inquiries.
+            </p>
         </div>
 
-        <div class="frost-panel rounded-2xl p-4 sm:p-6">
-            @include('messaging._panel', ['variant' => 'flat'])
-        </div>
+        @include('messaging._panel', ['variant' => 'flat'])
     </main>
-
-    <x-buyer.message-widget />
 
 </body>
 

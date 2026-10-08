@@ -1,22 +1,25 @@
 @php
     $isFrosted = ($variant ?? 'frosted') !== 'flat';
-    $panelClass = $isFrosted ? 'frost-panel-solid' : 'bg-white shadow-sm shadow-charcoal/5';
-    $inputClass = $isFrosted ? 'frost-input' : 'border border-light-gray bg-white';
+    $panelClass = $isFrosted ? 'frost-panel-solid' : 'border border-charcoal/10 bg-white shadow-sm shadow-charcoal/5';
+    $inputClass = $isFrosted ? 'frost-input' : 'border border-charcoal/15 bg-white';
+    $line = 'border-charcoal/10';
     $roleBadgeColors = [
-        'buyer' => 'bg-blue-100 text-blue-600',
+        'buyer' => 'bg-primary/10 text-primary',
         'seller' => 'bg-leaf-green/10 text-leaf-green',
-        'logistics' => 'bg-purple-100 text-purple-600',
-        'courier' => 'bg-orange-100 text-orange-600',
+        'logistics' => 'bg-sky-blue/15 text-sky-blue',
+        'courier' => 'bg-warning/10 text-warning',
     ];
 @endphp
 
-<div class="flex h-[calc(100vh-9rem)] gap-0 overflow-hidden rounded-2xl {{ $panelClass }}" id="messagingApp"
-    data-current-user-id="{{ auth()->id() }}" data-current-user-role="{{ auth()->user()->role }}"
-    data-buyer-mode="{{ $variant === 'flat' ? '1' : '0' }}" data-initial-conversation-id="{{ $activeConversation?->id }}">
+<div class="group/msg flex min-h-0 w-full flex-1 overflow-hidden rounded-2xl {{ $panelClass }}" id="messagingApp"
+    data-view="{{ $activeConversation ? 'thread' : 'list' }}" data-current-user-id="{{ auth()->id() }}"
+    data-current-user-role="{{ auth()->user()->role }}" data-buyer-mode="{{ $variant === 'flat' ? '1' : '0' }}"
+    data-initial-conversation-id="{{ $activeConversation?->id }}">
 
     <!-- CONVERSATION LIST -->
-    <div class="flex w-full max-w-xs flex-col border-r border-white/50 sm:max-w-sm">
-        <div class="flex items-center justify-between border-b border-white/50 p-4">
+    <div
+        class="flex min-h-0 w-full shrink-0 flex-col border-r {{ $line }} md:w-72 lg:w-80 max-md:group-data-[view=thread]/msg:hidden">
+        <div class="flex shrink-0 items-center justify-between border-b {{ $line }} px-3 py-2.5">
             <h2 class="text-base font-bold text-charcoal">Conversations</h2>
             <button type="button" id="newMessageBtn"
                 class="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition hover:bg-sky-blue">
@@ -24,27 +27,29 @@
             </button>
         </div>
 
-        <div id="conversationList" class="flex-1 space-y-1 overflow-y-auto p-2">
+        <div id="conversationList"
+            class="min-h-0 flex-1 divide-y divide-charcoal/10 overflow-y-auto overscroll-contain">
             @forelse ($conversations as $conversation)
                 @php
                     $other = $conversation->otherParticipantFor(auth()->id());
+                    $otherName = trim($other?->messaging_name ?? '');
                     $lastMessage = $conversation->messages->last();
                     $unread = $conversation->unreadCountFor(auth()->id());
                 @endphp
 
                 <div class="group relative">
                     <button type="button" data-conversation-id="{{ $conversation->id }}"
-                        class="conversation-item flex w-full items-start gap-3 rounded-xl p-3 pr-9 text-left transition hover:bg-primary/5
+                        class="conversation-item flex w-full items-start gap-3 p-3 pr-9 text-left transition hover:bg-primary/5
                             {{ $activeConversation?->id === $conversation->id ? 'bg-primary/10' : '' }}">
                         <div
                             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                            {{ strtoupper(substr($other->messaging_name ?? '?', 0, 1)) }}
+                            {{ $otherName !== '' ? mb_strtoupper(mb_substr($otherName, 0, 1)) : '?' }}
                         </div>
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center justify-between gap-2">
                                 <span class="flex min-w-0 items-center gap-1.5">
                                     <p class="truncate text-sm font-semibold text-charcoal">
-                                        {{ $other->messaging_name ?? 'Unknown' }}</p>
+                                        {{ $otherName !== '' ? $otherName : 'Unknown' }}</p>
                                     @if ($variant === 'admin' && $other)
                                         <span
                                             class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase {{ $roleBadgeColors[$other->role] ?? 'bg-light-gray text-charcoal/50' }}">
@@ -85,25 +90,34 @@
     </div>
 
     <!-- THREAD -->
-    <div class="flex flex-1 flex-col">
-        <div id="threadHeader" class="hidden items-center gap-3 border-b border-white/50 p-4">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col max-md:group-data-[view=list]/msg:hidden">
+
+        {{-- Pinned header. JS swaps hidden <-> flex. --}}
+        <div id="threadHeader"
+            class="hidden shrink-0 flex-wrap items-center gap-2 border-b {{ $line }} px-3 py-2.5 sm:px-4">
+            <button type="button" id="threadBackBtn" title="Back to conversations"
+                class="shrink-0 rounded-lg p-1.5 text-charcoal/60 transition hover:bg-primary/5 hover:text-primary md:hidden">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+            </button>
             <div id="threadHeaderAvatar"
                 class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
             </div>
-            <div class="min-w-0 flex-1">
+            <div class="min-w-0 flex-1 basis-28">
                 <p id="threadHeaderName" class="truncate text-sm font-bold text-charcoal"></p>
                 @if ($variant === 'admin')
-                    <p id="threadHeaderAssigned" class="text-[11px] text-charcoal/50"></p>
+                    <p id="threadHeaderAssigned" class="truncate text-[11px] text-charcoal/50"></p>
                 @endif
             </div>
 
             @if ($variant === 'admin')
                 <button type="button" id="threadClaimBtn"
-                    class="shrink-0 rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5">
+                    class="shrink-0 rounded-lg border border-primary/30 px-2.5 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5">
                     Claim
                 </button>
                 <button type="button" id="threadResolveBtn"
-                    class="shrink-0 rounded-lg bg-leaf-green px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110">
+                    class="shrink-0 rounded-lg bg-leaf-green px-2.5 py-1.5 text-xs font-semibold text-white transition hover:brightness-110">
                     Mark Resolved
                 </button>
             @endif
@@ -117,9 +131,11 @@
             </button>
         </div>
 
-        <div id="threadProductCard" class="hidden items-center gap-3 border-b border-white/50 bg-ice-blue/40 p-3">
+        {{-- Pinned product card --}}
+        <div id="threadProductCard"
+            class="hidden shrink-0 items-center gap-3 border-b {{ $line }} bg-ice-blue/60 px-3 py-2 sm:px-4">
             <img id="threadProductImage" src="" alt=""
-                class="h-12 w-12 shrink-0 rounded-lg bg-ice-blue/60 object-cover">
+                class="h-10 w-10 shrink-0 rounded-lg bg-ice-blue object-cover">
             <div class="min-w-0 flex-1">
                 <p id="threadProductName" class="truncate text-sm font-semibold text-charcoal"></p>
                 <p id="threadProductPrice" class="text-xs font-bold text-primary"></p>
@@ -130,7 +146,7 @@
             </a>
         </div>
 
-        <div id="threadEmptyState" class="flex flex-1 flex-col items-center justify-center text-center">
+        <div id="threadEmptyState" class="flex flex-1 flex-col items-center justify-center p-4 text-center">
             <svg class="h-12 w-12 text-charcoal/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                     d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8-1.284 0-2.503-.24-3.606-.673L3 20l1.673-4.394C3.94 14.503 3.7 13.284 3.7 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -138,14 +154,17 @@
             <p class="mt-3 text-sm text-charcoal/50">Select a conversation or start a new one.</p>
         </div>
 
-        <div id="threadMessages" class="hidden flex-1 space-y-3 overflow-y-auto p-4"></div>
+        {{-- The only scrolling region on the right side --}}
+        <div id="threadMessages"
+            class="hidden min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4"></div>
 
-        <form id="messageForm" class="hidden items-center gap-2 border-t border-white/50 p-3">
+        {{-- Pinned composer. JS swaps hidden <-> flex. --}}
+        <form id="messageForm" class="hidden shrink-0 items-end gap-2 border-t {{ $line }} p-2.5 sm:p-3">
             @csrf
             <textarea id="messageInput" rows="1" maxlength="2000" placeholder="Type a message…"
-                class="flex-1 resize-none rounded-xl {{ $inputClass }} px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"></textarea>
+                class="max-h-32 min-w-0 flex-1 resize-none rounded-xl {{ $inputClass }} px-4 py-2.5 text-sm leading-5 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"></textarea>
             <button type="submit"
-                class="shrink-0 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-sky-blue">
+                class="h-[42px] shrink-0 rounded-xl bg-primary px-4 text-sm font-bold text-white transition hover:bg-sky-blue">
                 Send
             </button>
         </form>
@@ -175,7 +194,8 @@
 <div id="newMessageModalOverlay" class="fixed inset-0 z-[90] hidden items-center justify-center bg-charcoal/50 p-4">
     <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
         <div class="flex items-center justify-between">
-            <h3 class="text-base font-bold text-charcoal">New Message</h3>
+            <h3 @if ($variant !== 'flat') id="newMessageModalTitle" @endif
+                class="text-base font-bold text-charcoal">New Message</h3>
             <button type="button" id="newMessageCloseBtn" class="text-charcoal/40 hover:text-charcoal">
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -185,7 +205,7 @@
 
         <div class="mt-4">
             <input type="text" id="contactSearchInput" placeholder="Search by name…"
-                class="w-full rounded-xl border border-light-gray px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
+                class="w-full rounded-xl border border-charcoal/15 px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
             <div id="contactResults" class="mt-2 max-h-48 space-y-1 overflow-y-auto"></div>
         </div>
 
@@ -193,7 +213,7 @@
             <p class="mb-2 text-xs text-charcoal/50">To: <span id="selectedContactName"
                     class="font-semibold text-charcoal"></span></p>
             <textarea id="newMessageBody" rows="3" maxlength="2000" placeholder="Write your message…"
-                class="w-full resize-none rounded-xl border border-light-gray px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"></textarea>
+                class="w-full resize-none rounded-xl border border-charcoal/15 px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"></textarea>
             <button type="button" id="newMessageSendBtn"
                 class="mt-3 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-sky-blue">
                 Send Message
