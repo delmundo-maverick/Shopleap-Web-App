@@ -17,7 +17,7 @@
     <div class="frost-surface"></div>
 
     <div class="relative z-30 shrink-0">
-        <x-buyer.header :cart-count="$cartCount" :cart-preview-items="$cartPreviewItems" />
+        <x-Buyer.header :cart-count="$cartCount" :cart-preview-items="$cartPreviewItems" />
     </div>
 
     <main class="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-2 px-3 py-3 sm:px-6 sm:py-4">

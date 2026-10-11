@@ -14,7 +14,7 @@
 <body class="min-h-screen text-charcoal">
     <div class="frost-surface"></div>
 
-    <x-buyer.header :cart-count="$cartCount" :cart-preview-items="$cartPreviewItems" />
+    <x-Buyer.header :cart-count="$cartCount" :cart-preview-items="$cartPreviewItems" />
 
     <main class="px-3 py-4 sm:px-6 sm:py-6">
         @include('help._center')
