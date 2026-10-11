@@ -29,7 +29,8 @@ export default defineConfig({
                 'resources/css/landing.css',
                 'resources/js/landing.js',
                 'resources/css/pages/seller/products.css',
-                'resources/js/pages/seller/products.js'
+                'resources/js/pages/seller/products.js',
+                'resources/js/pages/auth/login.js'
             ],
             refresh: true,
             fonts: [
