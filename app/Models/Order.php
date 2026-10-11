@@ -297,15 +297,42 @@ class Order extends Model
             return;
         }
 
-        $this->loadMissing('items');
-
         DB::transaction(function () {
-            foreach ($this->items as $item) {
+            // Re-check under a row lock so two simultaneous cancels can't both restore.
+            $locked = static::whereKey($this->id)->lockForUpdate()->first();
+
+            if (! $locked || $locked->stock_restored_at) {
+                return;
+            }
+
+            $items = $this->items()->get();
+
+            // Same lock order as checkout and the seller editor: products, then variants, ascending id.
+            $products = Product::whereIn('id', $items->pluck('product_id')->filter()->unique()->sort()->values())
+                ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+
+            ProductVariant::whereIn('id', $items->pluck('product_variant_id')->filter()->unique()->sort()->values())
+                ->orderBy('id')->lockForUpdate()->get();
+
+            $touchedVariantProducts = [];
+
+            foreach ($items as $item) {
                 if ($item->product_variant_id) {
                     ProductVariant::whereKey($item->product_variant_id)->increment('stock_quantity', $item->quantity);
-                } elseif ($item->product_id) {
+
+                    if ($products->has($item->product_id)) {
+                        $touchedVariantProducts[$item->product_id] = $products->get($item->product_id);
+                    }
+                } elseif ($item->product_id && empty($item->selected_options)) {
+                    // A line with options but no variant id is a variant that was deleted
+                    // long ago; adding it to the base product would corrupt its stock.
                     Product::whereKey($item->product_id)->increment('stock_quantity', $item->quantity);
                 }
+            }
+
+            // The product row holds the total across variants, so recompute it.
+            foreach ($touchedVariantProducts as $product) {
+                $product->syncFromVariants();
             }
 
             $this->update(['stock_restored_at' => now()]);

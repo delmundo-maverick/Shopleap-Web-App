@@ -284,12 +284,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const isMine = msg.sender_id === parseInt(document.querySelector('meta[name="user-id"]')?.content || '0', 10);
         const wrapper = document.createElement('div');
         wrapper.className = `flex ${isMine ? 'justify-end' : 'justify-start'}`;
+
+        const photos = (msg.attachments || []).map(a => `
+        <a href="${escapeHtml(a.url)}" target="_blank" rel="noopener" class="mb-1 block overflow-hidden rounded-lg">
+            <img src="${escapeHtml(a.url)}" alt="Photo" loading="lazy" class="max-h-40 w-full object-cover">
+        </a>`).join('');
+
         wrapper.innerHTML = `
-            <div class="max-w-[75%] rounded-2xl px-3.5 py-2 text-xs ${isMine ? 'bg-primary text-white' : 'bg-ice-blue text-charcoal'}">
-                <p class="whitespace-pre-line">${escapeHtml(msg.body)}</p>
-                <p class="mt-1 text-[9px] opacity-60">${msg.created_at}</p>
-            </div>
-        `;
+        <div class="max-w-[75%] rounded-2xl px-3.5 py-2 text-xs ${isMine ? 'bg-primary text-white' : 'bg-ice-blue text-charcoal'}">
+            ${photos}
+            ${msg.body ? `<p class="whitespace-pre-line">${escapeHtml(msg.body)}</p>` : ''}
+            <p class="mt-1 text-[9px] opacity-60">${msg.created_at}</p>
+        </div>
+    `;
         return wrapper;
     }
 

@@ -17,6 +17,7 @@
     <div class="flex h-dvh">
         <x-navbars.admin active="messages" />
 
+        {{-- Content column: viewport tall. Top bar and filters keep natural height, the panel takes the rest. --}}
         <div class="flex h-dvh min-w-0 flex-1 flex-col">
             <header
                 class="frost-panel-solid z-30 flex h-16 shrink-0 items-center justify-between border-b border-charcoal/10 px-4 sm:px-6">
@@ -29,8 +30,9 @@
                         </svg>
                     </button>
                     <div class="min-w-0">
-                        <h2 class="text-lg font-bold leading-tight text-charcoal sm:text-xl">Messages</h2>
-                        <p class="truncate text-xs text-charcoal/55 sm:text-sm">Help requests from Buyers, Sellers, and
+                        <h2 class="text-lg font-bold leading-tight text-charcoal sm:text-xl">Support Inbox</h2>
+                        <p class="truncate text-xs text-charcoal/55 sm:text-sm">Tickets and chats from Buyers, Sellers,
+                            and
                             Logistics</p>
                     </div>
                 </div>
@@ -38,12 +40,12 @@
 
             <main class="flex min-h-0 flex-1 flex-col gap-2 p-3 sm:p-4">
 
-                <div class="flex shrink-0 flex-col gap-2 lg:flex-row lg:items-center">
+                <div class="flex shrink-0 flex-col gap-2 xl:flex-row xl:items-center">
 
                     <!-- ROLE TABS -->
                     <div class="frost-panel-solid flex min-w-0 flex-1 overflow-x-auto rounded-2xl">
                         @foreach (['all' => 'All', 'buyer' => 'Buyers', 'seller' => 'Sellers', 'logistics' => 'Logistics'] as $key => $label)
-                            <a href="{{ route('messages.index', ['role' => $key, 'view' => $view]) }}"
+                            <a href="{{ route('messages.index', ['role' => $key, 'view' => $view, 'assign' => $assign]) }}"
                                 class="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-center text-sm font-semibold transition
                                     {{ $role === $key ? 'border-primary text-primary' : 'border-transparent text-charcoal/50 hover:text-charcoal' }}">
                                 {{ $label }}
@@ -58,16 +60,28 @@
                         @endforeach
                     </div>
 
-                    <!-- STATUS SEGMENTED CONTROL -->
-                    <div
-                        class="inline-flex shrink-0 self-start rounded-xl border border-charcoal/10 bg-white/40 p-1 lg:self-auto">
-                        @foreach (['open' => 'Open', 'resolved' => 'Resolved'] as $key => $label)
-                            <a href="{{ route('messages.index', ['role' => $role, 'view' => $key]) }}"
-                                class="rounded-lg px-4 py-1.5 text-xs font-semibold transition
-                                    {{ $view === $key ? 'bg-primary text-white' : 'text-charcoal/60 hover:text-charcoal' }}">
-                                {{ $label }} ({{ $statusCounts[$key] ?? 0 }})
-                            </a>
-                        @endforeach
+                    <div class="flex flex-wrap gap-2">
+                        <!-- STATUS -->
+                        <div class="inline-flex shrink-0 rounded-xl border border-charcoal/10 bg-white/40 p-1">
+                            @foreach (['open' => 'Open', 'resolved' => 'Resolved'] as $key => $label)
+                                <a href="{{ route('messages.index', ['role' => $role, 'view' => $key, 'assign' => $assign]) }}"
+                                    class="rounded-lg px-3 py-1.5 text-xs font-semibold transition
+                                        {{ $view === $key ? 'bg-primary text-white' : 'text-charcoal/60 hover:text-charcoal' }}">
+                                    {{ $label }} ({{ $statusCounts[$key] ?? 0 }})
+                                </a>
+                            @endforeach
+                        </div>
+
+                        <!-- ASSIGNMENT QUEUE -->
+                        <div class="inline-flex shrink-0 rounded-xl border border-charcoal/10 bg-white/40 p-1">
+                            @foreach (['all' => 'Everyone', 'mine' => 'Mine', 'unassigned' => 'Unassigned'] as $key => $label)
+                                <a href="{{ route('messages.index', ['role' => $role, 'view' => $view, 'assign' => $key]) }}"
+                                    class="rounded-lg px-3 py-1.5 text-xs font-semibold transition
+                                        {{ $assign === $key ? 'bg-primary text-white' : 'text-charcoal/60 hover:text-charcoal' }}">
+                                    {{ $label }}
+                                </a>
+                            @endforeach
+                        </div>
                     </div>
                 </div>
 

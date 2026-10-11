@@ -9,12 +9,16 @@ use App\Models\ProductOption;
 use App\Models\ProductVariant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::with('images')
+        $threshold = (int) config('shop.low_stock_threshold', 5);
+
+        $query = Product::with(['images', 'variants'])
             ->where('seller_id', $request->user()->id)
             ->latest();
 
@@ -28,6 +32,10 @@ class ProductController extends Controller
 
         if ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
+        }
+
+        if ($request->filled('stock') && $request->stock !== 'all') {
+            $query->stockLevel($request->stock, $threshold);
         }
 
         $products = $query->paginate(15)->withQueryString();
@@ -49,29 +57,46 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:2000'],
-            'price' => ['required', 'numeric', 'min:0'],
+
+            // Simple products only. With variants these are derived from the variants.
+            'price' => ['required_without:variants', 'nullable', 'numeric', 'min:0'],
             'discount_price' => ['nullable', 'numeric', 'min:0', 'lt:price'],
-            'stock_quantity' => ['required', 'integer', 'min:0'],
+            'stock_quantity' => ['required_without:variants', 'nullable', 'integer', 'min:0'],
+
             'images' => ['required', 'array', 'min:1', 'max:6'],
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
 
             // Option groups, e.g. "Pack Size" -> "Pack of 4, Pack of 5"
-            'options' => ['nullable', 'array'],
-            'options.*.name' => ['required', 'string', 'max:100'],
+            'options' => ['required_with:variants', 'nullable', 'array', 'max:3'],
+            'options.*.name' => ['required', 'string', 'max:100', 'distinct:ignore_case'],
             'options.*.values' => ['required', 'string', 'max:500'],
 
             // One row per combination of option values
-            'variants' => ['nullable', 'array'],
+            'variants' => ['required_with:options', 'nullable', 'array', 'max:100'],
             'variants.*.options' => ['required', 'array'],
             'variants.*.price' => ['required', 'numeric', 'min:0'],
             'variants.*.stock_quantity' => ['required', 'integer', 'min:0'],
-            'variants.*.sku' => ['nullable', 'string', 'max:100'],
+            'variants.*.sku' => ['nullable', 'string', 'max:100', 'distinct'],
+        ], [
+            'variants.required_with' => 'Click "Generate Variant Combinations" and fill in each variant before saving.',
+            'options.required_with' => 'Add at least one option group for your variants.',
+            'options.*.name.distinct' => 'Each option needs a different name.',
+            'variants.*.sku.distinct' => 'Each variant needs a different SKU.',
         ]);
 
         $sellerCategory = $request->user()->sellerProfile?->line_of_business;
-        $hasVariants = $request->filled('variants');
 
-        DB::transaction(function () use ($request, $validated, $sellerCategory, $hasVariants) {
+        $groups = [];
+        $variants = [];
+
+        if (!empty($validated['variants'])) {
+            $groups = $this->normalizeOptions($validated['options']);
+            $variants = $this->matchVariantsToOptions($groups, $validated['variants']);
+        }
+
+        $hasVariants = $variants !== [];
+
+        DB::transaction(function () use ($request, $validated, $sellerCategory, $hasVariants, $groups, $variants) {
             $product = Product::create([
                 'seller_id' => $request->user()->id,
                 'name' => $validated['name'],
@@ -79,14 +104,14 @@ class ProductController extends Controller
                 'category' => $sellerCategory,
                 'subcategory' => null,
 
-                // With variants, the product's own price/stock become
-                // "starting from" price and total stock across variants.
+                // With variants, the product's own price/stock are "starting from"
+                // price and total stock across variants.
                 'price' => $hasVariants
-                    ? collect($request->input('variants'))->min('price')
+                    ? collect($variants)->min('price')
                     : $validated['price'],
                 'discount_price' => $hasVariants ? null : ($validated['discount_price'] ?? null),
                 'stock_quantity' => $hasVariants
-                    ? collect($request->input('variants'))->sum('stock_quantity')
+                    ? collect($variants)->sum('stock_quantity')
                     : $validated['stock_quantity'],
 
                 'status' => 'active',
@@ -102,21 +127,22 @@ class ProductController extends Controller
                 ]);
             }
 
-            foreach ($request->input('options', []) as $option) {
+            foreach ($groups as $name => $values) {
                 ProductOption::create([
                     'product_id' => $product->id,
-                    'name' => $option['name'],
-                    'values' => array_map('trim', explode(',', $option['values'])),
+                    'name' => $name,
+                    'values' => $values,
                 ]);
             }
 
-            foreach ($request->input('variants', []) as $variant) {
+            foreach ($variants as $variant) {
                 ProductVariant::create([
                     'product_id' => $product->id,
                     'options' => $variant['options'],
                     'price' => $variant['price'],
                     'stock_quantity' => $variant['stock_quantity'],
                     'sku' => $variant['sku'] ?? null,
+                    'is_active' => true,
                 ]);
             }
         });
@@ -129,7 +155,7 @@ class ProductController extends Controller
     {
         $this->authorizeOwnership($request, $product);
 
-        $product->load(['images', 'options', 'variants']);
+        $product->load(['images', 'options', 'variants' => fn($q) => $q->orderBy('id')]);
 
         return response()->json([
             'id' => $product->id,
@@ -140,10 +166,12 @@ class ProductController extends Controller
             'price' => (float) $product->price,
             'discount_price' => $product->discount_price ? (float) $product->discount_price : null,
             'stock_quantity' => $product->stock_quantity,
+            'low_stock_variants' => $product->lowStockVariantCount((int) config('shop.low_stock_threshold', 5)),
             'status' => $product->status,
             'images' => $product->images->map(fn($img) => ['id' => $img->id, 'url' => $img->url]),
-            'options' => $product->options,
-            'variants' => $product->variants,
+            'options' => $product->options->map(fn($o) => ['name' => $o->name, 'values' => $o->values]),
+            'has_variants' => $product->variants->isNotEmpty(),
+            'variants' => $this->variantPayload($product),
         ]);
     }
 
@@ -151,28 +179,75 @@ class ProductController extends Controller
     {
         $this->authorizeOwnership($request, $product);
 
-        $validated = $request->validate([
+        $categories = collect(config('shopleap_categories.list'));
+        $hasVariants = $product->hasVariants();
+
+        $rules = [
             'name' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:2000'],
-            'category' => ['required', 'string'],
-            'subcategory' => ['nullable', 'string'],
-            'price' => ['required', 'numeric', 'min:0'],
-            'discount_price' => ['nullable', 'numeric', 'min:0', 'lt:price'],
-            'stock_quantity' => ['required', 'integer', 'min:0'],
+            'category' => ['required', Rule::in($categories->pluck('name')->all())],
+            'subcategory' => ['nullable', 'string', 'max:100'],
+        ];
+
+        // Variant products: price/stock/discount live on the variants and the
+        // product row is recalculated from them. Simple products: edit directly.
+        $rules += $hasVariants
+            ? [
+                'variants' => ['required', 'array', 'min:1'],
+                'variants.*.id' => ['required', 'integer'],
+                'variants.*.price' => ['required', 'numeric', 'min:0'],
+                'variants.*.stock_quantity' => ['required', 'integer', 'min:0'],
+                'variants.*.sku' => ['nullable', 'string', 'max:100', 'distinct'],
+                'variants.*.is_active' => ['required', 'boolean'],
+            ]
+            : [
+                'price' => ['required', 'numeric', 'min:0'],
+                'discount_price' => ['nullable', 'numeric', 'min:0', 'lt:price'],
+                'stock_quantity' => ['required', 'integer', 'min:0'],
+            ];
+
+        $validated = $request->validate($rules, [
+            'variants.*.sku.distinct' => 'Each variant needs a different SKU.',
         ]);
 
-        $product->update($validated);
+        $allowedSubcategories = $categories->firstWhere('name', $validated['category'])['subcategories'] ?? [];
+
+        if (!empty($validated['subcategory']) && !in_array($validated['subcategory'], $allowedSubcategories, true)) {
+            throw ValidationException::withMessages([
+                'subcategory' => 'Choose a subcategory that belongs to the selected category.',
+            ]);
+        }
+
+        DB::transaction(function () use ($product, $validated, $hasVariants) {
+            // Lock order everywhere (checkout, restoreStock, here): product first, then variants.
+            Product::whereKey($product->id)->lockForUpdate()->first();
+
+            if ($hasVariants) {
+                $this->applyVariantChanges($product, $validated['variants']);
+
+                $product->update(collect($validated)->only(['name', 'description', 'category', 'subcategory'])->all());
+                $product->syncFromVariants();
+            } else {
+                $product->update($validated);
+            }
+        });
+
+        $product->refresh()->load('variants');
+        $threshold = (int) config('shop.low_stock_threshold', 5);
 
         return response()->json([
             'success' => true,
             'message' => "{$product->name} was updated successfully.",
             'product' => [
                 'name' => $product->name,
+                'category' => $product->category,
                 'price' => (float) $product->price,
                 'discount_price' => $product->discount_price ? (float) $product->discount_price : null,
                 'stock_quantity' => $product->stock_quantity,
                 'status' => $product->status,
+                'low_stock_variants' => $product->lowStockVariantCount($threshold),
             ],
+            'variants' => $this->variantPayload($product),
         ]);
     }
 
@@ -191,6 +266,113 @@ class ProductController extends Controller
             'message' => "{$product->name} is now {$request->status}.",
             'status' => $request->status,
         ]);
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
+
+    /** Update existing variants by id. Never delete: carts and orders reference them. */
+    private function applyVariantChanges(Product $product, array $rows): void
+    {
+        $existing = $product->variants()->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        $rows = collect($rows);
+
+        if ($rows->pluck('id')->diff($existing->keys())->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'variants' => 'One or more variants no longer exist. Close this window and try again.',
+            ]);
+        }
+
+        if ($rows->filter(fn($r) => (bool) $r['is_active'])->isEmpty()) {
+            throw ValidationException::withMessages([
+                'variants' => 'Keep at least one variant active, or archive the whole product instead.',
+            ]);
+        }
+
+        foreach ($rows as $row) {
+            $existing[$row['id']]->update([
+                'price' => $row['price'],
+                'stock_quantity' => $row['stock_quantity'],
+                'sku' => $row['sku'] ?? null,
+                'is_active' => (bool) $row['is_active'],
+            ]);
+        }
+    }
+
+    /** "Pack Size" => "Pack of 4, Pack of 5"  →  ['Pack Size' => ['Pack of 4', 'Pack of 5']] */
+    private function normalizeOptions(array $options): array
+    {
+        $groups = [];
+
+        foreach ($options as $option) {
+            $groups[trim($option['name'])] = collect(explode(',', $option['values']))
+                ->map(fn($v) => trim($v))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        return $groups;
+    }
+
+    /**
+     * Every variant must use exactly the declared option names, with values
+     * that belong to those options, and no combination may appear twice.
+     * Returns the variants with their option keys in declared order.
+     */
+    private function matchVariantsToOptions(array $groups, array $variants): array
+    {
+        $names = array_keys($groups);
+        $seen = [];
+        $ordered = [];
+
+        foreach (array_values($variants) as $i => $variant) {
+            $combo = $variant['options'];
+
+            if (count($combo) !== count($names) || array_diff($names, array_keys($combo))) {
+                throw ValidationException::withMessages([
+                    "variants.{$i}.options" => 'A variant does not match your option groups. Click "Generate Variant Combinations" again.',
+                ]);
+            }
+
+            $normalized = [];
+            foreach ($groups as $name => $values) {
+                if (!is_string($combo[$name]) || !in_array($combo[$name], $values, true)) {
+                    throw ValidationException::withMessages([
+                        "variants.{$i}.options" => "\"{$name}\" has a value that is not in your option list. Click \"Generate Variant Combinations\" again.",
+                    ]);
+                }
+                $normalized[$name] = $combo[$name];
+            }
+
+            $key = json_encode(array_values($normalized));
+            if (isset($seen[$key])) {
+                throw ValidationException::withMessages([
+                    "variants.{$i}.options" => 'The same combination appears twice.',
+                ]);
+            }
+            $seen[$key] = true;
+
+            $variant['options'] = $normalized;
+            $ordered[] = $variant;
+        }
+
+        return $ordered;
+    }
+
+    private function variantPayload(Product $product): array
+    {
+        return $product->variants->sortBy('id')->values()->map(fn($v) => [
+            'id' => $v->id,
+            'options' => $v->options,
+            'label' => $v->label,
+            'price' => (float) $v->price,
+            'stock_quantity' => $v->stock_quantity,
+            'sku' => $v->sku,
+            'is_active' => $v->is_active,
+        ])->all();
     }
 
     private function authorizeOwnership(Request $request, Product $product): void

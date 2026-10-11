@@ -7,6 +7,7 @@ use App\Notifications\OtpNotification;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\ValidationException;
 
 class OtpService
 {
@@ -17,7 +18,7 @@ class OtpService
     {
         $otp = (string) random_int(100000, 999999);
 
-        OtpVerification::updateOrCreate(
+        $record = OtpVerification::updateOrCreate(
             ['email' => $email, 'role' => $role],
             [
                 'otp_hash' => Hash::make($otp),
@@ -27,7 +28,17 @@ class OtpService
             ]
         );
 
-        Notification::route('mail', $email)->notify(new OtpNotification($otp));
+        try {
+            Notification::route('mail', $email)->notify(new OtpNotification($otp));
+        } catch (\Throwable $e) {
+            report($e); // still logged to your Render logs
+
+            $record->delete(); // don't leave an OTP the user never received
+
+            throw ValidationException::withMessages([
+                'email' => 'We could not send the verification email. Please try again in a moment.',
+            ]);
+        }
     }
 
     public function verify(string $email, string $role, string $otp): array

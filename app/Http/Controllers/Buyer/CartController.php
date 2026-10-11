@@ -46,7 +46,10 @@ class CartController extends Controller
 
         $variant = null;
         if ($request->filled('variant_id')) {
-            $variant = ProductVariant::where('product_id', $product->id)->find($request->variant_id);
+            // Archived variants can't be bought.
+            $variant = ProductVariant::where('product_id', $product->id)
+                ->where('is_active', true)
+                ->find($request->variant_id);
 
             if (!$variant) {
                 return response()->json(['success' => false, 'message' => 'Selected option is no longer available.'], 422);
@@ -91,7 +94,6 @@ class CartController extends Controller
         ]);
     }
 
-
     public function update(Request $request, CartItem $cartItem)
     {
         $this->authorizeOwnership($request, $cartItem);
@@ -103,14 +105,29 @@ class CartController extends Controller
 
         $cartItem->load('product.variants', 'variant');
 
+        if ($cartItem->product->status !== 'active') {
+            return $this->fail('This product is no longer available.');
+        }
+
         $variant = $cartItem->variant;
+
+        // The line's current variant was archived and the buyer hasn't picked a replacement.
+        if (!$request->filled('variant_id') && $variant && !$variant->is_active) {
+            return $this->fail('This option is no longer available. Please choose another or remove it.');
+        }
+
+        // A line with no variant on a product that now has variants must pick one first.
+        if (!$request->filled('variant_id') && !$variant && $cartItem->product->hasVariants()) {
+            return $this->fail('Please choose an option.');
+        }
 
         if ($request->filled('variant_id')) {
             $variant = ProductVariant::where('product_id', $cartItem->product_id)
+                ->where('is_active', true)
                 ->find($request->variant_id);
 
             if (!$variant) {
-                return response()->json(['success' => false, 'message' => 'Selected option is no longer available.'], 422);
+                return $this->fail('Selected option is no longer available.');
             }
 
             // Switching to a variant that's already its own cart line?
@@ -125,10 +142,7 @@ class CartController extends Controller
                 $mergedQty = $existingLine->quantity + $request->quantity;
 
                 if ($mergedQty > $variant->stock_quantity) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "Only {$variant->stock_quantity} in stock.",
-                    ], 422);
+                    return $this->fail("Only {$variant->stock_quantity} in stock.");
                 }
 
                 $existingLine->update([
@@ -147,8 +161,8 @@ class CartController extends Controller
                     'unit_price' => $existingLine->unit_price,
                     'selected_options' => $existingLine->selected_options,
                     'stock' => $variant->stock_quantity,
-                    'cart_total' => $request->user()->cartItems()->with('product', 'variant')->get()->sum('line_total'),
-                    'cart_count' => $request->user()->cartItems()->sum('quantity'),
+                    'cart_total' => $this->cartTotal($request),
+                    'cart_count' => $this->cartCount($request),
                 ]);
             }
         }
@@ -156,10 +170,7 @@ class CartController extends Controller
         $availableStock = $variant?->stock_quantity ?? $cartItem->product->stock_quantity;
 
         if ($request->quantity > $availableStock) {
-            return response()->json([
-                'success' => false,
-                'message' => "Only {$availableStock} in stock.",
-            ], 422);
+            return $this->fail("Only {$availableStock} in stock.");
         }
 
         $cartItem->quantity = $request->quantity;
@@ -174,12 +185,13 @@ class CartController extends Controller
         return response()->json([
             'success' => true,
             'merged' => false,
+            'quantity' => $cartItem->quantity,
             'line_total' => $cartItem->line_total,
             'unit_price' => $cartItem->unit_price,
             'selected_options' => $cartItem->selected_options,
             'stock' => $availableStock,
-            'cart_total' => $request->user()->cartItems()->with('product', 'variant')->get()->sum('line_total'),
-            'cart_count' => $request->user()->cartItems()->sum('quantity'),
+            'cart_total' => $this->cartTotal($request),
+            'cart_count' => $this->cartCount($request),
         ]);
     }
 
@@ -194,9 +206,49 @@ class CartController extends Controller
 
         return response()->json([
             'success' => true,
-            'cart_total' => $request->user()->cartItems()->with('product', 'variant')->get()->sum('line_total'),
-            'cart_count' => $request->user()->cartItems()->sum('quantity'),
+            'cart_total' => $this->cartTotal($request),
+            'cart_count' => $this->cartCount($request),
         ]);
+    }
+
+    /**
+     * AJAX — remove several cart lines in one request. Only the buyer's own lines are touched.
+     */
+    public function destroyMany(Request $request)
+    {
+        $data = $request->validate([
+            'ids'   => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $removedIds = CartItem::where('user_id', $request->user()->id)
+            ->whereIn('id', $data['ids'])
+            ->pluck('id');
+
+        CartItem::whereIn('id', $removedIds)->delete();
+
+        return response()->json([
+            'success'     => true,
+            'removed_ids' => $removedIds,
+            'cart_count'  => CartItem::where('user_id', $request->user()->id)->sum('quantity'),
+        ]);
+    }
+
+    // ------------------------------------------------------------------
+
+    private function fail(string $message)
+    {
+        return response()->json(['success' => false, 'message' => $message], 422);
+    }
+
+    private function cartCount(Request $request): int
+    {
+        return (int) $request->user()->cartItems()->sum('quantity');
+    }
+
+    private function cartTotal(Request $request): float
+    {
+        return (float) $request->user()->cartItems()->with('product', 'variant')->get()->sum('line_total');
     }
 
     private function authorizeOwnership(Request $request, CartItem $cartItem): void

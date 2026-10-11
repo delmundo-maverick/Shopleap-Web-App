@@ -1,19 +1,40 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const reviewModalOverlay = document.getElementById('reviewModalOverlay');
-    const reviewModalProductName = document.getElementById('reviewModalProductName');
+    const overlay = document.getElementById('reviewModalOverlay');
+    const productName = document.getElementById('reviewModalProductName');
     const starButtons = document.querySelectorAll('.star-btn');
     const ratingInput = document.getElementById('reviewRatingInput');
+    const commentInput = document.getElementById('reviewComment');
     const mediaInput = document.getElementById('reviewMediaInput');
     const mediaPreview = document.getElementById('reviewMediaPreview');
+    const errorBox = document.getElementById('reviewError');
+    const submitBtn = document.getElementById('reviewSubmitBtn');
+    const MAX_MEDIA = 5;
 
     let currentRating = 0;
+    let currentAction = null;
 
     function paintStars(rating) {
         starButtons.forEach((btn, i) => {
+            const svg = btn.querySelector('svg');
             const filled = i < rating;
-            btn.querySelector('svg').setAttribute('fill', filled ? '#1A5FB4' : 'none');
-            btn.querySelector('svg').setAttribute('stroke', filled ? '#1A5FB4' : '#94A3B8');
+            svg.setAttribute('fill', filled ? '#1A5FB4' : 'none');
+            svg.setAttribute('stroke', filled ? '#1A5FB4' : '#94A3B8');
         });
+    }
+
+    function showError(msg) {
+        errorBox.textContent = msg;
+        errorBox.classList.remove('hidden');
+    }
+
+    function clearError() {
+        errorBox.textContent = '';
+        errorBox.classList.add('hidden');
+    }
+
+    function closeModal() {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
     }
 
     starButtons.forEach((btn, i) => {
@@ -28,35 +49,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('.write-review-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            reviewModalProductName.textContent = btn.dataset.productName;
-            document.getElementById('reviewProductId').value = btn.dataset.productId;
-            document.getElementById('reviewOrderItemId').value = btn.dataset.orderItemId;
+            currentAction = btn.dataset.action;
+            productName.textContent = btn.dataset.productName;
 
             currentRating = 0;
             ratingInput.value = '';
             paintStars(0);
-            document.getElementById('reviewComment').value = '';
+            commentInput.value = '';
             mediaInput.value = '';
             mediaPreview.innerHTML = '';
+            clearError();
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Review';
 
-            reviewModalOverlay.classList.remove('hidden');
-            reviewModalOverlay.classList.add('flex');
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
         });
     });
 
-    document.getElementById('reviewModalCloseBtn')?.addEventListener('click', closeReviewModal);
-    reviewModalOverlay?.addEventListener('click', (e) => {
-        if (e.target === reviewModalOverlay) closeReviewModal();
+    document.getElementById('reviewModalCloseBtn')?.addEventListener('click', closeModal);
+    overlay?.addEventListener('click', e => {
+        if (e.target === overlay) closeModal();
     });
-
-    function closeReviewModal() {
-        reviewModalOverlay.classList.add('hidden');
-        reviewModalOverlay.classList.remove('flex');
-    }
 
     mediaInput?.addEventListener('change', function () {
         mediaPreview.innerHTML = '';
-        Array.from(this.files).slice(0, 5).forEach(file => {
+        Array.from(this.files).slice(0, MAX_MEDIA).forEach(file => {
             const wrapper = document.createElement('div');
             wrapper.className = 'relative aspect-square overflow-hidden rounded-lg border border-light-gray bg-ice-blue/60';
 
@@ -74,15 +92,47 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    document.getElementById('reviewSubmitBtn')?.addEventListener('click', function () {
+    submitBtn?.addEventListener('click', async () => {
+        clearError();
+
         if (!currentRating) {
-            alert('Please select a star rating.');
+            showError('Please select a star rating.');
             return;
         }
 
-        // TODO: wire to a real endpoint once the reviews table/backend exists.
-        // For now this only previews the UI — nothing is saved.
-        alert('Review UI captured — backend saving isn\'t built yet.');
-        closeReviewModal();
+        const fd = new FormData();
+        fd.append('rating', currentRating);
+        fd.append('comment', commentInput.value.trim());
+        Array.from(mediaInput.files).slice(0, MAX_MEDIA).forEach(f => fd.append('media[]', f));
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting…';
+
+        try {
+            const res = await fetch(currentAction, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                },
+                body: fd,
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                const firstError = data.errors ? Object.values(data.errors)[0][0] : null;
+                showError(firstError || data.message || 'Something went wrong. Please try again.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Review';
+                return;
+            }
+
+            window.location.reload(); // the flashed status banner shows "Thanks for your review!"
+        } catch {
+            showError('Network error. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Review';
+        }
     });
 });

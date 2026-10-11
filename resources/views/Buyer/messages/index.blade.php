@@ -21,11 +21,17 @@
     </div>
 
     <main class="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-2 px-3 py-3 sm:px-6 sm:py-4">
-        <div class="flex shrink-0 items-baseline gap-3">
-            <h1 class="text-lg font-bold tracking-tight text-charcoal sm:text-xl">Messages</h1>
-            <p class="hidden truncate text-sm text-charcoal/60 sm:block">
-                Conversations with sellers about your orders and inquiries.
-            </p>
+        <div class="flex shrink-0 items-center justify-between gap-3">
+            <div class="min-w-0">
+                <h1 class="text-lg font-bold tracking-tight text-charcoal sm:text-xl">Messages</h1>
+                <p class="hidden truncate text-sm text-charcoal/60 sm:block">
+                    Chats with sellers and your support tickets.
+                </p>
+            </div>
+            <a href="{{ route('help.index') }}"
+                class="shrink-0 rounded-lg border border-primary/30 bg-white/70 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5">
+                Help Center
+            </a>
         </div>
 
         @include('messaging._panel', ['variant' => 'flat'])

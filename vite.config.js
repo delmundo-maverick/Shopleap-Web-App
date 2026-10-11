@@ -28,6 +28,8 @@ export default defineConfig({
                 'resources/js/components/buyer-header.js',
                 'resources/css/landing.css',
                 'resources/js/landing.js',
+                'resources/css/pages/seller/products.css',
+                'resources/js/pages/seller/products.js'
             ],
             refresh: true,
             fonts: [

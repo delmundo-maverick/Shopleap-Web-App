@@ -22,7 +22,12 @@ class OrderController extends Controller
             $counts[$key] = (clone $baseQuery)->whereIn('status', $statuses)->count();
         }
 
-        $ordersQuery = Order::with(['items.product', 'seller.sellerProfile'])
+        $ordersQuery = Order::with([
+            'items.product',
+            'items.review',
+            'seller.sellerProfile',
+            'events',
+        ])
             ->where('buyer_id', $request->user()->id)
             ->latest();
 
@@ -48,30 +53,27 @@ class OrderController extends Controller
         ));
     }
 
-    public function show(Request $request, Order $order)
-    {
-        if ($order->buyer_id !== $request->user()->id) {
-            abort(403);
-        }
-
-        $order->load(['items', 'seller.sellerProfile', 'events']);
-
-        return view('Buyer.orders.show', compact('order'));
-    }
-
+    /**
+     * Buyer confirms the parcel arrived (DELIVERED -> COMPLETED).
+     * The conditional update makes a double-click or a second tab a harmless no-op.
+     */
     public function confirmReceived(Request $request, Order $order)
     {
         if ($order->buyer_id !== $request->user()->id) {
             abort(403);
         }
 
-        if ($order->status !== Order::STATUS_DELIVERED) {
+        $updated = Order::whereKey($order->id)
+            ->where('status', Order::STATUS_DELIVERED)
+            ->update(['status' => Order::STATUS_COMPLETED]);
+
+        if ($updated) {
+            $order->status = Order::STATUS_COMPLETED;
+            $order->logStatusEvent();
+        } elseif ($order->status !== Order::STATUS_COMPLETED) {
             return back()->with('status', 'This order can only be confirmed once it has been delivered.');
         }
 
-        $order->update(['status' => Order::STATUS_COMPLETED]);
-        $order->logStatusEvent();
-
-        return back()->with('status', 'Thanks for confirming! Your order is now marked as completed.');
+        return redirect()->route('buyer.orders.index', ['tab' => 'completed']);
     }
 }

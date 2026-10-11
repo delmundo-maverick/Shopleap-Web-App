@@ -1,0 +1,260 @@
+<?php
+
+return [
+
+    'attachments' => [
+        // Private disk. Set MESSAGE_ATTACHMENT_DISK=<your R2 disk name> in .env to use R2.
+        'disk' => env('MESSAGE_ATTACHMENT_DISK', env('FILESYSTEM_DISK', 'local')),
+        'max_files' => 4,
+        'max_kb' => 5120,
+    ],
+
+    'topics' => [
+
+        // ───────────── Buyer ─────────────
+        'order' => [
+            'role' => 'buyer',
+            'label' => 'Order issue',
+            'icon' => '📦',
+            'description' => 'Cancel, wrong, damaged or missing items',
+            'order' => 'required',
+            'issues' => [
+                ['label' => 'I want to cancel my order'],
+                ['label' => 'I received the wrong item'],
+                ['label' => 'My item is damaged or defective'],
+                ['label' => 'An item is missing from my order'],
+                ['label' => 'Something else about my order'],
+            ],
+        ],
+        'shipping' => [
+            'role' => 'buyer',
+            'label' => 'Shipping & delivery',
+            'icon' => '🚚',
+            'description' => 'Tracking, delays and delivery problems',
+            'order' => 'required',
+            'issues' => [
+                ['label' => 'Where is my order?'],
+                ['label' => 'Tracking has not updated'],
+                ['label' => 'Marked as delivered but I did not receive it', 'ask' => 'Have you checked with your household or neighbors?'],
+                ['label' => 'I want to change my delivery address'],
+                ['label' => 'Something else about delivery'],
+            ],
+        ],
+        'returns' => [
+            'role' => 'buyer',
+            'label' => 'Return & refund',
+            'icon' => '↩️',
+            'description' => 'Returns, refunds and exchanges',
+            'order' => 'required',
+            'issues' => [
+                ['label' => 'I want to return an item', 'ask' => 'Have you already received the item?'],
+                ['label' => 'I want a refund'],
+                ['label' => 'My refund has not arrived yet'],
+                ['label' => 'My return request was declined'],
+                ['label' => 'Something else about a return'],
+            ],
+        ],
+        'payment' => [
+            'role' => 'buyer',
+            'label' => 'Payment',
+            'icon' => '💳',
+            'description' => 'Charges, failed payments and receipts',
+            'order' => 'optional',
+            'issues' => [
+                ['label' => 'I was charged twice', 'ask' => 'Do both charges appear on your statement?'],
+                ['label' => 'Payment failed but money was deducted'],
+                ['label' => 'Problem with my payment method'],
+                ['label' => 'I need a receipt or invoice'],
+                ['label' => 'Something else about payment'],
+            ],
+        ],
+        'account' => [
+            'role' => 'buyer',
+            'label' => 'Account & security',
+            'icon' => '👤',
+            'description' => 'Login, profile and account safety',
+            'order' => 'none',
+            'issues' => [
+                ['label' => 'I cannot log in', 'ask' => 'Have you tried resetting your password?'],
+                ['label' => 'I want to update my account details'],
+                ['label' => 'I think my account was compromised'],
+                ['label' => 'I want to delete my account'],
+                ['label' => 'Something else about my account'],
+            ],
+        ],
+        'other' => [
+            'role' => 'buyer',
+            'label' => 'Something else',
+            'icon' => '💬',
+            'description' => 'Product questions, feedback and reports',
+            'order' => 'optional',
+            'issues' => [
+                ['label' => 'I have a question about a product'],
+                ['label' => 'I want to report a seller'],
+                ['label' => 'Feedback or suggestion'],
+                ['label' => 'Other'],
+            ],
+        ],
+
+        // ───────────── Seller ─────────────
+        'seller_orders' => [
+            'role' => 'seller',
+            'label' => 'Orders & fulfilment',
+            'icon' => '📦',
+            'description' => 'Order status, cancellations and buyer issues',
+            'order' => 'required',
+            'issues' => [
+                ['label' => 'An order status looks wrong'],
+                ['label' => 'A buyer cancelled or disputes an order'],
+                ['label' => 'A buyer reports a damaged or wrong item'],
+                ['label' => 'I cannot update this order'],
+                ['label' => 'Something else about an order'],
+            ],
+        ],
+        'seller_pickups' => [
+            'role' => 'seller',
+            'label' => 'Pickups & shipping',
+            'icon' => '🚚',
+            'description' => 'Pickup requests, riders and waybills',
+            'order' => 'required',
+            'issues' => [
+                ['label' => 'My pickup request was declined'],
+                ['label' => 'The rider did not arrive for pickup', 'ask' => 'Was the parcel packed and ready at the scheduled time?'],
+                ['label' => 'I need to change or cancel a pickup'],
+                ['label' => 'Problem printing the waybill'],
+                ['label' => 'Something else about shipping'],
+            ],
+        ],
+        'seller_payouts' => [
+            'role' => 'seller',
+            'label' => 'Payouts & fees',
+            'icon' => '💰',
+            'description' => 'Earnings, commission and reports',
+            'order' => 'optional',
+            'issues' => [
+                ['label' => 'A payout is missing or delayed'],
+                ['label' => 'The commission amount looks wrong'],
+                ['label' => 'My report does not match my orders'],
+                ['label' => 'Something else about payouts'],
+            ],
+        ],
+        'seller_listings' => [
+            'role' => 'seller',
+            'label' => 'Products & inventory',
+            'icon' => '🏷️',
+            'description' => 'Listings, stock and product status',
+            'order' => 'none',
+            'issues' => [
+                ['label' => 'My product was removed or rejected'],
+                ['label' => 'I cannot save or edit a product'],
+                ['label' => 'Stock numbers are not updating'],
+                ['label' => 'Product images will not upload'],
+                ['label' => 'Something else about my products'],
+            ],
+        ],
+        'seller_account' => [
+            'role' => 'seller',
+            'label' => 'Account & verification',
+            'icon' => '👤',
+            'description' => 'Approval, shop details and login',
+            'order' => 'none',
+            'issues' => [
+                ['label' => 'Question about my verification status'],
+                ['label' => 'I want to update my shop details'],
+                ['label' => 'I cannot log in', 'ask' => 'Have you tried resetting your password?'],
+                ['label' => 'I think my account was compromised'],
+                ['label' => 'Something else about my account'],
+            ],
+        ],
+        'seller_other' => [
+            'role' => 'seller',
+            'label' => 'Something else',
+            'icon' => '💬',
+            'description' => 'Feedback or anything not listed',
+            'order' => 'optional',
+            'issues' => [
+                ['label' => 'I want to report a buyer'],
+                ['label' => 'Feedback or suggestion'],
+                ['label' => 'Other'],
+            ],
+        ],
+
+        // ───────────── Logistics ─────────────
+        'logistics_parcels' => [
+            'role' => 'logistics',
+            'label' => 'Parcel problems',
+            'icon' => '📦',
+            'description' => 'Missing, damaged or mismatched parcels',
+            'order' => 'required',
+            'issues' => [
+                ['label' => 'A parcel arrived damaged'],
+                ['label' => 'A parcel is missing or did not arrive', 'ask' => 'Was the arrival already confirmed in the system?'],
+                ['label' => 'Parcel details do not match the order'],
+                ['label' => 'A delivery failed repeatedly'],
+                ['label' => 'Something else about a parcel'],
+            ],
+        ],
+        'logistics_pickups' => [
+            'role' => 'logistics',
+            'label' => 'Pickups & hubs',
+            'icon' => '🚚',
+            'description' => 'Pickup requests and incoming parcels',
+            'order' => 'required',
+            'issues' => [
+                ['label' => 'A pickup request has wrong details'],
+                ['label' => 'The seller was not ready for pickup'],
+                ['label' => 'I cannot confirm pickup or arrival'],
+                ['label' => 'Something else about pickups'],
+            ],
+        ],
+        'logistics_riders' => [
+            'role' => 'logistics',
+            'label' => 'Riders',
+            'icon' => '🏍️',
+            'description' => 'Rider applications and assignments',
+            'order' => 'none',
+            'issues' => [
+                ['label' => 'A rider application needs review'],
+                ['label' => 'I cannot assign or reassign a rider'],
+                ['label' => 'Report a rider issue'],
+                ['label' => 'Something else about riders'],
+            ],
+        ],
+        'logistics_areas' => [
+            'role' => 'logistics',
+            'label' => 'Service areas',
+            'icon' => '📍',
+            'description' => 'Coverage and area assignment',
+            'order' => 'none',
+            'issues' => [
+                ['label' => 'I want to add or change a service area'],
+                ['label' => 'Parcels are being assigned to the wrong area'],
+                ['label' => 'Something else about service areas'],
+            ],
+        ],
+        'logistics_account' => [
+            'role' => 'logistics',
+            'label' => 'Account & verification',
+            'icon' => '👤',
+            'description' => 'Approval, center details and login',
+            'order' => 'none',
+            'issues' => [
+                ['label' => 'Question about my verification status'],
+                ['label' => 'I want to update my center details'],
+                ['label' => 'I cannot log in', 'ask' => 'Have you tried resetting your password?'],
+                ['label' => 'Something else about my account'],
+            ],
+        ],
+        'logistics_other' => [
+            'role' => 'logistics',
+            'label' => 'Something else',
+            'icon' => '💬',
+            'description' => 'Feedback or anything not listed',
+            'order' => 'optional',
+            'issues' => [
+                ['label' => 'Feedback or suggestion'],
+                ['label' => 'Other'],
+            ],
+        ],
+    ],
+];

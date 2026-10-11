@@ -209,6 +209,18 @@
     </div>
 
     <script>
+        const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        } [c]));
+
+        const MAX_OPTION_GROUPS = 3;
+        const inputCls =
+            'w-full rounded-lg border border-light-gray px-3 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10';
+
         // ---------------------------------------------------
         // OPTION GROUPS (e.g. "Pack Size" -> "Pack of 4, Pack of 5")
         // ---------------------------------------------------
@@ -235,14 +247,14 @@
             row.dataset.rowIndex = index;
             row.innerHTML = `
                 <div class="flex-1">
-                    <input type="text" name="options[${index}][name]" class="option-name-input" value="${name}" placeholder="Option name (e.g. Pack Size)"
-                        class="w-full rounded-lg border border-light-gray px-3 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
+                    <input type="text" name="options[${index}][name]" value="${esc(name)}" maxlength="100"
+                        placeholder="Option name (e.g. Pack Size)" class="option-name-input ${inputCls}">
                 </div>
                 <div class="flex-[2]">
-                    <input type="text" name="options[${index}][values]" class="option-values-input" value="${values}" placeholder="Values, comma-separated (e.g. Pack of 4, Pack of 5)"
-                        class="w-full rounded-lg border border-light-gray px-3 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
+                    <input type="text" name="options[${index}][values]" value="${esc(values)}" maxlength="500"
+                        placeholder="Values, comma-separated (e.g. Pack of 4, Pack of 5)" class="option-values-input ${inputCls}">
                 </div>
-                <button type="button" class="remove-option-btn mt-1 shrink-0 rounded-lg p-2 text-charcoal/40 transition hover:bg-sale-red/10 hover:text-sale-red">
+                <button type="button" aria-label="Remove option" class="remove-option-btn mt-1 shrink-0 rounded-lg p-2 text-charcoal/40 transition hover:bg-sale-red/10 hover:text-sale-red">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -253,7 +265,13 @@
                 refreshOptionState();
             });
             row.querySelectorAll('input').forEach(input => {
-                input.addEventListener('input', refreshOptionState);
+                input.addEventListener('input', () => {
+                    // [ and ] would break the variants[i][options][<name>] field names.
+                    if (input.classList.contains('option-name-input')) {
+                        input.value = input.value.replace(/[\[\]]/g, '');
+                    }
+                    refreshOptionState();
+                });
             });
             optionsContainer.appendChild(row);
             refreshOptionState();
@@ -263,21 +281,33 @@
             return Array.from(optionsContainer.children)
                 .map(row => ({
                     name: row.querySelector('.option-name-input').value.trim(),
-                    values: row.querySelector('.option-values-input').value
+                    values: [...new Set(
+                        row.querySelector('.option-values-input').value
                         .split(',')
                         .map(v => v.trim())
-                        .filter(Boolean),
+                        .filter(Boolean)
+                    )],
                 }))
                 .filter(group => group.name && group.values.length > 0);
         }
 
         function refreshOptionState() {
             const groups = getCurrentOptionGroups();
+            const atLimit = optionsContainer.children.length >= MAX_OPTION_GROUPS;
+
+            addOptionBtn.disabled = atLimit;
+            addOptionBtn.classList.toggle('opacity-50', atLimit);
             generateVariantsBtn.classList.toggle('hidden', groups.length === 0);
 
             // If options no longer valid, fall back to simple pricing.
             if (groups.length === 0) {
                 showVariantMode(false);
+                return;
+            }
+
+            // Keep the variant table in step with the options once it exists.
+            if (!variantsWrapper.classList.contains('hidden')) {
+                renderVariantRows();
             }
         }
 
@@ -331,25 +361,25 @@
 
                 const hiddenInputs = Object.entries(combo)
                     .map(([name, value]) =>
-                        `<input type="hidden" name="variants[${i}][options][${name}]" value="${value}">`)
+                        `<input type="hidden" name="variants[${i}][options][${esc(name)}]" value="${esc(value)}">`)
                     .join('');
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td class="px-4 py-3 font-medium text-charcoal">
-                        ${label}
+                        ${esc(label)}
                         ${hiddenInputs}
                     </td>
                     <td class="px-4 py-2">
-                        <input type="number" name="variants[${i}][price]" value="${saved.price ?? ''}" min="0" step="0.01" required
+                        <input type="number" name="variants[${i}][price]" value="${esc(saved.price ?? '')}" min="0" step="0.01" required
                             class="variant-price-input w-28 rounded-lg border border-light-gray px-2 py-1.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
                     </td>
                     <td class="px-4 py-2">
-                        <input type="number" name="variants[${i}][stock_quantity]" value="${saved.stock ?? ''}" min="0" required
+                        <input type="number" name="variants[${i}][stock_quantity]" value="${esc(saved.stock ?? '')}" min="0" step="1" required
                             class="variant-stock-input w-24 rounded-lg border border-light-gray px-2 py-1.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
                     </td>
                     <td class="px-4 py-2">
-                        <input type="text" name="variants[${i}][sku]" value="${saved.sku ?? ''}" placeholder="Optional"
+                        <input type="text" name="variants[${i}][sku]" value="${esc(saved.sku ?? '')}" maxlength="100" placeholder="Optional"
                             class="variant-sku-input w-28 rounded-lg border border-light-gray px-2 py-1.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
                     </td>
                 `;
@@ -389,6 +419,29 @@
                 baseStock.value = stocks.length ? stocks.reduce((a, b) => a + b, 0) : 0;
             }
         });
+
+        // ---------------------------------------------------
+        // RESTORE after a server-side validation error
+        // ---------------------------------------------------
+        (function restoreOldInput() {
+            const oldOptions = Object.values(@json(old('options', [])) || {});
+            const oldVariants = Object.values(@json(old('variants', [])) || {});
+
+            if (!oldOptions.length) return;
+
+            oldOptions.forEach(o => addOptionRow(o.name ?? '', o.values ?? ''));
+
+            oldVariants.forEach(v => {
+                if (!v.options) return;
+                savedVariantData.set(JSON.stringify(v.options), {
+                    price: v.price ?? '',
+                    stock: v.stock_quantity ?? '',
+                    sku: v.sku ?? '',
+                });
+            });
+
+            if (oldVariants.length) renderVariantRows();
+        })();
 
         // ---------------------------------------------------
         // IMAGE PREVIEW

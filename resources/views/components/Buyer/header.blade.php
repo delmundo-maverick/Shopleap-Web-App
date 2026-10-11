@@ -58,39 +58,51 @@
                 </a>
 
                 {{-- Profile dropdown --}}
-                <div class="relative" x-data="{ open: false }" @click.outside="open = false">
-                    <button type="button" @click="open = !open"
-                        class="flex items-center gap-2 rounded-full py-1 pl-1 pr-2.5 transition hover:bg-white/10">
+                <div class="relative" x-data="{ open: false }" @click.outside="open = false"
+                    :class="{ 'z-[100]': open, 'z-10': !open }">
+                    <button type="button" @click="open = !open" :aria-expanded="open"
+                        class="relative flex items-center gap-2 rounded-full py-1 pl-1 pr-2.5 transition hover:bg-white/10">
                         <div
                             class="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-bold text-primary">
                             {{ strtoupper(substr(auth()->user()->name ?? 'B', 0, 1)) }}
                         </div>
-                        <span
-                            class="hidden max-w-[100px] truncate text-xs font-medium sm:block">{{ auth()->user()->name ?? 'Buyer' }}</span>
+
+                        <span class="hidden max-w-[100px] truncate text-xs font-medium sm:block">
+                            {{ auth()->user()->name ?? 'Buyer' }}
+                        </span>
                     </button>
 
                     <div x-show="open" x-cloak x-transition
-                        class="absolute right-0 mt-2 w-52 overflow-hidden rounded-lg bg-white py-1.5 text-charcoal shadow-xl">
+                        class="absolute right-0 mt-2 w-52 overflow-hidden rounded-lg bg-white py-1.5 text-charcoal shadow-xl ring-1 ring-black/5">
                         <span class="flex items-center justify-between px-4 py-2.5 text-sm text-charcoal/40">
                             My Account
-                            <span
-                                class="rounded-full bg-light-gray px-2 py-0.5 text-[10px] font-bold text-charcoal/50">Soon</span>
+                            <span class="rounded-full bg-light-gray px-2 py-0.5 text-[10px] font-bold text-charcoal/50">
+                                Soon
+                            </span>
                         </span>
+
                         <a href="{{ route('buyer.orders.index') }}"
-                            class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My Orders</a>
+                            class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">
+                            My Orders
+                        </a>
+
                         <a href="{{ route('messages.index') }}"
-                            class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">Chat / Messages</a>
+                            class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">
+                            Chat / Messages
+                        </a>
+
                         <div class="my-1 h-px bg-light-gray"></div>
+
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <button type="submit"
-                                class="block w-full px-4 py-2.5 text-left text-sm text-sale-red transition hover:bg-sale-red/10">Logout</button>
+                                class="block w-full px-4 py-2.5 text-left text-sm text-sale-red transition hover:bg-sale-red/10">
+                                Logout
+                            </button>
                         </form>
                     </div>
                 </div>
-
             </div>
-
         </div>
     </div>
 
@@ -100,13 +112,7 @@
     <div class="mx-auto flex h-[68px] max-w-7xl items-center gap-6 px-5 sm:px-8">
 
         {{-- LOGO --}}
-        <a href="{{ route('buyer.home') }}" class="flex shrink-0 items-center gap-2">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
-                <img src="{{ asset('images/Shopleap-Logo.png') }}" alt="Shopleap"
-                    class="h-full w-full rounded-lg object-contain">
-            </div>
-            <span class="hidden text-xl font-extrabold tracking-tight sm:block">Shopleap</span>
-        </a>
+        <x-logo />
 
         {{-- SEARCH BAR --}}
         <div class="relative flex-1" x-data="{ open: false }" @click.outside="open = false">

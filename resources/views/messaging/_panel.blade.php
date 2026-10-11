@@ -1,5 +1,6 @@
 @php
     $isFrosted = ($variant ?? 'frosted') !== 'flat';
+    $isAdminView = $variant === 'admin';
     $panelClass = $isFrosted ? 'frost-panel-solid' : 'border border-charcoal/10 bg-white shadow-sm shadow-charcoal/5';
     $inputClass = $isFrosted ? 'frost-input' : 'border border-charcoal/15 bg-white';
     $line = 'border-charcoal/10';
@@ -11,20 +12,41 @@
     ];
 @endphp
 
+{{--
+    Fills whatever space its parent gives it (parent must be a flex column with a definite height).
+    data-view drives the mobile layout: "list" shows conversations, "thread" shows the chat.
+    From md and up both panes always show side by side.
+--}}
 <div class="group/msg flex min-h-0 w-full flex-1 overflow-hidden rounded-2xl {{ $panelClass }}" id="messagingApp"
-    data-view="{{ $activeConversation ? 'thread' : 'list' }}" data-current-user-id="{{ auth()->id() }}"
+    data-view="{{ $activeConversation ? 'thread' : 'list' }}" data-details="off" data-current-user-id="{{ auth()->id() }}"
     data-current-user-role="{{ auth()->user()->role }}" data-buyer-mode="{{ $variant === 'flat' ? '1' : '0' }}"
     data-initial-conversation-id="{{ $activeConversation?->id }}">
-
     <!-- CONVERSATION LIST -->
     <div
         class="flex min-h-0 w-full shrink-0 flex-col border-r {{ $line }} md:w-72 lg:w-80 max-md:group-data-[view=thread]/msg:hidden">
-        <div class="flex shrink-0 items-center justify-between border-b {{ $line }} px-3 py-2.5">
-            <h2 class="text-base font-bold text-charcoal">Conversations</h2>
-            <button type="button" id="newMessageBtn"
-                class="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition hover:bg-sky-blue">
-                + New
-            </button>
+        <div class="flex shrink-0 items-center justify-between gap-2 border-b {{ $line }} px-3 py-2.5">
+            <h2 class="text-base font-bold text-charcoal">Messages</h2>
+            <div class="flex items-center gap-1.5">
+                @unless ($isAdminView)
+                    <a href="{{ route('help.index') }}"
+                        class="rounded-lg border border-primary/30 px-2.5 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5">
+                        Help
+                    </a>
+                @endunless
+                <button type="button" id="newMessageBtn"
+                    class="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition hover:bg-sky-blue">
+                    + New
+                </button>
+            </div>
+        </div>
+
+        <div id="kindTabs" class="flex shrink-0 gap-1 border-b {{ $line }} px-2 py-1.5">
+            @foreach (['all' => 'All', 'chat' => 'Chats', 'ticket' => 'Tickets'] as $kind => $kindLabel)
+                <button type="button" data-kind-tab="{{ $kind }}"
+                    class="flex-1 rounded-lg px-2 py-1 text-xs font-semibold transition {{ $kind === 'all' ? 'bg-primary/10 text-primary' : 'text-charcoal/55 hover:text-charcoal' }}">
+                    {{ $kindLabel }}
+                </button>
+            @endforeach
         </div>
 
         <div id="conversationList"
@@ -35,22 +57,43 @@
                     $otherName = trim($other?->messaging_name ?? '');
                     $lastMessage = $conversation->messages->last();
                     $unread = $conversation->unreadCountFor(auth()->id());
+                    $isTicket = (bool) $conversation->category;
+                    $ticketMeta = $isTicket
+                        ? \App\Support\TicketPresenter::number($conversation) .
+                            ' · ' .
+                            \App\Support\TicketPresenter::topic($conversation)
+                        : '';
+                    $rowTitle =
+                        $isTicket && !$isAdminView
+                            ? ($conversation->subject ?:
+                            'Support ticket')
+                            : ($otherName !== ''
+                                ? $otherName
+                                : 'Unknown');
+                    $state = $isTicket
+                        ? \App\Support\TicketPresenter::state($conversation, $lastMessage, auth()->user())
+                        : null;
+                    $preview = $lastMessage
+                        ? (filled($lastMessage->body)
+                            ? $lastMessage->body
+                            : '📷 Photo')
+                        : 'No messages yet';
                 @endphp
 
-                <div class="group relative">
+                <div class="group relative" data-kind="{{ $isTicket ? 'ticket' : 'chat' }}">
                     <button type="button" data-conversation-id="{{ $conversation->id }}"
+                        data-title="{{ $rowTitle }}" data-meta="{{ $ticketMeta }}"
                         class="conversation-item flex w-full items-start gap-3 p-3 pr-9 text-left transition hover:bg-primary/5
                             {{ $activeConversation?->id === $conversation->id ? 'bg-primary/10' : '' }}">
                         <div
                             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                            {{ $otherName !== '' ? mb_strtoupper(mb_substr($otherName, 0, 1)) : '?' }}
+                            {{ $isTicket && !$isAdminView ? 'S' : ($otherName !== '' ? mb_strtoupper(mb_substr($otherName, 0, 1)) : '?') }}
                         </div>
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center justify-between gap-2">
                                 <span class="flex min-w-0 items-center gap-1.5">
-                                    <p class="truncate text-sm font-semibold text-charcoal">
-                                        {{ $otherName !== '' ? $otherName : 'Unknown' }}</p>
-                                    @if ($variant === 'admin' && $other)
+                                    <p class="truncate text-sm font-semibold text-charcoal">{{ $rowTitle }}</p>
+                                    @if ($isAdminView && $other)
                                         <span
                                             class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase {{ $roleBadgeColors[$other->role] ?? 'bg-light-gray text-charcoal/50' }}">
                                             {{ $other->role }}
@@ -62,13 +105,24 @@
                                         class="shrink-0 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-white">{{ $unread }}</span>
                                 @endif
                             </div>
-                            @if ($conversation->product)
+
+                            @if ($isTicket)
+                                <p class="truncate text-[11px] font-semibold text-primary/70">{{ $ticketMeta }}</p>
+                                @if ($isAdminView && $conversation->subject)
+                                    <p class="truncate text-[11px] text-charcoal/70">{{ $conversation->subject }}</p>
+                                @endif
+                            @elseif ($conversation->product)
                                 <p class="truncate text-[11px] text-primary/70">Re: {{ $conversation->product->name }}
                                 </p>
                             @endif
-                            <p class="truncate text-xs text-charcoal/50">{{ $lastMessage?->body ?? 'No messages yet' }}
-                            </p>
-                            @if ($variant === 'admin' && $conversation->assignedAgent)
+
+                            <p class="truncate text-xs text-charcoal/50">{{ $preview }}</p>
+
+                            @if ($state)
+                                <span
+                                    class="mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold {{ $state[1] }}">{{ $state[0] }}</span>
+                            @endif
+                            @if ($isAdminView && $conversation->assignedAgent)
                                 <p class="mt-0.5 truncate text-[10px] font-semibold text-primary/60">Assigned:
                                     {{ $conversation->assignedAgent->name }}</p>
                             @endif
@@ -84,8 +138,12 @@
                     </button>
                 </div>
             @empty
-                <p class="p-4 text-center text-xs text-charcoal/50">No conversations yet. Start one with "+ New".</p>
+                <p class="p-4 text-center text-xs text-charcoal/50">No conversations yet. Start one with "+
+                    New"@unless ($isAdminView)
+                        or open a ticket from Help
+                    @endunless.</p>
             @endforelse
+            <p id="kindEmpty" class="hidden p-4 text-center text-xs text-charcoal/50">Nothing here yet.</p>
         </div>
     </div>
 
@@ -106,12 +164,19 @@
             </div>
             <div class="min-w-0 flex-1 basis-28">
                 <p id="threadHeaderName" class="truncate text-sm font-bold text-charcoal"></p>
-                @if ($variant === 'admin')
-                    <p id="threadHeaderAssigned" class="truncate text-[11px] text-charcoal/50"></p>
-                @endif
+                <p class="truncate text-[11px] text-charcoal/50"><span id="threadHeaderMeta"></span>
+                    @if ($isAdminView)
+                        <span id="threadHeaderAssigned"></span>
+                    @endif
+                </p>
             </div>
+            <span id="threadStatusBadge" class="hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"></span>
 
-            @if ($variant === 'admin')
+            @if ($isAdminView)
+                <button type="button" id="threadDetailsBtn"
+                    class="shrink-0 rounded-lg border border-charcoal/15 px-2.5 py-1.5 text-xs font-semibold text-charcoal/70 transition hover:bg-primary/5 hover:text-primary 2xl:hidden">
+                    Details
+                </button>
                 <button type="button" id="threadClaimBtn"
                     class="shrink-0 rounded-lg border border-primary/30 px-2.5 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5">
                     Claim
@@ -159,17 +224,70 @@
             class="hidden min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4"></div>
 
         {{-- Pinned composer. JS swaps hidden <-> flex. --}}
-        <form id="messageForm" class="hidden shrink-0 items-end gap-2 border-t {{ $line }} p-2.5 sm:p-3">
+        <form id="messageForm" class="hidden shrink-0 flex-col border-t {{ $line }}">
             @csrf
-            <textarea id="messageInput" rows="1" maxlength="2000" placeholder="Type a message…"
-                class="max-h-32 min-w-0 flex-1 resize-none rounded-xl {{ $inputClass }} px-4 py-2.5 text-sm leading-5 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"></textarea>
-            <button type="submit"
-                class="h-[42px] shrink-0 rounded-xl bg-primary px-4 text-sm font-bold text-white transition hover:bg-sky-blue">
-                Send
-            </button>
+            <div id="attachmentPreview" class="hidden flex-wrap gap-2 px-2.5 pt-2.5 sm:px-3"></div>
+            <div class="flex items-end gap-2 p-2.5 sm:p-3">
+                <button type="button" id="attachBtn" title="Attach photos" aria-label="Attach photos"
+                    class="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-charcoal/15 bg-white text-charcoal/55 transition hover:border-primary/40 hover:text-primary">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                </button>
+                <input type="file" id="attachInput" accept="image/jpeg,image/png,image/webp,image/gif" multiple
+                    class="hidden">
+                <textarea id="messageInput" rows="1" maxlength="2000" placeholder="Type a message…"
+                    class="max-h-32 min-w-0 flex-1 resize-none rounded-xl {{ $inputClass }} px-4 py-2.5 text-sm leading-5 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"></textarea>
+                <button type="submit"
+                    class="h-[42px] shrink-0 rounded-xl bg-primary px-4 text-sm font-bold text-white transition hover:bg-sky-blue disabled:opacity-50">
+                    Send
+                </button>
+            </div>
         </form>
     </div>
 
+    @if ($isAdminView)
+        {{-- Docked ticket details (wide screens). Smaller screens use the Details button + modal below. --}}
+        <aside id="detailsDocked"
+            class="hidden min-h-0 w-80 shrink-0 flex-col border-l {{ $line }} 2xl:group-data-[details=on]/msg:flex">
+            <div class="shrink-0 border-b {{ $line }} px-4 py-2.5">
+                <h2 class="text-sm font-bold text-charcoal">Details</h2>
+            </div>
+            <div id="detailsDockedBody" class="min-h-0 flex-1 overflow-y-auto overscroll-contain"></div>
+        </aside>
+    @endif
+
+</div>
+
+@if ($isAdminView)
+    {{-- Details modal (below 2xl). Outside the panel so the frosted blur can't trap it. --}}
+    <div id="detailsModal" class="fixed inset-0 z-[85] hidden bg-charcoal/40 2xl:hidden">
+        <div class="ml-auto flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+            <div class="flex shrink-0 items-center justify-between border-b {{ $line }} px-4 py-3">
+                <h2 class="text-sm font-bold text-charcoal">Details</h2>
+                <button type="button" id="detailsModalClose" aria-label="Close details"
+                    class="rounded-lg p-1.5 text-charcoal/50 transition hover:bg-primary/5 hover:text-primary">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="detailsModalBody" class="min-h-0 flex-1 overflow-y-auto overscroll-contain"></div>
+        </div>
+    </div>
+@endif
+
+{{-- Photo viewer --}}
+<div id="imageLightbox" class="fixed inset-0 z-[95] hidden items-center justify-center bg-charcoal/80 p-4">
+    <button type="button" id="lightboxClose" aria-label="Close"
+        class="absolute right-4 top-4 rounded-full bg-white/90 p-2 text-charcoal transition hover:bg-white">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+    </button>
+    <img id="lightboxImg" src="" alt="" class="max-h-full max-w-full rounded-lg object-contain">
 </div>
 
 @if ($variant === 'flat')

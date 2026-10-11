@@ -14,14 +14,16 @@ trait HandlesOtpRegistration
         array $profileAttributes,
         OtpService $otpService
     ) {
+        // Send first. If this fails, OtpService throws a ValidationException
+        // and nothing gets stored in the session.
+        $otpService->generateAndSend($userAttributes['email'], $role);
+
         $request->session()->put('pending_registration', [
             'role' => $role,
             'email' => $userAttributes['email'],
             'user' => $userAttributes,
             'profile' => $profileAttributes,
         ]);
-
-        $otpService->generateAndSend($userAttributes['email'], $role);
 
         if ($request->wantsJson()) {
             return response()->json(['email' => $userAttributes['email']]);

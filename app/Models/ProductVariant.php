@@ -12,6 +12,7 @@ class ProductVariant extends Model
         'price',
         'stock_quantity',
         'sku',
+        'is_active',
     ];
 
     protected function casts(): array
@@ -19,12 +20,24 @@ class ProductVariant extends Model
         return [
             'options' => 'array',
             'price' => 'decimal:2',
+            'stock_quantity' => 'integer',
+            'is_active' => 'boolean',
         ];
     }
 
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    public function isLowStock(?int $threshold = null): bool
+    {
+        return $this->stock_quantity <= ($threshold ?? (int) config('shop.low_stock_threshold', 5));
     }
 
     /**

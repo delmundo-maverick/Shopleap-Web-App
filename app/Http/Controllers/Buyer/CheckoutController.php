@@ -7,8 +7,11 @@ use App\Models\CartItem;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PlatformSetting;
+use App\Models\Product;
+use App\Models\ProductVariant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class CheckoutController extends Controller
 {
@@ -33,28 +36,60 @@ class CheckoutController extends Controller
 
     public function store(Request $request)
     {
-        $cartItems = $this->selectedCartItems($request, withLock: true);
-
-        if ($cartItems->isEmpty()) {
-            return redirect()->route('buyer.cart.index')->with('status', 'Your cart is empty.');
-        }
-
-        foreach ($cartItems as $item) {
-            $availableStock = $item->variant?->stock_quantity ?? $item->product?->stock_quantity;
-
-            if (!$item->product || $item->product->status !== 'active' || $availableStock < $item->quantity) {
-                return back()->withErrors([
-                    'stock' => "\"{$item->product?->name}\" no longer has enough stock. Please update your cart.",
-                ]);
-            }
-        }
-
         $buyer = $request->user();
 
-        DB::transaction(function () use ($cartItems, $buyer) {
-            $bySeller = $cartItems->groupBy('product.seller_id');
+        // Everything happens in ONE transaction: the cart lock, the stock checks and the
+        // stock deductions. (Previously the lock was taken outside the transaction, so it
+        // released immediately and two buyers could both pass the stock check.)
+        $placed = DB::transaction(function () use ($request, $buyer) {
 
-            foreach ($bySeller as $sellerId => $items) {
+            // 1. Lock the cart rows so a double-click can't place the order twice.
+            $cartItems = $this->selectedCartItems($request, withLock: true);
+
+            if ($cartItems->isEmpty()) {
+                return false;
+            }
+
+            // 2. Lock the stock rows in a fixed order (products, then variants, ascending id)
+            //    — the same order the seller editor and Order::restoreStock use, so they can't deadlock.
+            $productIds = $cartItems->pluck('product_id')->unique()->sort()->values();
+
+            $products = Product::whereIn('id', $productIds)
+                ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+
+            $variants = ProductVariant::whereIn('id', $cartItems->pluck('product_variant_id')->filter()->unique()->sort()->values())
+                ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+
+            // Products that sell through variants must never be bought as a bare product.
+            $variantProducts = ProductVariant::whereIn('product_id', $productIds)
+                ->pluck('product_id')->flip();
+
+            // 3. Validate against the locked, fresh rows.
+            foreach ($cartItems as $item) {
+                $product = $products->get($item->product_id);
+                $variant = $item->product_variant_id ? $variants->get($item->product_variant_id) : null;
+                $name = $product?->name ?? 'An item';
+
+                $unavailable = !$product
+                    || $product->status !== 'active'
+                    || ($item->product_variant_id && (!$variant || !$variant->is_active))
+                    || (!$item->product_variant_id && $variantProducts->has($product->id));
+
+                if ($unavailable) {
+                    $this->fail("\"{$name}\" is no longer available. Please update your cart.");
+                }
+
+                $stock = $variant?->stock_quantity ?? $product->stock_quantity;
+
+                if ($stock < $item->quantity) {
+                    $this->fail("\"{$name}\" no longer has enough stock. Please update your cart.");
+                }
+            }
+
+            // 4. Create the orders and deduct stock.
+            $touchedVariantProducts = [];
+
+            foreach ($cartItems->groupBy('product.seller_id') as $sellerId => $items) {
                 $orderTotal = $items->sum('line_total');
 
                 $order = Order::create([
@@ -87,22 +122,50 @@ class CheckoutController extends Controller
                         'subtotal' => $item->line_total,
                     ]);
 
-                    if ($item->variant) {
-                        $item->variant->decrement('stock_quantity', $item->quantity);
+                    // Conditional decrement: never goes below zero, even if a check above were missed.
+                    if ($item->product_variant_id) {
+                        $affected = ProductVariant::whereKey($item->product_variant_id)
+                            ->where('stock_quantity', '>=', $item->quantity)
+                            ->decrement('stock_quantity', $item->quantity);
+
+                        $touchedVariantProducts[$item->product_id] = $products->get($item->product_id);
                     } else {
-                        $item->product->decrement('stock_quantity', $item->quantity);
+                        $affected = Product::whereKey($item->product_id)
+                            ->where('stock_quantity', '>=', $item->quantity)
+                            ->decrement('stock_quantity', $item->quantity);
+                    }
+
+                    if (!$affected) {
+                        $this->fail("\"{$item->product->name}\" no longer has enough stock. Please update your cart.");
                     }
                 }
             }
 
-            // Only remove the items that were actually checked out.
+            // 5. Keep each variant product's total stock in step with its variants.
+            foreach ($touchedVariantProducts as $product) {
+                $product->syncFromVariants();
+            }
+
+            // 6. Only remove the items that were actually checked out.
             $cartItems->pluck('id')->chunk(500)->each(
                 fn($chunk) => CartItem::whereIn('id', $chunk)->delete()
             );
+
+            return true;
         });
+
+        if (!$placed) {
+            return redirect()->route('buyer.cart.index')->with('status', 'Your cart is empty.');
+        }
 
         return redirect()->route('buyer.orders.index')
             ->with('status', 'Order placed successfully! You can track its status here.');
+    }
+
+    /** Aborts the checkout (rolling the transaction back) and returns the buyer to the form. */
+    private function fail(string $message): never
+    {
+        throw ValidationException::withMessages(['stock' => $message]);
     }
 
     /**
