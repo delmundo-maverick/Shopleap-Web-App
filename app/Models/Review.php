@@ -14,11 +14,16 @@ class Review extends Model
         'seller_id',
         'rating',
         'comment',
+        'seller_reply',
+        'seller_replied_at',
     ];
 
     protected function casts(): array
     {
-        return ['rating' => 'integer'];
+        return [
+            'rating' => 'integer',
+            'seller_replied_at' => 'datetime',
+        ];
     }
 
     public function orderItem()
@@ -45,5 +50,25 @@ class Review extends Model
     public function media()
     {
         return $this->hasMany(ReviewMedia::class)->orderBy('sort_order');
+    }
+
+    /** "Juan Dela Cruz" -> "J*****z" so buyers keep some privacy on shown feedback. */
+    public function getBuyerMaskedNameAttribute(): string
+    {
+        $name = trim((string) $this->buyer?->name);
+
+        if ($name === '') {
+            return 'Anonymous buyer';
+        }
+
+        $length = mb_strlen($name);
+
+        if ($length <= 2) {
+            return mb_substr($name, 0, 1) . '*';
+        }
+
+        return mb_substr($name, 0, 1)
+            . str_repeat('*', min($length - 2, 5))
+            . mb_substr($name, -1);
     }
 }

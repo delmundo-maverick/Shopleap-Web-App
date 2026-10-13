@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Seller;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\Review;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -96,6 +97,50 @@ class DashboardController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Customer Reviews: store rating, star breakdown, latest reviews
+        |--------------------------------------------------------------------------
+        */
+
+        $reviewSummary = Review::where('seller_id', $user->id)
+            ->toBase()
+            ->selectRaw('COUNT(*) AS total, AVG(rating) AS average')
+            ->first();
+
+        $reviewCount = (int) ($reviewSummary->total ?? 0);
+        $storeRating = $reviewCount > 0 ? round((float) $reviewSummary->average, 1) : null;
+
+        $distributionRows = Review::where('seller_id', $user->id)
+            ->toBase()
+            ->select('rating')
+            ->selectRaw('COUNT(*) AS total')
+            ->groupBy('rating')
+            ->pluck('total', 'rating');
+
+        $ratingDistribution = [];
+        foreach ([5, 4, 3, 2, 1] as $star) {
+            $ratingDistribution[$star] = (int) ($distributionRows[$star] ?? 0);
+        }
+
+        $recentReviews = Review::with(['media', 'orderItem', 'product', 'buyer'])
+            ->where('seller_id', $user->id)
+            ->latest()
+            ->take(5)
+            ->get()
+            ->map(fn($review) => [
+                'rating'     => $review->rating,
+                'comment'    => $review->comment,
+                'product'    => $review->orderItem?->product_name ?? $review->product?->name ?? 'Product',
+                'buyer'      => $this->maskName($review->buyer?->name),
+                'order_id'   => $review->order_id,
+                'created_at' => $review->created_at,
+                'media'      => $review->media->map(fn($m) => [
+                    'url'      => $m->url,
+                    'is_video' => $m->is_video,
+                ])->values(),
+            ]);
+
+        /*
+        |--------------------------------------------------------------------------
         | Dashboard Statistics
         |--------------------------------------------------------------------------
         */
@@ -115,8 +160,8 @@ class DashboardController extends Controller
                 ->where('status', 'active')
                 ->count(),
 
-            // TODO: Calculate from reviews when the reviews table exists.
-            'store_rating' => null,
+            'store_rating' => $storeRating,
+            'review_count' => $reviewCount,
         ];
 
         /*
@@ -136,7 +181,28 @@ class DashboardController extends Controller
             'salesTrend',
             'orderStatusCounts',
             'stats',
-            'recentOrders'
+            'recentOrders',
+            'ratingDistribution',
+            'recentReviews'
         ));
+    }
+
+    private function maskName(?string $name): string
+    {
+        $name = trim((string) $name);
+
+        if ($name === '') {
+            return 'Anonymous buyer';
+        }
+
+        $length = mb_strlen($name);
+
+        if ($length <= 2) {
+            return mb_substr($name, 0, 1) . '*';
+        }
+
+        return mb_substr($name, 0, 1)
+            . str_repeat('*', min($length - 2, 5))
+            . mb_substr($name, -1);
     }
 }

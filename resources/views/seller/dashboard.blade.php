@@ -155,10 +155,17 @@
                         </div>
 
                         <p class="mt-2 text-3xl font-bold text-charcoal">
-                            {{ $stats['store_rating'] ?? '--' }}
+                            {{ $stats['store_rating'] !== null ? number_format($stats['store_rating'], 1) : '--' }}
                         </p>
 
-                        <p class="mt-1 text-xs text-charcoal/50">No reviews yet</p>
+                        <p class="mt-1 text-xs text-charcoal/50">
+                            @if ($stats['review_count'] > 0)
+                                From {{ number_format($stats['review_count']) }}
+                                {{ \Illuminate\Support\Str::plural('review', $stats['review_count']) }}
+                            @else
+                                No reviews yet
+                            @endif
+                        </p>
                     </div>
 
                 </div>
@@ -199,6 +206,138 @@
                                 </p>
                             </div>
                         </div>
+                    </div>
+
+                </div>
+
+                {{-- CUSTOMER REVIEWS --}}
+                <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+
+                    {{-- Rating summary --}}
+                    <div class="frost-panel rounded-2xl p-5">
+                        <div class="mb-4">
+                            <h3 class="text-sm font-bold text-charcoal">Customer Reviews</h3>
+                            <p class="text-xs text-charcoal/50">All time</p>
+                        </div>
+
+                        @if ($stats['review_count'] > 0)
+                            @php
+                                $avg = $stats['store_rating'];
+                                $filledStars = (int) round($avg);
+                            @endphp
+
+                            <div class="flex items-end gap-2">
+                                <p class="text-4xl font-bold text-charcoal">{{ number_format($avg, 1) }}</p>
+                                <p class="pb-1 text-sm text-charcoal/50">out of 5</p>
+                            </div>
+
+                            <p class="mt-1 text-lg leading-none">
+                                <span class="text-amber-400">{{ str_repeat('★', $filledStars) }}</span><span
+                                    class="text-charcoal/15">{{ str_repeat('★', 5 - $filledStars) }}</span>
+                            </p>
+
+                            <p class="mt-1 text-xs text-charcoal/50">
+                                {{ number_format($stats['review_count']) }}
+                                {{ \Illuminate\Support\Str::plural('review', $stats['review_count']) }}
+                            </p>
+
+                            <div class="mt-5 space-y-2">
+                                @foreach ($ratingDistribution as $star => $count)
+                                    @php $percent = $stats['review_count'] > 0 ? round(($count / $stats['review_count']) * 100) : 0; @endphp
+                                    <div class="flex items-center gap-2 text-xs">
+                                        <span
+                                            class="w-6 shrink-0 font-semibold text-charcoal/60">{{ $star }}★</span>
+                                        <div class="h-2 flex-1 overflow-hidden rounded-full bg-charcoal/10">
+                                            <div class="h-full rounded-full bg-amber-400"
+                                                style="width: {{ $percent }}%"></div>
+                                        </div>
+                                        <span
+                                            class="w-6 shrink-0 text-right text-charcoal/50">{{ $count }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <div
+                                class="flex h-40 items-center justify-center rounded-xl border border-dashed border-white/70 bg-white/30 px-4 text-center text-sm text-charcoal/40">
+                                No reviews yet
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Latest reviews --}}
+                    <div class="frost-panel rounded-2xl p-5 lg:col-span-2">
+                        <div class="mb-4 flex items-start justify-between gap-3">
+                            <div>
+                                <h3 class="text-sm font-bold text-charcoal">Latest Reviews</h3>
+                                <p class="text-xs text-charcoal/50">What buyers are saying about your products</p>
+                            </div>
+
+                            <a href="{{ route('seller.reviews.index') }}"
+                                class="shrink-0 text-xs font-semibold text-primary hover:underline">
+                                View all &amp; reply
+                            </a>
+                        </div>
+
+                        @if ($recentReviews->isEmpty())
+                            <div
+                                class="flex h-40 items-center justify-center rounded-xl border border-dashed border-white/70 bg-white/30 px-4 text-center text-sm text-charcoal/40">
+                                Reviews appear here once buyers confirm their orders and rate your products.
+                            </div>
+                        @else
+                            <div class="divide-y divide-white/60">
+                                @foreach ($recentReviews as $review)
+                                    <div class="py-4 first:pt-0 last:pb-0">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <p class="text-sm font-semibold text-charcoal">{{ $review['buyer'] }}
+                                                </p>
+                                                <p class="mt-0.5 text-sm leading-none">
+                                                    <span
+                                                        class="text-amber-400">{{ str_repeat('★', $review['rating']) }}</span><span
+                                                        class="text-charcoal/15">{{ str_repeat('★', 5 - $review['rating']) }}</span>
+                                                </p>
+                                            </div>
+
+                                            <p class="shrink-0 text-xs text-charcoal/40">
+                                                {{ $review['created_at']->diffForHumans() }}
+                                            </p>
+                                        </div>
+
+                                        <p class="mt-2 text-xs text-charcoal/50">
+                                            {{ $review['product'] }} ·
+                                            <a href="{{ route('seller.orders.show', $review['order_id']) }}"
+                                                class="font-semibold text-primary hover:underline">Order
+                                                #{{ $review['order_id'] }}</a>
+                                        </p>
+
+                                        @if (filled($review['comment']))
+                                            <p class="mt-2 whitespace-pre-line text-sm text-charcoal/80">
+                                                {{ $review['comment'] }}</p>
+                                        @else
+                                            <p class="mt-2 text-sm italic text-charcoal/35">Rated without a written
+                                                review.</p>
+                                        @endif
+
+                                        @if ($review['media']->isNotEmpty())
+                                            <div class="mt-3 flex flex-wrap gap-2">
+                                                @foreach ($review['media'] as $media)
+                                                    @if ($media['is_video'])
+                                                        <video src="{{ $media['url'] }}" controls preload="metadata"
+                                                            class="h-20 w-28 rounded-lg bg-charcoal/10 object-cover"></video>
+                                                    @else
+                                                        <a href="{{ $media['url'] }}" target="_blank" rel="noopener"
+                                                            class="block h-20 w-20 overflow-hidden rounded-lg bg-charcoal/10">
+                                                            <img src="{{ $media['url'] }}" alt="Review photo"
+                                                                loading="lazy" class="h-full w-full object-cover">
+                                                        </a>
+                                                    @endif
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
 
                 </div>

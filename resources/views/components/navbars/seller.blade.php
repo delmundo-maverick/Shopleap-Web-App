@@ -132,7 +132,7 @@
                         d="M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2m-6 0h6m-6 0H5a2 2 0 01-2-2V7a2 2 0 012-2h3.28a1 1 0 01.948.684l.5 1.5a1 1 0 00.949.685H15.28a1 1 0 01.948.684l.5 1.5a1 1 0 00.949.685H19a2 2 0 012 2v6a2 2 0 01-2 2h-4" />
                 </svg>
 
-                <span class="nav-label">Order Notifications</span>
+                <span class="nav-label">Prepare &amp; Ship Orders</span>
             </a>
 
 
@@ -147,7 +147,7 @@
                         d="M20 12H4m16 0l-4-4m4 4l-4 4M4 12l4-4M4 12l4 4" />
                 </svg>
 
-                <span class="nav-label">Prepare &amp; Ship Orders</span>
+                <span class="nav-label">Order Notification</span>
             </a>
 
 

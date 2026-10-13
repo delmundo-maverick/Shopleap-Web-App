@@ -93,7 +93,10 @@
 
                         $unreviewed = $order->items->filter(fn($i) => !$i->review);
                         $nextToRate = $unreviewed->first();
-                        $buyAgainItem = $order->items->first(fn($i) => $i->product && $i->product->status === 'active');
+                        $canReorder = $order->items->contains(
+                            fn($i) => $i->product && $i->product->status === 'active',
+                        );
+                        $chatProductId = $order->items->first(fn($i) => $i->product)?->product_id;
 
                         $timeline = $order->events->whereNotNull('status')->sortByDesc('id')->values();
                         $latest = $timeline->first();
@@ -187,8 +190,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                                 d="M3 7h11v9H3zM14 10h4l3 3v3h-7zM7 19a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM17 19a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
                                         </svg>
-                                        <span
-                                            class="truncate font-semibold text-leaf-green">{{ $latest->title }}</span>
+                                        <span class="truncate font-semibold text-leaf-green">{{ $latest->title }}</span>
                                         <span
                                             class="hidden shrink-0 text-charcoal/40 sm:inline">{{ $latest->created_at->format('M d, g:i A') }}</span>
                                     </span>
@@ -250,17 +252,24 @@
                                 @endif
                             @endif
 
-                            <a href="{{ route('messages.index', ['seller' => $order->seller_id]) }}"
-                                class="rounded-lg border border-charcoal/20 bg-white px-5 py-2 text-xs font-bold text-charcoal transition hover:border-primary hover:text-primary">
+                            <button type="button"
+                                class="contact-seller-btn rounded-lg border border-charcoal/20 bg-white px-5 py-2 text-xs font-bold text-charcoal transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                                data-open-url="{{ route('messages.open') }}"
+                                data-messages-url="{{ route('messages.index') }}"
+                                data-recipient-id="{{ $order->seller_id }}"
+                                data-product-id="{{ $chatProductId }}">
                                 Contact Seller
-                            </a>
+                            </button>
 
                             @if ($canBuyAgain)
-                                @if ($buyAgainItem)
-                                    <a href="{{ route('buyer.products.show', $buyAgainItem->product) }}"
-                                        class="rounded-lg border border-primary bg-white px-5 py-2 text-xs font-bold text-primary transition hover:bg-primary/5">
-                                        Buy Again
-                                    </a>
+                                @if ($canReorder)
+                                    <form method="POST" action="{{ route('buyer.orders.buy-again', $order) }}">
+                                        @csrf
+                                        <button type="submit"
+                                            class="rounded-lg border border-primary bg-white px-5 py-2 text-xs font-bold text-primary transition hover:bg-primary/5">
+                                            Buy Again
+                                        </button>
+                                    </form>
                                 @else
                                     <span
                                         class="cursor-not-allowed rounded-lg border border-charcoal/10 bg-white px-5 py-2 text-xs font-bold text-charcoal/30">

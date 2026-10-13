@@ -75,6 +75,21 @@
 
                 <h1 class="mt-3 text-2xl font-bold text-charcoal">{{ $product->name }}</h1>
 
+                @if ($reviewStats['count'] > 0)
+                    @php $avgFilled = (int) round($reviewStats['average']); @endphp
+                    <a href="#reviews" class="mt-2 inline-flex items-center gap-2 text-sm">
+                        <span class="font-bold text-charcoal">{{ number_format($reviewStats['average'], 1) }}</span>
+                        <span class="leading-none">
+                            <span class="text-amber-400">{{ str_repeat('★', $avgFilled) }}</span><span
+                                class="text-charcoal/15">{{ str_repeat('★', 5 - $avgFilled) }}</span>
+                        </span>
+                        <span class="text-xs text-charcoal/50 underline-offset-2 hover:underline">
+                            {{ number_format($reviewStats['count']) }}
+                            {{ \Illuminate\Support\Str::plural('review', $reviewStats['count']) }}
+                        </span>
+                    </a>
+                @endif
+
                 <div class="mt-3 flex items-baseline gap-2">
                     <span class="text-3xl font-bold text-primary">
                         @if ($product->options->isNotEmpty())
@@ -221,16 +236,155 @@
         </div>
 
         <!-- BUYER REVIEWS -->
-        <div class="mt-4 rounded-lg bg-white p-6 shadow-sm shadow-charcoal/5">
-            <h3 class="mb-3 text-sm font-bold uppercase tracking-wide text-charcoal/50">Buyer Reviews</h3>
-            <div class="flex flex-col items-center justify-center py-8 text-center">
-                <svg class="h-10 w-10 text-charcoal/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                        d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.539 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.784.57-1.838-.196-1.539-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                </svg>
-                <p class="mt-3 text-sm text-charcoal/50">No reviews yet</p>
-                <p class="mt-1 text-xs text-charcoal/35">Be the first to review this product after your purchase.</p>
-            </div>
+        <div id="reviews" class="mt-4 scroll-mt-24 rounded-lg bg-white p-6 shadow-sm shadow-charcoal/5">
+            <h3 class="mb-4 text-sm font-bold uppercase tracking-wide text-charcoal/50">Buyer Reviews</h3>
+
+            @if ($reviewStats['count'] === 0)
+                <div class="flex flex-col items-center justify-center py-8 text-center">
+                    <svg class="h-10 w-10 text-charcoal/20" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.539 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.784.57-1.838-.196-1.539-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
+                    <p class="mt-3 text-sm text-charcoal/50">No reviews yet</p>
+                    <p class="mt-1 text-xs text-charcoal/35">Be the first to review this product after your purchase.
+                    </p>
+                </div>
+            @else
+                @php
+                    $avg = $reviewStats['average'];
+                    $filled = (int) round($avg);
+                    $reviewUrl = fn(array $params) => request()->fullUrlWithQuery(
+                        array_merge(['page' => null], $params),
+                    ) . '#reviews';
+                    $pillBase = 'rounded-full border px-4 py-1.5 text-xs font-semibold transition';
+                    $pillOn = 'border-primary bg-primary text-white';
+                    $pillOff = 'border-light-gray bg-white text-charcoal/70 hover:border-primary hover:text-primary';
+                    $noFilter = !$ratingFilter && !$mediaFilter;
+                @endphp
+
+                <!-- SUMMARY + FILTERS -->
+                <div class="flex flex-col gap-6 rounded-xl bg-ice-blue/40 p-5 md:flex-row md:items-center">
+
+                    <div class="shrink-0 text-center md:w-40">
+                        <p class="text-4xl font-bold text-primary">{{ number_format($avg, 1) }}<span
+                                class="text-base font-semibold text-charcoal/40"> / 5</span></p>
+                        <p class="mt-1 text-lg leading-none">
+                            <span class="text-amber-400">{{ str_repeat('★', $filled) }}</span><span
+                                class="text-charcoal/15">{{ str_repeat('★', 5 - $filled) }}</span>
+                        </p>
+                        <p class="mt-1 text-xs text-charcoal/50">
+                            {{ number_format($reviewStats['count']) }}
+                            {{ \Illuminate\Support\Str::plural('review', $reviewStats['count']) }}
+                        </p>
+                    </div>
+
+                    <div class="flex-1 space-y-1.5">
+                        @foreach ($ratingDistribution as $star => $count)
+                            @php $percent = round(($count / $reviewStats['count']) * 100); @endphp
+                            <div class="flex items-center gap-2 text-xs">
+                                <span class="w-6 shrink-0 font-semibold text-charcoal/60">{{ $star }}★</span>
+                                <div class="h-2 flex-1 overflow-hidden rounded-full bg-charcoal/10">
+                                    <div class="h-full rounded-full bg-amber-400"
+                                        style="width: {{ $percent }}%">
+                                    </div>
+                                </div>
+                                <span class="w-6 shrink-0 text-right text-charcoal/50">{{ $count }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <a href="{{ $reviewUrl(['rating' => null, 'media' => null]) }}"
+                        class="{{ $pillBase }} {{ $noFilter ? $pillOn : $pillOff }}">
+                        All ({{ $reviewStats['count'] }})
+                    </a>
+                    @foreach ($ratingDistribution as $star => $count)
+                        @if ($count > 0)
+                            <a href="{{ $reviewUrl(['rating' => $star, 'media' => null]) }}"
+                                class="{{ $pillBase }} {{ $ratingFilter === $star && !$mediaFilter ? $pillOn : $pillOff }}">
+                                {{ $star }} ★ ({{ $count }})
+                            </a>
+                        @endif
+                    @endforeach
+                    @if ($reviewStats['with_media'] > 0)
+                        <a href="{{ $reviewUrl(['rating' => null, 'media' => 1]) }}"
+                            class="{{ $pillBase }} {{ $mediaFilter ? $pillOn : $pillOff }}">
+                            With Photos/Videos ({{ $reviewStats['with_media'] }})
+                        </a>
+                    @endif
+                </div>
+
+                <!-- REVIEW LIST -->
+                @if ($reviews->isEmpty())
+                    <p class="py-10 text-center text-sm text-charcoal/50">No reviews match this filter.</p>
+                @else
+                    <div class="mt-2 divide-y divide-light-gray">
+                        @foreach ($reviews as $review)
+                            <div class="flex gap-3 py-5">
+
+                                <div
+                                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold uppercase text-primary">
+                                    {{ mb_substr($review['buyer'], 0, 1) }}
+                                </div>
+
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-semibold text-charcoal">{{ $review['buyer'] }}</p>
+                                    <p class="mt-0.5 text-sm leading-none">
+                                        <span
+                                            class="text-amber-400">{{ str_repeat('★', $review['rating']) }}</span><span
+                                            class="text-charcoal/15">{{ str_repeat('★', 5 - $review['rating']) }}</span>
+                                    </p>
+                                    <p class="mt-1 text-xs text-charcoal/40">
+                                        {{ $review['created_at']->format('Y-m-d H:i') }}
+                                        @if ($review['variation'])
+                                            | Variation: {{ $review['variation'] }}
+                                        @endif
+                                    </p>
+
+                                    @if (filled($review['comment']))
+                                        <p class="mt-2 whitespace-pre-line text-sm text-charcoal/80">
+                                            {{ $review['comment'] }}</p>
+                                    @endif
+
+                                    @if ($review['media']->isNotEmpty())
+                                        <div class="mt-3 flex flex-wrap gap-2">
+                                            @foreach ($review['media'] as $media)
+                                                @if ($media['is_video'])
+                                                    <video src="{{ $media['url'] }}" controls preload="metadata"
+                                                        class="h-24 w-32 rounded-lg bg-charcoal/10 object-cover"></video>
+                                                @else
+                                                    <a href="{{ $media['url'] }}" target="_blank" rel="noopener"
+                                                        class="block h-24 w-24 overflow-hidden rounded-lg bg-charcoal/10">
+                                                        <img src="{{ $media['url'] }}" alt="Review photo"
+                                                            loading="lazy" class="h-full w-full object-cover">
+                                                    </a>
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                    @endif
+
+                                    @if (filled($review['reply']))
+                                        <div class="mt-3 rounded-lg bg-ice-blue/60 px-4 py-3">
+                                            <p class="text-xs font-bold text-primary">
+                                                Response from
+                                                {{ $product->seller?->sellerProfile?->shop_name ?? 'the seller' }}
+                                            </p>
+                                            <p class="mt-1 whitespace-pre-line text-sm text-charcoal/70">
+                                                {{ $review['reply'] }}</p>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div class="pagination-frost mt-4 flex justify-center">
+                        {{ $reviews->onEachSide(1)->links() }}
+                    </div>
+                @endif
+            @endif
         </div>
 
         <!-- RECOMMENDED PRODUCTS -->
@@ -251,6 +405,14 @@
                                 <p class="line-clamp-2 text-xs text-charcoal">{{ $item->name }}</p>
                                 <p class="mt-1 text-sm font-bold text-primary">
                                     ₱{{ number_format($item->display_price, 2) }}</p>
+                                @if (($item->reviews_count ?? 0) > 0)
+                                    <p class="mt-1 flex items-center gap-1 text-[11px] text-charcoal/50">
+                                        <span class="text-amber-400">★</span>
+                                        <span
+                                            class="font-semibold text-charcoal/70">{{ number_format($item->reviews_avg_rating, 1) }}</span>
+                                        <span>({{ $item->reviews_count }})</span>
+                                    </p>
+                                @endif
                             </div>
                         </a>
                     @endforeach
@@ -276,6 +438,14 @@
                                 <p class="line-clamp-2 text-xs text-charcoal">{{ $item->name }}</p>
                                 <p class="mt-1 text-sm font-bold text-primary">
                                     ₱{{ number_format($item->display_price, 2) }}</p>
+                                @if (($item->reviews_count ?? 0) > 0)
+                                    <p class="mt-1 flex items-center gap-1 text-[11px] text-charcoal/50">
+                                        <span class="text-amber-400">★</span>
+                                        <span
+                                            class="font-semibold text-charcoal/70">{{ number_format($item->reviews_avg_rating, 1) }}</span>
+                                        <span>({{ $item->reviews_count }})</span>
+                                    </p>
+                                @endif
                             </div>
                         </a>
                     @endforeach

@@ -6,6 +6,7 @@ use App\Http\Controllers\Buyer\Concerns\LoadsCartSummary;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\Review;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -50,6 +51,10 @@ class ProductController extends Controller
             $query->latest();
         }
 
+        // After the sort block on purpose: the bestseller branch calls select('products.*'),
+        // which would wipe the rating columns if they were added earlier.
+        $query->withReviewStats();
+
         $products = $query->paginate(24)->withQueryString();
         $categories = config('shopleap_categories.list');
 
@@ -68,6 +73,7 @@ class ProductController extends Controller
         $product->load(['images', 'seller.sellerProfile', 'options', 'variants']);
 
         $related = Product::with('images')
+            ->withReviewStats()
             ->where('category', $product->category)
             ->where('id', '!=', $product->id)
             ->active()
@@ -76,14 +82,87 @@ class ProductController extends Controller
             ->get();
 
         $explore = Product::with('images')
+            ->withReviewStats()
             ->where('id', '!=', $product->id)
             ->active()
             ->inRandomOrder()
             ->limit(12)
             ->get();
 
+        /*
+        |--------------------------------------------------------------------------
+        | Reviews: summary, star breakdown, filtered + paginated list
+        |--------------------------------------------------------------------------
+        */
+
+        $ratingFilter = (int) $request->input('rating');
+        $ratingFilter = ($ratingFilter >= 1 && $ratingFilter <= 5) ? $ratingFilter : null;
+        $mediaFilter = $request->boolean('media');
+
+        $reviewBase = Review::where('product_id', $product->id);
+
+        $summary = (clone $reviewBase)
+            ->toBase()
+            ->selectRaw('COUNT(*) AS total, AVG(rating) AS average')
+            ->first();
+
+        $reviewCount = (int) ($summary->total ?? 0);
+
+        $reviewStats = [
+            'count'      => $reviewCount,
+            'average'    => $reviewCount > 0 ? round((float) $summary->average, 1) : null,
+            'with_media' => $reviewCount > 0 ? (clone $reviewBase)->whereHas('media')->count() : 0,
+        ];
+
+        $distributionRows = (clone $reviewBase)
+            ->toBase()
+            ->select('rating')
+            ->selectRaw('COUNT(*) AS total')
+            ->groupBy('rating')
+            ->pluck('total', 'rating');
+
+        $ratingDistribution = [];
+        foreach ([5, 4, 3, 2, 1] as $star) {
+            $ratingDistribution[$star] = (int) ($distributionRows[$star] ?? 0);
+        }
+
+        $reviews = (clone $reviewBase)
+            ->with(['media', 'buyer', 'orderItem'])
+            ->when($ratingFilter, fn($q) => $q->where('rating', $ratingFilter))
+            ->when($mediaFilter, fn($q) => $q->whereHas('media'))
+            ->latest()
+            ->paginate(5)
+            ->withQueryString()
+            ->fragment('reviews')
+            ->through(fn(Review $review) => [
+                'id'         => $review->id,
+                'rating'     => $review->rating,
+                'comment'    => $review->comment,
+                'buyer'      => $review->buyer_masked_name,
+                'variation'  => collect($review->orderItem?->selected_options ?? [])
+                    ->map(fn($v, $k) => (is_int($k) ? '' : "{$k}: ") . (is_array($v) ? implode('/', $v) : $v))
+                    ->filter()
+                    ->implode(', '),
+                'created_at' => $review->created_at,
+                'reply'      => $review->seller_reply,
+                'replied_at' => $review->seller_replied_at,
+                'media'      => $review->media->map(fn($m) => [
+                    'url'      => $m->url,
+                    'is_video' => $m->is_video,
+                ])->values(),
+            ]);
+
         return view('Buyer.products.show', array_merge(
-            compact('product', 'related', 'explore'),
+            compact(
+                'product',
+                'related',
+                'explore',
+                'reviews',
+                'reviewStats',
+                'ratingDistribution',
+                'ratingFilter',
+                'mediaFilter'
+            ),
             $this->cartSummary($request)
         ));
     }
