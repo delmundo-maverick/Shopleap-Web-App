@@ -1,5 +1,47 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+
+    /* ───────────── Contact Seller → open (or reuse) the chat ───────────── */
+
+    document.querySelectorAll('.contact-seller-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (btn.disabled) return;
+
+            const label = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Opening…';
+
+            try {
+                const res = await fetch(btn.dataset.openUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrf,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        recipient_id: Number(btn.dataset.recipientId),
+                        product_id: btn.dataset.productId ? Number(btn.dataset.productId) : null,
+                    }),
+                });
+
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.conversation_id) throw new Error('open failed');
+
+                window.location.href = `${btn.dataset.messagesUrl}?conversation=${data.conversation_id}`;
+            } catch {
+                btn.disabled = false;
+                btn.textContent = label;
+                alert('Could not open the chat. Please try again.');
+            }
+        });
+    });
+
+    /* ───────────── Review modal ───────────── */
+
     const overlay = document.getElementById('reviewModalOverlay');
+    if (!overlay) return;
+
     const productName = document.getElementById('reviewModalProductName');
     const starButtons = document.querySelectorAll('.star-btn');
     const ratingInput = document.getElementById('reviewRatingInput');
@@ -68,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('reviewModalCloseBtn')?.addEventListener('click', closeModal);
-    overlay?.addEventListener('click', e => {
+    overlay.addEventListener('click', e => {
         if (e.target === overlay) closeModal();
     });
 
@@ -112,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch(currentAction, {
                 method: 'POST',
                 headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'X-CSRF-TOKEN': csrf,
                     'Accept': 'application/json',
                 },
                 body: fd,

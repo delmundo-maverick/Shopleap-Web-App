@@ -42,6 +42,7 @@ use App\Http\Controllers\Seller\{
     OrderController as SellerOrderController,
     ProductController as SellerProductController,
     ReportController as SellerReportController,
+    ReviewController as SellerReviewController,
     WaybillController,
 };
 
@@ -340,6 +341,13 @@ Route::middleware(['auth', 'seller'])->prefix('seller')->name('seller.')->group(
         Route::get('/export/pdf', 'exportPdf')->name('export.pdf');
     });
 
+    // Reviews
+    Route::prefix('reviews')->name('reviews.')->controller(SellerReviewController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/{review}/reply', 'reply')->middleware('throttle:30,1')->name('reply');
+        Route::delete('/{review}/reply', 'destroyReply')->name('reply.destroy');
+    });
+
     // Account
     Route::prefix('account')->name('account.')->controller(SellerAccountController::class)->group(function () {
         Route::get('/', 'show')->name('index');
@@ -386,6 +394,7 @@ Route::middleware(['auth', 'buyer'])->prefix('buyer')->name('buyer.')->group(fun
         Route::controller(BuyerOrderController::class)->group(function () {
             Route::get('/', 'index')->name('index');
             Route::post('/{order}/confirm', 'confirmReceived')->name('confirm');
+            Route::post('/{order}/buy-again', 'buyAgain')->name('buy-again');
         });
 
         // Review a purchased item (only allowed once the order is COMPLETED)

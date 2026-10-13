@@ -37,6 +37,11 @@ class Product extends Model
         return $this->hasMany(ProductImage::class)->orderBy('sort_order');
     }
 
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
+    }
+
     /**
      * The price to actually display — the discounted price when one is
      * set, otherwise the regular price.
@@ -151,6 +156,15 @@ class Product extends Model
     }
 
     /**
+     * Adds reviews_avg_rating and reviews_count to the query, for the
+     * star rating shown on product cards.
+     */
+    public function scopeWithReviewStats($query)
+    {
+        return $query->withAvg('reviews', 'rating')->withCount('reviews');
+    }
+
+    /**
      * Seller inventory filter.
      *  'out' => nothing left to sell
      *  'low' => still sellable, but the total or any active variant is at/below the threshold
@@ -167,10 +181,5 @@ class Product extends Model
             }),
             default => $query,
         };
-    }
-
-    public function reviews()
-    {
-        return $this->hasMany(Review::class);
     }
 }
