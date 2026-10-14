@@ -18,7 +18,7 @@ class ProductController extends Controller
     {
         $threshold = (int) config('shop.low_stock_threshold', 5);
 
-        $query = Product::with(['images', 'variants'])
+        $query = Product::with(['images', 'variants', 'liveDiscount'])
             ->where('seller_id', $request->user()->id)
             ->latest();
 
@@ -58,20 +58,17 @@ class ProductController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:2000'],
 
-            // Simple products only. With variants these are derived from the variants.
+            // Simple products only; with variants these are derived from the variants.
             'price' => ['required_without:variants', 'nullable', 'numeric', 'min:0'],
-            'discount_price' => ['nullable', 'numeric', 'min:0', 'lt:price'],
             'stock_quantity' => ['required_without:variants', 'nullable', 'integer', 'min:0'],
 
             'images' => ['required', 'array', 'min:1', 'max:6'],
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
 
-            // Option groups, e.g. "Pack Size" -> "Pack of 4, Pack of 5"
             'options' => ['required_with:variants', 'nullable', 'array', 'max:3'],
             'options.*.name' => ['required', 'string', 'max:100', 'distinct:ignore_case'],
             'options.*.values' => ['required', 'string', 'max:500'],
 
-            // One row per combination of option values
             'variants' => ['required_with:options', 'nullable', 'array', 'max:100'],
             'variants.*.options' => ['required', 'array'],
             'variants.*.price' => ['required', 'numeric', 'min:0'],
@@ -104,12 +101,10 @@ class ProductController extends Controller
                 'category' => $sellerCategory,
                 'subcategory' => null,
 
-                // With variants, the product's own price/stock are "starting from"
-                // price and total stock across variants.
+                // With variants: "starting from" price and total stock.
                 'price' => $hasVariants
                     ? collect($variants)->min('price')
                     : $validated['price'],
-                'discount_price' => $hasVariants ? null : ($validated['discount_price'] ?? null),
                 'stock_quantity' => $hasVariants
                     ? collect($variants)->sum('stock_quantity')
                     : $validated['stock_quantity'],
@@ -189,8 +184,7 @@ class ProductController extends Controller
             'subcategory' => ['nullable', 'string', 'max:100'],
         ];
 
-        // Variant products: price/stock/discount live on the variants and the
-        // product row is recalculated from them. Simple products: edit directly.
+        // Variant products: price/stock live on the variants. Simple products: edit directly.
         $rules += $hasVariants
             ? [
                 'variants' => ['required', 'array', 'min:1'],
@@ -202,7 +196,6 @@ class ProductController extends Controller
             ]
             : [
                 'price' => ['required', 'numeric', 'min:0'],
-                'discount_price' => ['nullable', 'numeric', 'min:0', 'lt:price'],
                 'stock_quantity' => ['required', 'integer', 'min:0'],
             ];
 
@@ -232,7 +225,7 @@ class ProductController extends Controller
             }
         });
 
-        $product->refresh()->load('variants');
+        $product->refresh()->load('variants', 'liveDiscount');
         $threshold = (int) config('shop.low_stock_threshold', 5);
 
         return response()->json([
@@ -242,7 +235,8 @@ class ProductController extends Controller
                 'name' => $product->name,
                 'category' => $product->category,
                 'price' => (float) $product->price,
-                'discount_price' => $product->discount_price ? (float) $product->discount_price : null,
+                // products.js reads this key for the sale price + strike-through.
+                'discount_price' => $product->was_price ? $product->display_price : null,
                 'stock_quantity' => $product->stock_quantity,
                 'status' => $product->status,
                 'low_stock_variants' => $product->lowStockVariantCount($threshold),
@@ -272,7 +266,7 @@ class ProductController extends Controller
     // Helpers
     // ------------------------------------------------------------------
 
-    /** Update existing variants by id. Never delete: carts and orders reference them. */
+    /** Update variants by id. Never delete: carts and orders reference them. */
     private function applyVariantChanges(Product $product, array $rows): void
     {
         $existing = $product->variants()->orderBy('id')->lockForUpdate()->get()->keyBy('id');
@@ -300,7 +294,7 @@ class ProductController extends Controller
         }
     }
 
-    /** "Pack Size" => "Pack of 4, Pack of 5"  →  ['Pack Size' => ['Pack of 4', 'Pack of 5']] */
+    /** "Pack Size" => "Pack of 4, Pack of 5" becomes ['Pack Size' => ['Pack of 4', 'Pack of 5']]. */
     private function normalizeOptions(array $options): array
     {
         $groups = [];
@@ -318,9 +312,8 @@ class ProductController extends Controller
     }
 
     /**
-     * Every variant must use exactly the declared option names, with values
-     * that belong to those options, and no combination may appear twice.
-     * Returns the variants with their option keys in declared order.
+     * Each variant must use exactly the declared option names, with valid values,
+     * and no combination may repeat. Returns variants with option keys in declared order.
      */
     private function matchVariantsToOptions(array $groups, array $variants): array
     {

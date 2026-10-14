@@ -48,7 +48,7 @@ class Product extends Model
      */
     public function getDisplayPriceAttribute(): float
     {
-        return (float) ($this->discount_price ?? $this->price);
+        return $this->priceAfterDiscount($this->price);
     }
 
     /**
@@ -57,8 +57,10 @@ class Product extends Model
      */
     public function getWasPriceAttribute(): ?float
     {
-        return $this->discount_price ? (float) $this->price : null;
-    }
+        $price = (float) $this->price;
+
+        return $this->display_price < $price ? $price : null;
+    }   
 
     /**
      * First product image's public R2 URL, or null if none uploaded.
@@ -104,6 +106,7 @@ class Product extends Model
             ? $this->variants->isNotEmpty()
             : $this->variants()->exists();
     }
+
 
     /** Active variants at or below the threshold (includes sold-out ones). */
     public function lowStockVariantCount(?int $threshold = null): int
@@ -181,5 +184,24 @@ class Product extends Model
             }),
             default => $query,
         };
+    }
+
+    public function discount()
+    {
+        return $this->hasOne(ProductDiscount::class);
+    }
+
+    /** The discount only while it is active and inside its schedule. Eager-load this on buyer pages. */
+    public function liveDiscount()
+    {
+        return $this->hasOne(ProductDiscount::class)->live();
+    }
+
+    /** Apply this product's live discount (if any) to any price, e.g. a variant's. */
+    public function priceAfterDiscount(float|string|null $price): float
+    {
+        $price = (float) $price;
+
+        return $this->liveDiscount?->apply($price) ?? $price;
     }
 }

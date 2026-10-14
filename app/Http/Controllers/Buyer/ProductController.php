@@ -21,7 +21,7 @@ class ProductController extends Controller
         $sort = in_array($request->get('sort'), ['newest', 'price_low', 'price_high', 'bestseller'], true)
             ? $request->get('sort') : 'newest';
 
-        $query = Product::with('images')->active();
+        $query = Product::with(['images', 'liveDiscount'])->active();
 
         if ($search) {
             $query->where('name', 'ilike', "%{$search}%");
@@ -51,8 +51,7 @@ class ProductController extends Controller
             $query->latest();
         }
 
-        // After the sort block on purpose: the bestseller branch calls select('products.*'),
-        // which would wipe the rating columns if they were added earlier.
+        // Must come after the sort block: select('products.*') would wipe the rating columns.
         $query->withReviewStats();
 
         $products = $query->paginate(24)->withQueryString();
@@ -70,9 +69,9 @@ class ProductController extends Controller
             abort(404);
         }
 
-        $product->load(['images', 'seller.sellerProfile', 'options', 'variants']);
+        $product->load(['images', 'seller.sellerProfile', 'options', 'variants', 'liveDiscount']);
 
-        $related = Product::with('images')
+        $related = Product::with(['images', 'liveDiscount'])
             ->withReviewStats()
             ->where('category', $product->category)
             ->where('id', '!=', $product->id)
@@ -81,7 +80,7 @@ class ProductController extends Controller
             ->limit(6)
             ->get();
 
-        $explore = Product::with('images')
+        $explore = Product::with(['images', 'liveDiscount'])
             ->withReviewStats()
             ->where('id', '!=', $product->id)
             ->active()
@@ -89,12 +88,7 @@ class ProductController extends Controller
             ->limit(12)
             ->get();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Reviews: summary, star breakdown, filtered + paginated list
-        |--------------------------------------------------------------------------
-        */
-
+        // Reviews: summary, star breakdown, filtered + paginated list
         $ratingFilter = (int) $request->input('rating');
         $ratingFilter = ($ratingFilter >= 1 && $ratingFilter <= 5) ? $ratingFilter : null;
         $mediaFilter = $request->boolean('media');

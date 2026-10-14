@@ -15,6 +15,7 @@ class OrderItem extends Model
         'price_at_purchase',
         'subtotal',
         'selected_options',
+        'original_price',
     ];
 
     protected function casts(): array

@@ -120,6 +120,20 @@
                 <span class="nav-label">Manage Inventory</span>
             </a>
 
+            
+            <a href="{{ route('seller.orders.index', ['status' => 'prepare']) }}" title="Prepare & Ship Orders"
+                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
+                {{ $active === 'prepare'
+                    ? 'frost-chip text-primary font-semibold'
+                    : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
+
+                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                        d="M20 12H4m16 0l-4-4m4 4l-4 4M4 12l4-4M4 12l4 4" />
+                </svg>
+
+                <span class="nav-label">Order Notification</span>
+            </a>
 
             <a href="{{ route('seller.orders.index', ['status' => 'new']) }}" title="Order Notifications"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
@@ -133,21 +147,6 @@
                 </svg>
 
                 <span class="nav-label">Prepare &amp; Ship Orders</span>
-            </a>
-
-
-            <a href="{{ route('seller.orders.index', ['status' => 'prepare']) }}" title="Prepare & Ship Orders"
-                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
-                {{ $active === 'prepare'
-                    ? 'frost-chip text-primary font-semibold'
-                    : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
-
-                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                        d="M20 12H4m16 0l-4-4m4 4l-4 4M4 12l4-4M4 12l4 4" />
-                </svg>
-
-                <span class="nav-label">Order Notification</span>
             </a>
 
 

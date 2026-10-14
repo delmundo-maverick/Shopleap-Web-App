@@ -103,14 +103,6 @@
                         <span class="hidden text-xs text-charcoal/60 sm:block">Shop Smart. Shop Simple.</span>
                     </span>
                 </a>
-
-                <div class="flex items-center gap-2 text-sm">
-                    <span class="hidden text-charcoal/60 sm:inline">New to Shopleap?</span>
-                    <a href="{{ route('register') }}"
-                        class="rounded-lg bg-white px-3 py-1.5 font-semibold text-primary shadow-sm transition hover:text-sky-blue sm:px-3.5 sm:py-2">
-                        Create an account
-                    </a>
-                </div>
             </header>
 
             {{-- m-auto on the child keeps it centered; the container only scrolls if the screen is too short to fit it --}}

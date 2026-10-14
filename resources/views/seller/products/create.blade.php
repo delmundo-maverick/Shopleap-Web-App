@@ -106,15 +106,6 @@
                             </div>
 
                             <div>
-                                <label class="mb-2 block text-sm font-semibold text-charcoal">Discount Price (₱)</label>
-                                <input type="number" id="baseDiscountPrice" name="discount_price"
-                                    value="{{ old('discount_price') }}" min="0" step="0.01"
-                                    placeholder="Optional"
-                                    class="w-full rounded-xl border border-light-gray bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
-                                <p class="mt-1.5 text-xs text-charcoal/45">Must be lower than the regular price.</p>
-                            </div>
-
-                            <div>
                                 <label class="mb-2 block text-sm font-semibold text-charcoal">Stock Quantity *</label>
                                 <input type="number" id="baseStock" name="stock_quantity"
                                     value="{{ old('stock_quantity') }}" required min="0" placeholder="0"
@@ -234,7 +225,6 @@
         const pricingHint = document.getElementById('pricingHint');
         const basePrice = document.getElementById('basePrice');
         const baseStock = document.getElementById('baseStock');
-        const baseDiscountPrice = document.getElementById('baseDiscountPrice');
 
         // Remembers previously entered price/stock/sku per combination key
         // so regenerating variants doesn't wipe out what was typed.
@@ -336,7 +326,6 @@
             if (enabled) {
                 basePrice.removeAttribute('required');
                 baseStock.removeAttribute('required');
-                baseDiscountPrice.value = '';
             } else {
                 basePrice.setAttribute('required', 'required');
                 baseStock.setAttribute('required', 'required');
