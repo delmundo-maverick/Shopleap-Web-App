@@ -38,9 +38,6 @@ class CheckoutController extends Controller
     {
         $buyer = $request->user();
 
-        // Everything happens in ONE transaction: the cart lock, the stock checks and the
-        // stock deductions. (Previously the lock was taken outside the transaction, so it
-        // released immediately and two buyers could both pass the stock check.)
         $placed = DB::transaction(function () use ($request, $buyer) {
 
             // 1. Lock the cart rows so a double-click can't place the order twice.
@@ -119,6 +116,7 @@ class CheckoutController extends Controller
                         'selected_options' => $item->selected_options,
                         'quantity' => $item->quantity,
                         'price_at_purchase' => $item->unit_price,
+                        'original_price' => $item->variant?->price ?? $item->product->price,
                         'subtotal' => $item->line_total,
                     ]);
 
@@ -175,7 +173,7 @@ class CheckoutController extends Controller
      */
     private function selectedCartItems(Request $request, bool $withLock = false)
     {
-        $query = $request->user()->cartItems()->with('product.seller.sellerProfile', 'variant');
+        $query = $request->user()->cartItems()->with('product.seller.sellerProfile', 'product.liveDiscount', 'variant');
 
         if ($withLock) {
             $query->lockForUpdate();

@@ -18,6 +18,7 @@ class CartController extends Controller
                 'product.seller.sellerProfile',
                 'product.options',
                 'product.variants',
+                'product.liveDiscount',
                 'variant',
             ])
             ->latest()
@@ -28,10 +29,7 @@ class CartController extends Controller
         return view('Buyer.cart.index', compact('cartItems', 'total'));
     }
 
-    /**
-     * AJAX — add a product (optionally a specific variant) to cart,
-     * or increment quantity if that exact product+variant is already there.
-     */
+    /** AJAX: add a product (optionally a variant) or increment an existing line. */
     public function store(Request $request, Product $product)
     {
         $request->validate([
@@ -41,29 +39,26 @@ class CartController extends Controller
         ]);
 
         if ($product->status !== 'active') {
-            return response()->json(['success' => false, 'message' => 'This product is currently unavailable.'], 422);
+            return $this->fail('This product is currently unavailable.');
         }
 
         $variant = null;
         if ($request->filled('variant_id')) {
-            // Archived variants can't be bought.
             $variant = ProductVariant::where('product_id', $product->id)
                 ->where('is_active', true)
                 ->find($request->variant_id);
 
             if (!$variant) {
-                return response()->json(['success' => false, 'message' => 'Selected option is no longer available.'], 422);
+                return $this->fail('Selected option is no longer available.');
             }
         } elseif ($product->hasVariants()) {
-            return response()->json(['success' => false, 'message' => 'Please select all product options.'], 422);
+            return $this->fail('Please select all product options.');
         }
 
         $availableStock = $variant ? $variant->stock_quantity : $product->stock_quantity;
         if ($availableStock < 1) {
-            return response()->json(['success' => false, 'message' => 'This item is out of stock.'], 422);
+            return $this->fail('This item is out of stock.');
         }
-
-        $qtyToAdd = $request->input('quantity', 1);
 
         $cartItem = CartItem::firstOrNew([
             'user_id' => $request->user()->id,
@@ -71,25 +66,20 @@ class CartController extends Controller
             'product_variant_id' => $variant?->id,
         ]);
 
-        $newQty = ($cartItem->exists ? $cartItem->quantity : 0) + $qtyToAdd;
+        $newQty = ($cartItem->exists ? $cartItem->quantity : 0) + $request->input('quantity', 1);
 
         if ($newQty > $availableStock) {
-            return response()->json([
-                'success' => false,
-                'message' => "Only {$availableStock} in stock.",
-            ], 422);
+            return $this->fail("Only {$availableStock} in stock.");
         }
 
         $cartItem->quantity = $newQty;
         $cartItem->selected_options = $variant ? $variant->options : null;
         $cartItem->save();
 
-        $cartCount = $request->user()->cartItems()->sum('quantity');
-
         return response()->json([
             'success' => true,
             'message' => "{$product->name} added to cart.",
-            'cart_count' => $cartCount,
+            'cart_count' => $this->cartCount($request),
             'cart_item_id' => $cartItem->id,
         ]);
     }
@@ -103,25 +93,24 @@ class CartController extends Controller
             'variant_id' => ['nullable', 'integer'],
         ]);
 
-        $cartItem->load('product.variants', 'variant');
+        $cartItem->load('product.variants', 'product.liveDiscount', 'variant');
 
         if ($cartItem->product->status !== 'active') {
             return $this->fail('This product is no longer available.');
         }
 
         $variant = $cartItem->variant;
+        $hasNewVariant = $request->filled('variant_id');
 
-        // The line's current variant was archived and the buyer hasn't picked a replacement.
-        if (!$request->filled('variant_id') && $variant && !$variant->is_active) {
+        if (!$hasNewVariant && $variant && !$variant->is_active) {
             return $this->fail('This option is no longer available. Please choose another or remove it.');
         }
 
-        // A line with no variant on a product that now has variants must pick one first.
-        if (!$request->filled('variant_id') && !$variant && $cartItem->product->hasVariants()) {
+        if (!$hasNewVariant && !$variant && $cartItem->product->hasVariants()) {
             return $this->fail('Please choose an option.');
         }
 
-        if ($request->filled('variant_id')) {
+        if ($hasNewVariant) {
             $variant = ProductVariant::where('product_id', $cartItem->product_id)
                 ->where('is_active', true)
                 ->find($request->variant_id);
@@ -130,9 +119,9 @@ class CartController extends Controller
                 return $this->fail('Selected option is no longer available.');
             }
 
-            // Switching to a variant that's already its own cart line?
-            // Merge into that line instead of creating a duplicate.
-            $existingLine = CartItem::where('user_id', $request->user()->id)
+            // Merge into an existing line for the same variant instead of duplicating.
+            $existingLine = CartItem::with('product.liveDiscount', 'variant')
+                ->where('user_id', $request->user()->id)
                 ->where('product_id', $cartItem->product_id)
                 ->where('product_variant_id', $variant->id)
                 ->where('id', '!=', $cartItem->id)
@@ -175,12 +164,13 @@ class CartController extends Controller
 
         $cartItem->quantity = $request->quantity;
 
-        if ($request->filled('variant_id')) {
+        if ($hasNewVariant) {
             $cartItem->product_variant_id = $variant->id;
             $cartItem->selected_options = $variant->options;
         }
 
         $cartItem->save();
+        $cartItem->load('variant'); // refresh so prices reflect the new variant
 
         return response()->json([
             'success' => true,
@@ -195,9 +185,7 @@ class CartController extends Controller
         ]);
     }
 
-    /**
-     * AJAX — remove a cart line entirely.
-     */
+    /** AJAX: remove a cart line. */
     public function destroy(Request $request, CartItem $cartItem)
     {
         $this->authorizeOwnership($request, $cartItem);
@@ -211,13 +199,11 @@ class CartController extends Controller
         ]);
     }
 
-    /**
-     * AJAX — remove several cart lines in one request. Only the buyer's own lines are touched.
-     */
+    /** AJAX: remove several of the buyer's cart lines. */
     public function destroyMany(Request $request)
     {
         $data = $request->validate([
-            'ids'   => ['required', 'array', 'min:1'],
+            'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
         ]);
 
@@ -228,9 +214,9 @@ class CartController extends Controller
         CartItem::whereIn('id', $removedIds)->delete();
 
         return response()->json([
-            'success'     => true,
+            'success' => true,
             'removed_ids' => $removedIds,
-            'cart_count'  => CartItem::where('user_id', $request->user()->id)->sum('quantity'),
+            'cart_count' => $this->cartCount($request),
         ]);
     }
 
@@ -248,7 +234,10 @@ class CartController extends Controller
 
     private function cartTotal(Request $request): float
     {
-        return (float) $request->user()->cartItems()->with('product', 'variant')->get()->sum('line_total');
+        return (float) $request->user()->cartItems()
+            ->with('product.liveDiscount', 'variant')
+            ->get()
+            ->sum('line_total');
     }
 
     private function authorizeOwnership(Request $request, CartItem $cartItem): void

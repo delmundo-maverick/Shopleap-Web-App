@@ -29,12 +29,15 @@ class CartItem extends Model
     }
 
     /**
-     * The price to actually charge — the variant's price when one is
-     * selected, otherwise the product's normal display price.
+     * The price to actually charge: the variant's price after any live
+     * discount when a variant is selected, otherwise the product's
+     * normal display price.
      */
     public function getUnitPriceAttribute(): float
     {
-        return (float) ($this->variant?->price ?? $this->product->display_price);
+        return (float) ($this->variant
+            ? $this->product->priceAfterDiscount($this->variant->price)
+            : $this->product->display_price);
     }
 
     public function getLineTotalAttribute(): float

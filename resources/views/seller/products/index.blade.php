@@ -160,12 +160,16 @@
                                     <span class="mr-1 text-xs text-charcoal/50">From</span>
                                 @endif
                                 <span data-field="price"
-                                    class="font-semibold text-charcoal">₱{{ number_format($product->discount_price ?? $product->price, 2) }}</span>
+                                    class="font-semibold text-charcoal">₱{{ number_format($product->display_price, 2) }}</span>
                                 <span data-field="original-price"
                                     @class([
                                         'ml-1 text-xs text-charcoal/40 line-through',
-                                        'hidden' => !$product->discount_price,
+                                        'hidden' => !$product->was_price,
                                     ])>₱{{ number_format($product->price, 2) }}</span>
+                                @if ($product->liveDiscount)
+                                    <span
+                                        class="ml-1 rounded bg-sale-red/10 px-1.5 py-0.5 text-[10px] font-bold text-sale-red">{{ $product->liveDiscount->label }}</span>
+                                @endif
                             </td>
                             <td>
                                 <span data-field="stock"
@@ -178,11 +182,15 @@
                                     class="status-badge badge--{{ $variant }}">{{ $product->status }}</span>
                             </td>
                             <td class="text-right">
-                                <button type="button" @click="openProduct({{ $product->id }})"
-                                    aria-label="Manage {{ $product->name }}"
-                                    class="btn-primary !px-3.5 !py-2 !text-xs !font-semibold">
-                                    Manage
-                                </button>
+                                <div class="flex items-center justify-end gap-2">
+                                    <a href="{{ route('seller.products.discount.edit', $product) }}"
+                                        class="btn-soft !px-3.5 !py-2 !text-xs">Discount</a>
+                                    <button type="button" @click="openProduct({{ $product->id }})"
+                                        aria-label="Manage {{ $product->name }}"
+                                        class="btn-primary !px-3.5 !py-2 !text-xs !font-semibold">
+                                        Manage
+                                    </button>
+                                </div>
                             </td>
                         </tr>
 
@@ -286,23 +294,13 @@
                         <p x-show="errors.subcategory" x-text="errors.subcategory?.[0]" class="field-error"></p>
                     </div>
 
-                    <!-- Simple products: price / discount / stock live on the product -->
+                    <!-- Simple products: price / stock live on the product -->
                     <div x-show="!hasVariants">
                         <label for="f-price" class="field-label">Price (₱)</label>
                         <input id="f-price" type="number" inputmode="decimal" x-model.number="form.price"
                             min="0" step="0.01" class="frost-input field-control"
                             :aria-invalid="errors.price ? 'true' : 'false'">
                         <p x-show="errors.price" x-text="errors.price?.[0]" class="field-error"></p>
-                    </div>
-
-                    <div x-show="!hasVariants">
-                        <label for="f-discount" class="field-label">Discount Price (₱)</label>
-                        <input id="f-discount" type="number" inputmode="decimal"
-                            x-model.number="form.discount_price" min="0" step="0.01"
-                            class="frost-input field-control"
-                            :aria-invalid="errors.discount_price ? 'true' : 'false'">
-                        <p x-show="errors.discount_price" x-text="errors.discount_price?.[0]" class="field-error">
-                        </p>
                     </div>
 
                     <div x-show="!hasVariants" class="sm:col-span-2">

@@ -44,6 +44,7 @@ use App\Http\Controllers\Seller\{
     ReportController as SellerReportController,
     ReviewController as SellerReviewController,
     WaybillController,
+    ProductDiscountController as SellerProductDiscountController,
 };
 
 use App\Http\Controllers\Buyer\{
@@ -319,6 +320,9 @@ Route::middleware(['auth', 'seller'])->prefix('seller')->name('seller.')->group(
         Route::get('/{product}/details', 'details')->name('details');
         Route::post('/{product}', 'update')->name('update');
         Route::post('/{product}/status', 'updateStatus')->name('status');
+        Route::get('/{product}/discount', [SellerProductDiscountController::class, 'edit'])->name('discount.edit');
+        Route::post('/{product}/discount', [SellerProductDiscountController::class, 'update'])->name('discount.update');
+        Route::delete('/{product}/discount', [SellerProductDiscountController::class, 'destroy'])->name('discount.destroy');
     });
 
     // Orders

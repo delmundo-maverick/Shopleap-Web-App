@@ -103,6 +103,12 @@
                     @endif
                 </div>
 
+                @if ($product->liveDiscount?->ends_at)
+                    <p class="mt-1 text-xs font-semibold text-sale-red">
+                        Sale ends {{ $product->liveDiscount->ends_at->format('M d, Y g:i A') }}
+                    </p>
+                @endif
+
                 <div class="mt-4 flex items-center gap-4 text-xs text-charcoal/50">
                     @if ($product->stock_quantity < 1)
                         <span class="font-semibold text-sale-red">Out of stock</span>
@@ -592,7 +598,8 @@
                 fn($v) => [
                     'id' => $v->id,
                     'options' => $v->options,
-                    'price' => (float) $v->price,
+                    'price' => (float) $product->priceAfterDiscount($v->price),
+                    'original_price' => (float) $v->price,
                     'stock_quantity' => $v->stock_quantity,
                 ],
             ),

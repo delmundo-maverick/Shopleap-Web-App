@@ -17,7 +17,7 @@ class ShopController extends Controller
     {
         abort_unless($seller->sellerProfile, 404);
 
-        $products = Product::with('images')
+        $products = Product::with(['images', 'liveDiscount'])
             ->withReviewStats()
             ->where('seller_id', $seller->id)
             ->active()
