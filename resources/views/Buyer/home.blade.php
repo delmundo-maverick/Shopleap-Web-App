@@ -174,7 +174,7 @@
                 <div>
                     <p class="mb-3 text-xs font-bold uppercase tracking-wide text-charcoal/50">Payment Methods</p>
                     <div class="flex flex-wrap gap-2">
-                        @foreach (['GCash', 'Maya', 'Visa', 'Mastercard', 'COD'] as $payment)
+                        @foreach (['COD'] as $payment)
                             <span
                                 class="rounded border border-light-gray px-2 py-1 text-[10px] font-semibold text-charcoal/60">{{ $payment }}</span>
                         @endforeach
@@ -184,7 +184,7 @@
                 <div>
                     <p class="mb-3 text-xs font-bold uppercase tracking-wide text-charcoal/50">Delivery Partners</p>
                     <div class="flex flex-wrap gap-2">
-                        @foreach (['J&T', 'LBC', 'Ninja Van', 'Flash'] as $courier)
+                        @foreach ([] as $courier)
                             <span
                                 class="rounded border border-light-gray px-2 py-1 text-[10px] font-semibold text-charcoal/60">{{ $courier }}</span>
                         @endforeach

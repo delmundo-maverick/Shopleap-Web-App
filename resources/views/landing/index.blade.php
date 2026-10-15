@@ -66,12 +66,12 @@
             <div class="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-5 py-3.5 sm:px-8 2xl:max-w-[1600px]">
 
                 <a href="/" class="flex shrink-0 items-center gap-3">
-                    <div class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-light-gray">
+                    <div class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl">
                         <img src="{{ asset('images/Shopleap-Logo.png') }}" alt="Shopleap"
                             class="h-full w-full object-contain">
                     </div>
                     <div class="hidden sm:block">
-                        <p class="font-display text-xl font-bold leading-none tracking-tight text-charcoal">Shopleap</p>
+                        <p class="font-logo text-xl font-bold leading-none tracking-tight text-charcoal">Shopleap</p>
                         <p class="mt-1 text-[11px] text-charcoal/55">Shop Smart. Shop Simple.</p>
                     </div>
                 </a>
