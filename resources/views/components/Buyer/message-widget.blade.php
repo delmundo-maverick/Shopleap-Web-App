@@ -76,12 +76,34 @@
 
         <div id="widgetThreadMessages" class="flex-1 space-y-2.5 overflow-y-auto p-3"></div>
 
+        <!-- Pending attachment previews -->
+        <div id="widgetThreadPreviews" class="hidden shrink-0 flex-wrap gap-2 border-t border-light-gray px-2.5 pt-2.5">
+        </div>
+
+        <!-- Attachment / send error -->
+        <p id="widgetThreadError" class="hidden shrink-0 px-3 pt-1.5 text-[11px] text-sale-red"></p>
+
         <form id="widgetThreadForm" class="flex shrink-0 items-center gap-2 border-t border-light-gray p-2.5">
+            <input type="file" id="widgetThreadFile"
+                accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm" multiple
+                class="hidden">
+
+            <button type="button" id="widgetThreadAttachBtn" title="Attach photo or video"
+                class="shrink-0 rounded-full p-2 text-charcoal/50 transition hover:bg-ice-blue hover:text-primary">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+            </button>
+
             <input type="text" id="widgetThreadInput" maxlength="2000" placeholder="Type a message here"
                 class="flex-1 rounded-full border border-light-gray px-3.5 py-2 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
-            <button type="submit" class="shrink-0 rounded-full bg-primary p-2 text-white transition hover:bg-sky-blue">
+
+            <button type="submit"
+                class="shrink-0 rounded-full bg-primary p-2 text-white transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:opacity-50">
                 <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-6-6l6 6-6 6" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M5 12h14m-6-6l6 6-6 6" />
                 </svg>
             </button>
         </form>

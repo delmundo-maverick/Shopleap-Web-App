@@ -235,7 +235,7 @@ class MessagingController extends Controller
 
     /**
      * Admin-only: everything about a ticket/conversation in one payload
-     * (ticket facts, people, order, product, original request, photos).
+     * (ticket facts, people, order, product, original request, photos, videos).
      */
     public function details(Request $request, Conversation $conversation)
     {
@@ -341,11 +341,13 @@ class MessagingController extends Controller
             'seller' => $product->seller?->messaging_name,
         ] : null;
 
-        // ── every photo in the thread ──
-        $photos = collect(MessageAttachmentService::forMessages($messages->pluck('id')))
+        // ── every photo in the thread (videos are listed separately) ──
+        $allMedia = collect(MessageAttachmentService::forMessages($messages->pluck('id')))
             ->flatten(1)
-            ->values()
-            ->all();
+            ->values();
+
+        $photos = $allMedia->where('type', 'image')->values()->all();
+        $videos = $allMedia->where('type', 'video')->values()->all();
 
         return response()->json([
             'ticket' => $ticket,
@@ -361,6 +363,7 @@ class MessagingController extends Controller
                 'customer_messages' => $messages->count() - $staffCount,
                 'staff_messages' => $staffCount,
                 'photo_count' => count($photos),
+                'video_count' => count($videos),
             ],
             'requester' => $requester,
             'people' => $people,
@@ -368,6 +371,7 @@ class MessagingController extends Controller
             'product' => $productData,
             'original_request' => $first?->body,
             'photos' => $photos,
+            'videos' => $videos,
         ]);
     }
 
@@ -440,7 +444,7 @@ class MessagingController extends Controller
         abort_unless($request->user()->role === 'super_admin', 403);
     }
 
-    /** AJAX (multipart) — post a message, optionally with photos, into an existing conversation. */
+    /** AJAX (multipart) — post a message, optionally with photos/videos, into an existing conversation. */
     public function storeMessage(Request $request, Conversation $conversation)
     {
         $user = $request->user();
@@ -448,7 +452,7 @@ class MessagingController extends Controller
 
         $request->validate(array_merge([
             'body' => ['nullable', 'string', 'max:2000', 'required_without:images'],
-        ], MessageAttachmentService::rules()));
+        ], MessageAttachmentService::rules(allowVideo: true)));
 
         $message = $conversation->messages()->create([
             'sender_id' => $user->id,
@@ -492,7 +496,26 @@ class MessagingController extends Controller
         $disk = Storage::disk($attachment->disk);
         abort_unless($disk->exists($attachment->path), 404);
 
-        return $disk->response($attachment->path, $attachment->original_name, [
+        $diskConfig = config("filesystems.disks.{$attachment->disk}", []);
+
+        // Public bucket (legacy uploads): files are served from the public URL.
+        if (($diskConfig['visibility'] ?? null) === 'public') {
+            return redirect()->away($disk->url($attachment->path));
+        }
+
+        // Private bucket (r2): short-lived signed URL. R2 handles Range requests,
+        // so video seeking works in Safari/iOS too.
+        if (($diskConfig['driver'] ?? null) === 's3') {
+            return redirect()->away(
+                $disk->temporaryUrl($attachment->path, now()->addMinutes(10), [
+                    'ResponseContentType' => $attachment->mime,
+                    'ResponseContentDisposition' => 'inline; filename="' . addslashes($attachment->original_name) . '"',
+                ])
+            );
+        }
+
+        // Local disk fallback: response()->file() supports Range requests.
+        return response()->file($disk->path($attachment->path), [
             'Content-Type' => $attachment->mime,
             'Cache-Control' => 'private, max-age=3600',
             'X-Content-Type-Options' => 'nosniff',
@@ -623,31 +646,53 @@ class MessagingController extends Controller
         $user = $request->user();
         abort_unless($user->role === 'buyer', 403);
 
-        $conversations = $user->conversations()
+        $rawConversations = $user->conversations()
             ->wherePivotNull('hidden_at')
             ->with(['participants', 'messages.sender', 'product'])
             ->orderByDesc('last_message_at')
-            ->get()
-            ->map(function ($conversation) use ($user) {
-                $other = $conversation->otherParticipantFor($user->id);
-                $lastMessage = $conversation->messages->last();
+            ->get();
 
-                return [
-                    'conversation_id' => $conversation->id,
-                    'other_id' => $other?->id,
-                    'other_role' => $other?->role,
-                    'name' => $conversation->category
-                        ? ($conversation->subject ?: 'Support ticket')
-                        : ($other?->role === 'super_admin' ? 'Shopleap Support' : ($other?->messaging_name ?? 'Unknown')),
-                    'last_message' => $lastMessage ? (filled($lastMessage->body) ? $lastMessage->body : '📷 Photo') : null,
-                    'last_message_at' => $conversation->last_message_at?->diffForHumans(),
-                    'unread_count' => $conversation->unreadCountFor($user->id),
-                    'product' => $conversation->product ? [
-                        'id' => $conversation->product->id,
-                        'name' => $conversation->product->name,
-                    ] : null,
-                ];
-            });
+        // For attachment-only last messages, find out whether they were videos or photos.
+        $lastMessageIds = $rawConversations
+            ->map(fn($c) => $c->messages->last()?->id)
+            ->filter()
+            ->values();
+
+        $attachmentMimes = MessageAttachment::whereIn('message_id', $lastMessageIds)
+            ->get(['message_id', 'mime'])
+            ->groupBy('message_id');
+
+        $conversations = $rawConversations->map(function ($conversation) use ($user, $attachmentMimes) {
+            $other = $conversation->otherParticipantFor($user->id);
+            $lastMessage = $conversation->messages->last();
+
+            $preview = null;
+            if ($lastMessage) {
+                if (filled($lastMessage->body)) {
+                    $preview = $lastMessage->body;
+                } else {
+                    $hasVideo = $attachmentMimes->get($lastMessage->id)
+                        ?->contains(fn($a) => str_starts_with((string) $a->mime, 'video/'));
+                    $preview = $hasVideo ? '🎥 Video' : '📷 Photo';
+                }
+            }
+
+            return [
+                'conversation_id' => $conversation->id,
+                'other_id' => $other?->id,
+                'other_role' => $other?->role,
+                'name' => $conversation->category
+                    ? ($conversation->subject ?: 'Support ticket')
+                    : ($other?->role === 'super_admin' ? 'Shopleap Support' : ($other?->messaging_name ?? 'Unknown')),
+                'last_message' => $preview,
+                'last_message_at' => $conversation->last_message_at?->diffForHumans(),
+                'unread_count' => $conversation->unreadCountFor($user->id),
+                'product' => $conversation->product ? [
+                    'id' => $conversation->product->id,
+                    'name' => $conversation->product->name,
+                ] : null,
+            ];
+        });
 
         $idsWithConversation = $conversations->pluck('other_id')->filter()->all();
 

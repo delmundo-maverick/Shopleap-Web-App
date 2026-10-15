@@ -123,7 +123,7 @@ return [
         ['q' => 'How do I become a rider?',
             'a' => 'Tap "Ride with Shopleap," complete the application with your license and vehicle details, and our logistics team will reach out once it\'s reviewed.'],
         ['q' => 'What payment methods are supported?',
-            'a' => 'GCash, Maya, major debit/credit cards, and cash on delivery, depending on the seller and delivery area.'],
+            'a' => 'Cash on Delivery.'],
         ['q' => 'Is my order protected if something goes wrong?',
             'a' => 'Yes — orders that don\'t arrive, or arrive not matching the listing, are covered under our buyer protection policy.'],
         ['q' => 'Can I track my delivery in real time?',

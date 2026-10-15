@@ -36,7 +36,7 @@
                         class="h-full w-full object-contain">
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold leading-tight text-primary">
+                    <h1 class="font-logo text-[1.375rem] text-primary font-medium leading-none tracking-tight">
                         Shopleap
                     </h1>
                     <p class="text-xs text-charcoal/60">

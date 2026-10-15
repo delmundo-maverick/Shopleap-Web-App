@@ -166,6 +166,10 @@ Route::middleware('auth')
         Route::get('/unread-count', 'unreadCount')->name('unread-count');
         Route::get('/support', 'openSupport')->name('support');
 
+        // Attachments (photo/video) — streamed only to conversation participants.
+        // Must be declared BEFORE the {conversation} prefix below.
+        Route::get('/attachments/{attachment}', 'attachment')->name('attachment');
+
         // Create / open conversations
         Route::post('/', 'store')->name('store');
         Route::post('/open', 'open')->name('open');

@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const threadView = document.getElementById('widgetThreadView');
     const threadBackBtn = document.getElementById('widgetThreadBackBtn');
     const threadCloseBtn = document.getElementById('widgetThreadCloseBtn');
+    const threadDeleteBtn = document.getElementById('widgetThreadDeleteBtn');
     const threadAvatar = document.getElementById('widgetThreadAvatar');
     const threadName = document.getElementById('widgetThreadName');
     const threadMessages = document.getElementById('widgetThreadMessages');
@@ -17,12 +18,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const threadInput = document.getElementById('widgetThreadInput');
     const productCard = document.getElementById('widgetThreadProductCard');
 
+    // Attachments
+    const attachBtn = document.getElementById('widgetThreadAttachBtn');
+    const fileInput = document.getElementById('widgetThreadFile');
+    const previewStrip = document.getElementById('widgetThreadPreviews');
+    const errorEl = document.getElementById('widgetThreadError');
+    const sendBtn = threadForm?.querySelector('button[type="submit"]');
+
     if (!toggleBtn || !panel) return;
 
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+    // Keep these in sync with config/support.php
+    const MAX_FILES = 4;
+    const MAX_IMAGE_MB = 5;
+    const MAX_VIDEO_MB = 20;
+    const ALLOWED_IMAGE = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const ALLOWED_VIDEO = ['video/mp4', 'video/quicktime', 'video/webm'];
+
     let activeConversationId = null;
     let lastMessageId = 0;
     let pollTimer = null;
+    let pendingFiles = []; // [{ file, url }]
 
     function jsonHeaders() {
         return {
@@ -32,11 +49,106 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    // For multipart: do NOT set Content-Type, the browser adds the boundary.
+    function formHeaders() {
+        return {
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json',
+        };
+    }
+
     function escapeHtml(str) {
         const div = document.createElement('div');
-        div.textContent = str;
+        div.textContent = str ?? '';
         return div.innerHTML;
     }
+
+    function isVideo(a) {
+        return a.type === 'video' || (a.mime || '').startsWith('video/');
+    }
+
+    // ---------------------------------------------------
+    // ATTACHMENTS (pending files, previews, validation)
+    // ---------------------------------------------------
+    function showError(msg) {
+        if (!errorEl) return;
+        errorEl.textContent = msg || '';
+        errorEl.classList.toggle('hidden', !msg);
+    }
+
+    function clearPending() {
+        pendingFiles.forEach(p => URL.revokeObjectURL(p.url));
+        pendingFiles = [];
+        if (fileInput) fileInput.value = '';
+        renderPreviews();
+        showError('');
+    }
+
+    function addFiles(fileList) {
+        showError('');
+
+        for (const file of fileList) {
+            const isImg = ALLOWED_IMAGE.includes(file.type);
+            const isVid = ALLOWED_VIDEO.includes(file.type);
+
+            if (!isImg && !isVid) {
+                showError(`${file.name}: only JPG, PNG, WEBP, GIF, MP4, MOV or WEBM files are allowed.`);
+                continue;
+            }
+
+            if (pendingFiles.length >= MAX_FILES) {
+                showError(`You can attach up to ${MAX_FILES} files per message.`);
+                break;
+            }
+
+            const limitMb = isVid ? MAX_VIDEO_MB : MAX_IMAGE_MB;
+            if (file.size > limitMb * 1024 * 1024) {
+                showError(`${file.name} is too large (max ${limitMb} MB for ${isVid ? 'videos' : 'photos'}).`);
+                continue;
+            }
+
+            pendingFiles.push({ file, url: URL.createObjectURL(file) });
+        }
+
+        if (fileInput) fileInput.value = '';
+        renderPreviews();
+    }
+
+    function renderPreviews() {
+        if (!previewStrip) return;
+
+        previewStrip.innerHTML = '';
+        const has = pendingFiles.length > 0;
+        previewStrip.classList.toggle('hidden', !has);
+        previewStrip.classList.toggle('flex', has);
+
+        pendingFiles.forEach((p, i) => {
+            const item = document.createElement('div');
+            item.className = 'relative h-14 w-14 overflow-hidden rounded-lg bg-ice-blue';
+            item.innerHTML = p.file.type.startsWith('video/')
+                ? `<video src="${p.url}" muted playsinline class="h-full w-full object-cover"></video>
+                   <span class="absolute inset-0 flex items-center justify-center bg-black/25 text-xs text-white">▶</span>`
+                : `<img src="${p.url}" alt="" class="h-full w-full object-cover">`;
+
+            const rm = document.createElement('button');
+            rm.type = 'button';
+            rm.title = 'Remove';
+            rm.className = 'absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-[10px] leading-none text-white';
+            rm.textContent = '×';
+            rm.addEventListener('click', () => {
+                URL.revokeObjectURL(p.url);
+                pendingFiles.splice(i, 1);
+                showError('');
+                renderPreviews();
+            });
+
+            item.appendChild(rm);
+            previewStrip.appendChild(item);
+        });
+    }
+
+    attachBtn?.addEventListener('click', () => fileInput?.click());
+    fileInput?.addEventListener('change', () => addFiles(fileInput.files));
 
     // ---------------------------------------------------
     // OPEN / CLOSE PANEL
@@ -52,6 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
         panel.classList.add('hidden');
         panel.classList.remove('flex');
         stopPolling();
+        clearPending();
     }
 
     toggleBtn.addEventListener('click', () => {
@@ -61,6 +174,9 @@ document.addEventListener('DOMContentLoaded', () => {
     threadCloseBtn?.addEventListener('click', closePanel);
 
     document.addEventListener('click', (e) => {
+        // Ignore clicks on elements removed from the DOM mid-click (e.g. preview "×" buttons).
+        if (!e.target.isConnected) return;
+
         if (!panel.contains(e.target) && !toggleBtn.contains(e.target)) {
             closePanel();
         }
@@ -75,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         threadView.classList.add('hidden');
         threadView.classList.remove('flex');
         stopPolling();
+        clearPending();
     }
 
     async function loadList() {
@@ -134,7 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
         row.className = 'flex w-full items-start gap-3 rounded-xl p-2.5 pr-9 text-left transition hover:bg-ice-blue';
         row.innerHTML = `
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                ${conv.name.charAt(0).toUpperCase()}
+                ${escapeHtml(conv.name.charAt(0).toUpperCase())}
             </span>
             <span class="min-w-0 flex-1">
                 <span class="flex items-center justify-between gap-2">
@@ -184,7 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${item.is_support ? 'bg-primary text-white' : 'bg-primary/10 text-primary'} text-sm font-bold">
                 ${item.is_support
                 ? '<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>'
-                : item.name.charAt(0).toUpperCase()}
+                : escapeHtml(item.name.charAt(0).toUpperCase())}
             </span>
             <span class="min-w-0 flex-1">
                 <span class="block truncate text-sm font-semibold text-charcoal">${escapeHtml(item.name)}</span>
@@ -215,6 +332,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // THREAD VIEW
     // ---------------------------------------------------
     function openThread(conversationId, name) {
+        stopPolling();
+        clearPending();
+
         activeConversationId = conversationId;
         lastMessageId = 0;
         threadMessages.innerHTML = '';
@@ -240,24 +360,29 @@ document.addEventListener('DOMContentLoaded', () => {
         stopPolling();
         showListView();
         loadList();
+    });
 
-        document.getElementById('widgetThreadDeleteBtn')?.addEventListener('click', async () => {
-            if (!activeConversationId || !confirm('Delete this chat?')) return;
-            await deleteConversation(activeConversationId);
-            stopPolling();
-            showListView();
-            loadList();
-        });
+    threadDeleteBtn?.addEventListener('click', async () => {
+        if (!activeConversationId || !confirm('Delete this chat?')) return;
+        await deleteConversation(activeConversationId);
+        stopPolling();
+        showListView();
+        loadList();
     });
 
     async function fetchMessages() {
         if (!activeConversationId) return;
+        const requestedFor = activeConversationId;
+
         try {
-            const res = await fetch(`/messages/${activeConversationId}/messages?after=${lastMessageId}`, {
+            const res = await fetch(`/messages/${requestedFor}/messages?after=${lastMessageId}`, {
                 headers: { Accept: 'application/json' },
             });
             if (!res.ok) return;
             const data = await res.json();
+
+            // The user may have switched chats while this request was in flight.
+            if (requestedFor !== activeConversationId) return;
 
             if (data.product) {
                 productCard.classList.remove('hidden');
@@ -267,12 +392,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('widgetThreadProductPrice').textContent = `₱${Number(data.product.price).toFixed(2)}`;
             }
 
+            let appended = false;
             data.messages.forEach(msg => {
+                if (msg.id <= lastMessageId) return; // already rendered (e.g. our own just-sent message)
                 threadMessages.appendChild(renderMessage(msg));
                 lastMessageId = Math.max(lastMessageId, msg.id);
+                appended = true;
             });
 
-            if (data.messages.length > 0) {
+            if (appended) {
                 threadMessages.scrollTop = threadMessages.scrollHeight;
             }
         } catch (err) {
@@ -281,46 +409,77 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderMessage(msg) {
-        const isMine = msg.sender_id === parseInt(document.querySelector('meta[name="user-id"]')?.content || '0', 10);
+        const myId = parseInt(document.querySelector('meta[name="user-id"]')?.content || '0', 10);
+        const isMine = msg.sender_id === myId;
         const wrapper = document.createElement('div');
         wrapper.className = `flex ${isMine ? 'justify-end' : 'justify-start'}`;
 
-        const photos = (msg.attachments || []).map(a => `
-        <a href="${escapeHtml(a.url)}" target="_blank" rel="noopener" class="mb-1 block overflow-hidden rounded-lg">
-            <img src="${escapeHtml(a.url)}" alt="Photo" loading="lazy" class="max-h-40 w-full object-cover">
-        </a>`).join('');
+        const media = (msg.attachments || []).map(a => isVideo(a)
+            ? `<video src="${escapeHtml(a.url)}" controls preload="metadata" playsinline
+                   class="mb-1 max-h-40 w-full rounded-lg bg-black"></video>`
+            : `<a href="${escapeHtml(a.url)}" target="_blank" rel="noopener" class="mb-1 block overflow-hidden rounded-lg">
+                   <img src="${escapeHtml(a.url)}" alt="Photo" loading="lazy" class="max-h-40 w-full object-cover">
+               </a>`
+        ).join('');
 
         wrapper.innerHTML = `
-        <div class="max-w-[75%] rounded-2xl px-3.5 py-2 text-xs ${isMine ? 'bg-primary text-white' : 'bg-ice-blue text-charcoal'}">
-            ${photos}
-            ${msg.body ? `<p class="whitespace-pre-line">${escapeHtml(msg.body)}</p>` : ''}
-            <p class="mt-1 text-[9px] opacity-60">${msg.created_at}</p>
-        </div>
-    `;
+            <div class="max-w-[75%] rounded-2xl px-3.5 py-2 text-xs ${isMine ? 'bg-primary text-white' : 'bg-ice-blue text-charcoal'}">
+                ${media}
+                ${msg.body ? `<p class="whitespace-pre-line">${escapeHtml(msg.body)}</p>` : ''}
+                <p class="mt-1 text-[9px] opacity-60">${escapeHtml(msg.created_at)}</p>
+            </div>
+        `;
         return wrapper;
     }
 
+    // ---------------------------------------------------
+    // SEND (text and/or photos/videos)
+    // ---------------------------------------------------
     threadForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const body = threadInput.value.trim();
-        if (!body || !activeConversationId) return;
 
-        threadInput.value = '';
+        const body = threadInput.value.trim();
+        if ((!body && pendingFiles.length === 0) || !activeConversationId) return;
+
+        const fd = new FormData();
+        if (body) fd.append('body', body);
+        pendingFiles.forEach(p => fd.append('images[]', p.file));
+
+        sendBtn.disabled = true;
+        showError('');
 
         try {
             const res = await fetch(`/messages/${activeConversationId}/messages`, {
                 method: 'POST',
-                headers: jsonHeaders(),
-                body: JSON.stringify({ body }),
+                headers: formHeaders(),
+                body: fd,
             });
-            const data = await res.json();
-            if (res.ok) {
+
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                const firstError = data.errors ? Object.values(data.errors)[0]?.[0] : null;
+                showError(
+                    res.status === 413
+                        ? 'Files are too large to upload.'
+                        : (firstError || data.message || 'Could not send message.')
+                );
+                return;
+            }
+
+            threadInput.value = '';
+            clearPending();
+
+            if (data.id > lastMessageId) {
                 threadMessages.appendChild(renderMessage(data));
-                lastMessageId = Math.max(lastMessageId, data.id);
+                lastMessageId = data.id;
                 threadMessages.scrollTop = threadMessages.scrollHeight;
             }
         } catch (err) {
             console.error(err);
+            showError('Network error. Please try again.');
+        } finally {
+            sendBtn.disabled = false;
         }
     });
 });
