@@ -11,9 +11,9 @@
 
 <x-logistics.layout title="Deliveries" :subtitle="$orders->total() . ' parcel(s) in this view'" active="deliveries">
 
-    <div class="frost-panel rounded-2xl px-4 py-3 text-xs text-charcoal/60">
-        Until the rider app is live, staff record <b>Out for Delivery</b>, <b>Delivered</b> and <b>Failed</b> on the
-        rider's behalf.
+    <div class="frost-panel rounded-2xl px-4 py-3 text-sm">
+        <span class="text-charcoal/60">Shipping fees earned (delivered parcels):</span>
+        <b class="text-primary">₱{{ number_format($shippingEarned, 2) }}</b>
     </div>
 
     <div class="frost-panel-solid flex overflow-x-auto rounded-2xl">
@@ -67,7 +67,11 @@
                         </div>
                         <div class="text-right">
                             <p class="text-xs text-charcoal/50">Cash on delivery</p>
-                            <p class="text-lg font-bold text-primary">₱{{ number_format($order->total_amount, 2) }}</p>
+                            <p class="text-lg font-bold text-primary">₱{{ number_format($order->grand_total, 2) }}</p>
+                            <p class="text-[11px] text-charcoal/50">
+                                Items ₱{{ number_format($order->total_amount, 2) }} + shipping
+                                ₱{{ number_format($order->shipping_fee, 2) }}
+                            </p>
                         </div>
                     </div>
 
@@ -86,11 +90,11 @@
                         @elseif ($tab === 'out')
                             <div class="flex flex-wrap items-start gap-3">
                                 <form method="POST" action="{{ route('logistics.deliveries.delivered', $order) }}"
-                                    onsubmit="return confirm('Confirm the parcel was handed over and ₱{{ number_format($order->total_amount, 2) }} was collected?')">
-                                    @csrf
-                                    <button type="submit"
-                                        class="rounded-xl bg-leaf-green px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110">Mark
-                                        Delivered</button>
+                                    onsubmit="return confirm('Confirm the parcel was handed over and ₱{{ number_format($order->grand_total, 2) }} was collected?')"
+                                    @csrf <button type="submit"
+                                    class="rounded-xl bg-leaf-green px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110">
+                                    Mark
+                                    Delivered</button>
                                 </form>
 
                                 <details class="min-w-[18rem] flex-1">
@@ -120,7 +124,8 @@
                                     @csrf
                                     <select name="rider_id" class="{{ $field }}">
                                         <option value="">Same rider
-                                            ({{ $order->deliveryRider?->full_name ?? 'unassigned' }})</option>
+                                            ({{ $order->deliveryRider?->full_name ?? 'unassigned' }})
+                                        </option>
                                         @foreach ($riders as $rider)
                                             <option value="{{ $rider->id }}">{{ $rider->full_name }}</option>
                                         @endforeach
@@ -143,8 +148,11 @@
                                     parcel to seller</button>
                             </form>
                         @else
-                            <p class="text-xs text-charcoal/50">Delivered {{ $order->updated_at->diffForHumans() }}.
-                                Waiting for the buyer to confirm receipt.</p>
+                            <p class="text-xs text-charcoal/50">
+                                Delivered {{ $order->updated_at->diffForHumans() }}. Shipping fee earned:
+                                <b>₱{{ number_format($order->shipping_fee, 2) }}</b>. Waiting for the buyer to confirm
+                                receipt.
+                            </p>
                         @endif
                     </div>
                 </div>

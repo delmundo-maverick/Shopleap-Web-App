@@ -58,12 +58,18 @@ class DeliveryController extends Controller
         $orders = $query->paginate(15)->withQueryString();
         $riders = $this->activeRiders($hub->id);
 
+        // Shipping fees earned on parcels this hub has delivered.
+        $shippingEarned = (float) $hub->orders()
+            ->whereIn('status', [Order::STATUS_DELIVERED, Order::STATUS_COMPLETED])
+            ->sum('shipping_fee');
+
         return view('logistics.deliveries.index', [
             'tab' => $tab,
             'counts' => $counts,
             'orders' => $orders,
             'riders' => $riders,
             'reasons' => self::FAILURE_REASONS,
+            'shippingEarned' => $shippingEarned,
         ]);
     }
 

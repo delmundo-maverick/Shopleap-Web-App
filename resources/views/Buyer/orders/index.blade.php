@@ -168,15 +168,21 @@
                         </div>
 
                         <!-- TOTAL -->
-                        <div class="flex items-center justify-between gap-3 border-t border-light-gray px-5 py-3.5">
-                            <span class="text-xs text-charcoal/50">
-                                Order #{{ $order->id }} · {{ $order->created_at->format('M d, Y') }}
-                            </span>
-                            <span class="text-sm text-charcoal">
-                                {{ $order->items->sum('quantity') }} item(s) ·
-                                Order Total: <span
-                                    class="text-base font-bold text-primary">₱{{ number_format($order->total_amount, 2) }}</span>
-                            </span>
+                        <div class="border-t border-light-gray px-5 py-3.5">
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="text-xs text-charcoal/50">
+                                    Order #{{ $order->id }} · {{ $order->created_at->format('M d, Y') }}
+                                </span>
+                                <div class="space-y-0.5 text-right text-xs text-charcoal/60">
+                                    <p>Merchandise Subtotal: ₱{{ number_format($order->total_amount, 2) }}</p>
+                                    <p>Shipping Fee: ₱{{ number_format($order->shipping_fee, 2) }}</p>
+                                    <p class="text-sm text-charcoal">
+                                        {{ $order->items->sum('quantity') }} item(s) ·
+                                        Order Total: <span
+                                            class="text-base font-bold text-primary">₱{{ number_format($order->grand_total, 2) }}</span>
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- TRACKING -->
@@ -190,7 +196,8 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                                 d="M3 7h11v9H3zM14 10h4l3 3v3h-7zM7 19a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM17 19a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
                                         </svg>
-                                        <span class="truncate font-semibold text-leaf-green">{{ $latest->title }}</span>
+                                        <span
+                                            class="truncate font-semibold text-leaf-green">{{ $latest->title }}</span>
                                         <span
                                             class="hidden shrink-0 text-charcoal/40 sm:inline">{{ $latest->created_at->format('M d, g:i A') }}</span>
                                     </span>
@@ -256,8 +263,7 @@
                                 class="contact-seller-btn rounded-lg border border-charcoal/20 bg-white px-5 py-2 text-xs font-bold text-charcoal transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
                                 data-open-url="{{ route('messages.open') }}"
                                 data-messages-url="{{ route('messages.index') }}"
-                                data-recipient-id="{{ $order->seller_id }}"
-                                data-product-id="{{ $chatProductId }}">
+                                data-recipient-id="{{ $order->seller_id }}" data-product-id="{{ $chatProductId }}">
                                 Contact Seller
                             </button>
 

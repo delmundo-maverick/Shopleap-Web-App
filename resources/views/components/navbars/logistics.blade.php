@@ -1,4 +1,5 @@
 @props(['active' => null])
+@vite(['resources/css/app.css', 'resources/js/app.js', 'resources/css/navbar.css', 'resources/js/shared/navbar.js'])
 
 @php
     // Add/rename/reorder logistics links here. `route => null` renders a "Soon" placeholder.
@@ -83,42 +84,15 @@
 
 <div id="sidebarOverlay" class="fixed inset-0 z-40 hidden bg-charcoal/40 backdrop-blur-sm lg:hidden"></div>
 
-<style>
-    #sidebarNav.is-collapsed {
-        width: 5rem;
-    }
-
-    #sidebarNav.is-collapsed .nav-label,
-    #sidebarNav.is-collapsed .brand-text,
-    #sidebarNav.is-collapsed .nav-section-title {
-        display: none;
-    }
-
-    #sidebarNav.is-collapsed .nav-link {
-        justify-content: center;
-        padding-left: 0.625rem;
-        padding-right: 0.625rem;
-    }
-
-    #sidebarNav.is-collapsed .sidebar-header-inner {
-        justify-content: center;
-    }
-
-    #sidebarNav.is-collapsed .logout-form button {
-        justify-content: center;
-        padding-left: 0.625rem;
-        padding-right: 0.625rem;
-    }
-</style>
-
-<aside id="sidebarNav"
+<aside id="sidebarNav" data-unread-url="{{ route('messages.unread-count') }}" data-storage-key="sidebarCollapsed"
     class="frost-panel-solid fixed inset-y-0 left-0 z-50 w-64 -translate-x-full overflow-visible transition-[width,transform] duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:z-auto lg:translate-x-0">
 
     {{-- Sidebar content --}}
     <div id="sidebarContent" class="flex h-full w-full min-w-0 flex-col overflow-hidden">
 
         {{-- Logo/Header --}}
-        <div class="flex h-20 shrink-0 items-center justify-between gap-2 border-b border-white/50 px-4">
+        <div
+            class="sidebar-header-container flex h-20 shrink-0 items-center justify-between gap-2 border-b border-white/50 px-4 transition-all">
 
             <div class="sidebar-header-inner flex min-w-0 items-center gap-3">
 
@@ -126,7 +100,7 @@
                     class="h-11 w-11 shrink-0 rounded-xl object-contain">
 
                 <div class="brand-text min-w-0 flex-1">
-                    <h1 class="text-lg font-bold leading-tight text-primary">
+                    <h1 class="font-logo text-lg font-bold leading-tight text-primary">
                         SHOPLEAP
                     </h1>
 
@@ -137,7 +111,8 @@
 
             </div>
 
-            <div class="flex shrink-0 items-center gap-1.5">
+            {{-- Separator & Toggle Menu Section --}}
+            <div class="flex shrink-0 items-center gap-1.5 pl-3 border-l border-white/50">
 
                 {{-- Desktop collapse toggle --}}
                 <button type="button" id="sidebarToggleBtn"
@@ -152,7 +127,7 @@
 
                 {{-- Mobile close button --}}
                 <button type="button" id="sidebarCloseBtn" aria-label="Close sidebar"
-                    class="flex h-9 w-9 items-center justify-center rounded-lg text-charcoal/50 transition hover:bg-ice-blue hover:text-primary lg:hidden">
+                    class="nav-label flex h-9 w-9 items-center justify-center rounded-lg text-charcoal/50 transition hover:bg-ice-blue hover:text-primary lg:hidden">
 
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -193,7 +168,7 @@
                             <span
                                 class="nav-label shrink-0 rounded-full bg-sale-red/10 px-2 py-0.5 text-[10px] font-bold text-sale-red">Soon</span>
                         @elseif (!empty($link['badge']))
-                            <span id="logisticsMessageBadge"
+                            <span data-message-badge
                                 class="nav-label hidden shrink-0 rounded-full bg-sale-red px-1.5 py-0.5 text-[10px] font-bold text-white"></span>
                         @endif
                     </a>
@@ -267,151 +242,3 @@
     </div>
 
 </div>
-
-
-<script>
-    (function() {
-
-        const sidebar = document.getElementById('sidebarNav');
-        const overlay = document.getElementById('sidebarOverlay');
-        const closeBtn = document.getElementById('sidebarCloseBtn');
-        const toggleBtn = document.getElementById('sidebarToggleBtn');
-        const messageBadge = document.getElementById('logisticsMessageBadge');
-
-        async function refreshMessageBadge() {
-            if (!messageBadge) return;
-            try {
-                const res = await fetch('{{ route('messages.unread-count') }}', {
-                    headers: {
-                        'Accept': 'application/json'
-                    },
-                });
-                if (!res.ok) return;
-                const data = await res.json();
-
-                if (data.count > 0) {
-                    messageBadge.textContent = data.count > 9 ? '9+' : data.count;
-                    messageBadge.classList.remove('hidden');
-                } else {
-                    messageBadge.classList.add('hidden');
-                }
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        refreshMessageBadge();
-        setInterval(refreshMessageBadge, 20000);
-
-
-        if (toggleBtn) {
-
-            toggleBtn.addEventListener('click', function() {
-                sidebar.classList.toggle('is-collapsed');
-            });
-
-        }
-
-        function isOpen() {
-            return !sidebar?.classList.contains('-translate-x-full');
-        }
-
-        function openSidebar() {
-            sidebar?.classList.remove('-translate-x-full');
-            overlay?.classList.remove('hidden');
-        }
-
-        function closeSidebar() {
-            sidebar?.classList.add('-translate-x-full');
-            overlay?.classList.add('hidden');
-        }
-
-        function toggleSidebar() {
-            if (isOpen()) {
-                closeSidebar();
-            } else {
-                openSidebar();
-            }
-        }
-
-
-        document.addEventListener('click', function(e) {
-
-            if (e.target.closest('[data-sidebar-toggle]')) {
-
-                e.preventDefault();
-                toggleSidebar();
-
-            }
-
-        });
-
-
-        if (closeBtn) {
-
-            closeBtn.addEventListener('click', closeSidebar);
-
-        }
-
-
-        if (overlay) {
-
-            overlay.addEventListener('click', closeSidebar);
-
-        }
-
-
-        const logoutForm = document.getElementById('logoutForm');
-        const logoutTriggerBtn = document.getElementById('logoutTriggerBtn');
-        const logoutModalOverlay = document.getElementById('logoutModalOverlay');
-        const logoutCancelBtn = document.getElementById('logoutCancelBtn');
-        const logoutConfirmBtn = document.getElementById('logoutConfirmBtn');
-
-        function openLogoutModal() {
-            logoutModalOverlay.classList.remove('hidden');
-            logoutModalOverlay.classList.add('flex');
-        }
-
-        function closeLogoutModal() {
-            logoutModalOverlay.classList.add('hidden');
-            logoutModalOverlay.classList.remove('flex');
-        }
-
-        if (logoutTriggerBtn) {
-            logoutTriggerBtn.addEventListener('click', openLogoutModal);
-        }
-
-        if (logoutCancelBtn) {
-            logoutCancelBtn.addEventListener('click', closeLogoutModal);
-        }
-
-        if (logoutModalOverlay) {
-            logoutModalOverlay.addEventListener('click', function(e) {
-                if (e.target === logoutModalOverlay) closeLogoutModal();
-            });
-        }
-
-        if (logoutConfirmBtn) {
-            logoutConfirmBtn.addEventListener('click', function() {
-                logoutForm.submit();
-            });
-        }
-
-
-        window.addEventListener('resize', function() {
-
-            if (window.innerWidth >= 1024) {
-
-                sidebar.classList.remove('-translate-x-full');
-
-            } else {
-
-                sidebar.classList.remove('is-collapsed');
-
-            }
-
-        });
-
-
-    })();
-</script>

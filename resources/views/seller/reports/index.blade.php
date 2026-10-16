@@ -365,6 +365,8 @@
                         <li><b>Lost</b> covers Cancelled, Delivery Failed, and Returned orders and is excluded from
                             sales and earnings.</li>
                         <li>Figures are grouped by <b>order date</b>, not completion date.</li>
+                        <li><b>Shipping fees</b> are paid by the buyer to delivery and are not part of gross sales,
+                            commission or earnings.</li>
                     </ul>
                 </div>
 

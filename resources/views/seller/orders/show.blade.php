@@ -169,7 +169,7 @@
 
                                 <div class="mt-4 space-y-1.5 border-t border-white/50 pt-4 text-sm">
                                     <div class="flex justify-between text-charcoal/70">
-                                        <span>Order Total</span>
+                                        <span>Items Total</span>
                                         <span
                                             class="font-semibold text-charcoal">₱{{ number_format($order->total_amount, 2) }}</span>
                                     </div>
@@ -181,6 +181,21 @@
                                         class="flex justify-between border-t border-white/50 pt-1.5 font-bold text-charcoal">
                                         <span>Your Earnings</span>
                                         <span>₱{{ number_format($order->total_amount - $order->commission_amount, 2) }}</span>
+                                    </div>
+
+                                    <div class="mt-3 rounded-xl bg-ice-blue/60 p-3 text-xs text-charcoal/60">
+                                        <div class="flex justify-between">
+                                            <span>Shipping fee paid by buyer</span>
+                                            <span
+                                                class="font-semibold text-charcoal">₱{{ number_format($order->shipping_fee, 2) }}</span>
+                                        </div>
+                                        <p class="mt-1 text-[11px] text-charcoal/45">Goes to delivery, not included in
+                                            your earnings.</p>
+                                        <div class="mt-1.5 flex justify-between border-t border-white/60 pt-1.5">
+                                            <span>Buyer pays (COD)</span>
+                                            <span
+                                                class="font-bold text-charcoal">₱{{ number_format($order->grand_total, 2) }}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

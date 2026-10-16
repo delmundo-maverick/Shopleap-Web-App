@@ -46,17 +46,19 @@ class TransactionController extends Controller
         return response()->streamDownload(function () use ($service, $from, $to) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['Order #', 'Date', 'Buyer', 'Seller', 'Status', 'GMV (PHP)', 'Commission (PHP)', 'Seller Payout (PHP)']);
+            fputcsv($out, ['Order #', 'Date', 'Buyer', 'Seller', 'Status', 'GMV (PHP)', 'Commission (PHP)', 'Seller Payout (PHP)', 'Shipping Fee (PHP)']);
 
-            $totals = ['gmv' => 0.0, 'commission' => 0.0];
+            $totals = ['gmv' => 0.0, 'commission' => 0.0, 'shipping' => 0.0];
 
             foreach ($service->ledger($from, $to)->cursor() as $order) {
-                $gross = (float) $order->total_amount;
+                $gross = (float) $order->total_amount;          // items only
                 $commission = (float) $order->commission_amount;
+                $shippingFee = (float) $order->shipping_fee;    // separate from GMV
 
                 if (in_array($order->status, Order::GROUP_REALIZED, true)) {
                     $totals['gmv'] += $gross;
                     $totals['commission'] += $commission;
+                    $totals['shipping'] += $shippingFee;
                 }
 
                 fputcsv($out, [
@@ -68,6 +70,7 @@ class TransactionController extends Controller
                     number_format($gross, 2, '.', ''),
                     number_format($commission, 2, '.', ''),
                     number_format($gross - $commission, 2, '.', ''),
+                    number_format($shippingFee, 2, '.', ''),
                 ]);
             }
 
@@ -81,6 +84,7 @@ class TransactionController extends Controller
                 number_format($totals['gmv'], 2, '.', ''),
                 number_format($totals['commission'], 2, '.', ''),
                 number_format($totals['gmv'] - $totals['commission'], 2, '.', ''),
+                number_format($totals['shipping'], 2, '.', ''),
             ]);
 
             fclose($out);

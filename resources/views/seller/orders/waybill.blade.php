@@ -224,7 +224,7 @@
                 </td>
                 <td style="text-align: right;">
                     <span class="muted" style="font-size: 6px; text-transform: uppercase;">Amount to collect</span><br>
-                    <span class="cod-amount">₱{{ number_format($order->total_amount, 2) }}</span>
+                    <span class="cod-amount">₱{{ number_format($order->grand_total, 2) }}</span>
                 </td>
             </tr>
         </table>

@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+
 
 class Order extends Model
 {
@@ -13,6 +15,8 @@ class Order extends Model
         'buyer_name',
         'status',
         'total_amount',
+        'shipping_fee',
+        'shipping_zone',
         'commission_amount',
         'ship_province',
         'ship_municipality',
@@ -35,6 +39,7 @@ class Order extends Model
     protected function casts(): array
     {
         return [
+            'shipping_fee' => 'decimal:2',
             'pickup_date' => 'date',
             'waybill_printed_at' => 'datetime',
             'stock_restored_at' => 'datetime',
@@ -248,6 +253,12 @@ class Order extends Model
         return self::STATUS_COLORS[$this->status] ?? 'bg-light-gray text-charcoal';
     }
 
+    /** What the buyer actually pays (COD amount): items + shipping. total_amount stays items-only. */
+    public function getGrandTotalAttribute(): float
+    {
+        return (float) $this->total_amount + (float) $this->shipping_fee;
+    }
+
     /**
      * Delivery destination. Reads the checkout snapshot, falling back to the
      * buyer's live profile for orders placed before snapshots existed.
@@ -272,7 +283,7 @@ class Order extends Model
     public function logStatusEvent(?string $note = null, ?int $actorId = null): OrderEvent
     {
         return $this->events()->create([
-            'actor_id' => $actorId ?? auth()->id(),
+            'actor_id' => $actorId ?? Auth::id(),
             'status' => $this->status,
             'title' => self::TIMELINE_TITLES[$this->status] ?? $this->status_label,
             'note' => $note,
@@ -283,7 +294,7 @@ class Order extends Model
     public function logInternalEvent(string $title, ?string $note = null, ?int $actorId = null): OrderEvent
     {
         return $this->events()->create([
-            'actor_id' => $actorId ?? auth()->id(),
+            'actor_id' => $actorId ?? Auth::id(),
             'status' => null,
             'title' => $title,
             'note' => $note,
