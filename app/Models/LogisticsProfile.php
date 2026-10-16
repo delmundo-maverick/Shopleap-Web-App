@@ -45,6 +45,11 @@ class LogisticsProfile extends Model
         return $this->hasMany(CourierProfile::class);
     }
 
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
+    }
+
     public function serviceAreas()
     {
         return $this->hasMany(HubServiceArea::class);

@@ -190,6 +190,7 @@ Route::middleware('auth')
         });
     });
 
+
 /*
 |--------------------------------------------------------------------------
 | Admin Routes
@@ -231,17 +232,30 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Activity logs
     Route::get('/logs', [ActivityLogController::class, 'index'])->name('logs.index');
 
-    // Platform settings
+    // Platform settings (one page per sidebar item)
     Route::prefix('settings')->name('settings.')->controller(PlatformSettingController::class)->group(function () {
+
+        // General  -> admin.settings.index
         Route::get('/', 'index')->name('index');
         Route::post('/general', 'updateGeneral')->name('general');
-        Route::post('/policies/{policy}', 'updatePolicy')->name('policies.update');
 
+        // Shipping -> admin.settings.shipping.index
+        Route::get('/shipping', 'shipping')->name('shipping.index');
+        Route::post('/shipping', 'updateShipping')->name('shipping');
+
+        // Announcements -> admin.settings.announcements.index
         Route::prefix('announcements')->name('announcements.')->group(function () {
+            Route::get('/', 'announcements')->name('index');
             Route::post('/', 'storeAnnouncement')->name('store');
             Route::post('/{announcement}', 'updateAnnouncement')->name('update');
             Route::post('/{announcement}/toggle', 'toggleAnnouncement')->name('toggle');
             Route::delete('/{announcement}', 'destroyAnnouncement')->name('destroy');
+        });
+
+        // Policies -> admin.settings.policies.index
+        Route::prefix('policies')->name('policies.')->group(function () {
+            Route::get('/', 'policies')->name('index');
+            Route::post('/{policy}', 'updatePolicy')->name('update');
         });
     });
 });

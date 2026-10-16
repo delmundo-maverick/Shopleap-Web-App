@@ -229,39 +229,44 @@
                             <p class="text-sm font-semibold text-charcoal">No transactions found</p>
                         </div>
                     @else
-                        <table class="w-full text-left text-sm">
-                            <thead class="border-b border-white/50 bg-primary/5 text-charcoal/60">
-                                <tr>
-                                    <th class="px-5 py-3 font-semibold">Order</th>
-                                    <th class="px-5 py-3 font-semibold">Buyer</th>
-                                    <th class="px-5 py-3 font-semibold">Seller</th>
-                                    <th class="px-5 py-3 font-semibold">Status</th>
-                                    <th class="px-5 py-3 text-right font-semibold">GMV</th>
-                                    <th class="px-5 py-3 text-right font-semibold">Commission</th>
-                                    <th class="px-5 py-3 font-semibold">Date</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-white/50">
-                                @foreach ($orders as $order)
-                                    <tr class="transition hover:bg-white/40">
-                                        <td class="px-5 py-4 font-semibold">#{{ $order->id }}</td>
-                                        <td class="px-5 py-4 text-charcoal/70">{{ $order->buyer_name }}</td>
-                                        <td class="px-5 py-4 text-charcoal/70">
-                                            {{ $order->seller->sellerProfile->business_name ?? ($order->seller->name ?? '—') }}
-                                        </td>
-                                        <td class="px-5 py-4"><span
-                                                class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $order->status_color }}">{{ $order->status_label }}</span>
-                                        </td>
-                                        <td class="px-5 py-4 text-right font-semibold">
-                                            {{ $peso($order->total_amount) }}</td>
-                                        <td class="px-5 py-4 text-right text-charcoal/60">
-                                            {{ $peso($order->commission_amount) }}</td>
-                                        <td class="px-5 py-4 text-charcoal/50">
-                                            {{ $order->created_at->format('M d, Y') }}</td>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[820px] text-left text-sm">
+                                <thead class="border-b border-white/50 bg-primary/5 text-charcoal/60">
+                                    <tr>
+                                        <th class="px-5 py-3 font-semibold">Order</th>
+                                        <th class="px-5 py-3 font-semibold">Buyer</th>
+                                        <th class="px-5 py-3 font-semibold">Seller</th>
+                                        <th class="px-5 py-3 font-semibold">Status</th>
+                                        <th class="px-5 py-3 text-right font-semibold">GMV</th>
+                                        <th class="px-5 py-3 text-right font-semibold">Commission</th>
+                                        <th class="px-5 py-3 text-right font-semibold">Shipping</th>
+                                        <th class="px-5 py-3 font-semibold">Date</th>
                                     </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody class="divide-y divide-white/50">
+                                    @foreach ($orders as $order)
+                                        <tr class="transition hover:bg-white/40">
+                                            <td class="px-5 py-4 font-semibold">#{{ $order->id }}</td>
+                                            <td class="px-5 py-4 text-charcoal/70">{{ $order->buyer_name }}</td>
+                                            <td class="px-5 py-4 text-charcoal/70">
+                                                {{ $order->seller->sellerProfile->business_name ?? ($order->seller->name ?? '—') }}
+                                            </td>
+                                            <td class="px-5 py-4"><span
+                                                    class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $order->status_color }}">{{ $order->status_label }}</span>
+                                            </td>
+                                            <td class="px-5 py-4 text-right font-semibold">
+                                                {{ $peso($order->total_amount) }}</td>
+                                            <td class="px-5 py-4 text-right text-charcoal/60">
+                                                {{ $peso($order->commission_amount) }}</td>
+                                            <td class="px-5 py-4 text-right text-charcoal/60">
+                                                {{ $peso($order->shipping_fee) }}</td>
+                                            <td class="px-5 py-4 text-charcoal/50">
+                                                {{ $order->created_at->format('M d, Y') }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
                         <div class="p-4">{{ $orders->onEachSide(1)->links() }}</div>
                     @endif
                 </div>

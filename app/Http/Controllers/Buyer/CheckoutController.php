@@ -12,10 +12,13 @@ use App\Models\ProductVariant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use App\Services\ShippingFeeCalculator;
+use Illuminate\Support\Collection;
 
 class CheckoutController extends Controller
 {
-    public function index(Request $request)
+
+    public function index(Request $request, ShippingFeeCalculator $shipping)
     {
         $cartItems = $this->selectedCartItems($request);
 
@@ -24,21 +27,32 @@ class CheckoutController extends Controller
         }
 
         $groupedBySeller = $cartItems->groupBy('product.seller_id');
-        $total = $cartItems->sum('line_total');
+        $subtotal = $cartItems->sum('line_total');
         $itemIds = $cartItems->pluck('id')->implode(',');
+
+        $shippingBySeller = $this->quoteShipping($request, $groupedBySeller, $shipping);
+        $shippingTotal = collect($shippingBySeller)->sum('fee');
 
         return view('Buyer.checkout.index', [
             'groupedBySeller' => $groupedBySeller,
-            'total' => $total,
+            'total' => $subtotal,                    // items only
+            'shippingBySeller' => $shippingBySeller,
+            'shippingTotal' => $shippingTotal,
+            'grandTotal' => $subtotal + $shippingTotal,
             'itemIds' => $itemIds,
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ShippingFeeCalculator $shipping)
     {
         $buyer = $request->user();
 
-        $placed = DB::transaction(function () use ($request, $buyer) {
+        // The fee depends on the delivery address.
+        if (! $buyer->buyerProfile?->province || ! $buyer->buyerProfile?->municipality) {
+            return back()->withErrors(['address' => 'Please add your delivery address before placing your order.']);
+        }
+
+        $placed = DB::transaction(function () use ($request, $buyer, $shipping) {
 
             // 1. Lock the cart rows so a double-click can't place the order twice.
             $cartItems = $this->selectedCartItems($request, withLock: true);
@@ -89,13 +103,22 @@ class CheckoutController extends Controller
             foreach ($cartItems->groupBy('product.seller_id') as $sellerId => $items) {
                 $orderTotal = $items->sum('line_total');
 
+                // Always recomputed on the server, in case the buyer changed their address after the checkout page was loaded.
+                $quote = $shipping->calculate(
+                    $items->first()->product->seller,
+                    $buyer->buyerProfile?->province,
+                    $buyer->buyerProfile?->municipality,
+                );
+
                 $order = Order::create([
                     'seller_id' => $sellerId,
                     'buyer_id' => $buyer->id,
                     'buyer_name' => $buyer->name,
                     'status' => Order::STATUS_PLACED,
-                    'total_amount' => $orderTotal,
-                    'commission_amount' => round($orderTotal * PlatformSetting::commissionRate(), 2),
+                    'total_amount' => $orderTotal,                  // items only
+                    'shipping_fee' => $quote['fee'],
+                    'shipping_zone' => $quote['zone'],
+                    'commission_amount' => round($orderTotal * PlatformSetting::commissionRate(), 2), // items only, not shipping
                     'ship_province' => $buyer->buyerProfile?->province,
                     'ship_municipality' => $buyer->buyerProfile?->municipality,
                     'ship_barangay' => $buyer->buyerProfile?->barangay,
@@ -164,6 +187,26 @@ class CheckoutController extends Controller
     private function fail(string $message): never
     {
         throw ValidationException::withMessages(['stock' => $message]);
+    }
+
+    /**
+     * @param  Collection<int|string, Collection<int, \App\Models\CartItem>>  $groupedBySeller
+     * @return array<int|string, array{fee: float, zone: string}> keyed by seller id
+     */
+    private function quoteShipping(Request $request, Collection $groupedBySeller, ShippingFeeCalculator $shipping): array
+    {
+        $profile = $request->user()->buyerProfile;
+        $quotes = [];
+
+        foreach ($groupedBySeller as $sellerId => $items) {
+            $quotes[$sellerId] = $shipping->calculate(
+                $items->first()->product->seller,
+                $profile?->province,
+                $profile?->municipality,
+            );
+        }
+
+        return $quotes;
     }
 
     /**

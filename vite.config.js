@@ -13,19 +13,19 @@ export default defineConfig({
                 'resources/css/landing.css',
                 'resources/js/landing.js',
 
-                // Components
+                // Shared (used by multiple roles)
+                'resources/css/navbar.css',
+                'resources/js/shared/navbar.js',
                 'resources/js/components/buyer-header.js',
-
-                // Shared pages
                 'resources/js/pages/help.js',
                 'resources/js/pages/messaging.js',
 
                 // Auth
                 'resources/css/pages/auth-register.css',
-                'resources/js/pages/auth/login.js',
                 'resources/js/pages/auth/buyer-register.js',
-                'resources/js/pages/auth/seller-register.js',
+                'resources/js/pages/auth/login.js',
                 'resources/js/pages/auth/logistics-register.js',
+                'resources/js/pages/auth/seller-register.js',
 
                 // Buyer
                 'resources/js/pages/buyer/buyer-cart.js',

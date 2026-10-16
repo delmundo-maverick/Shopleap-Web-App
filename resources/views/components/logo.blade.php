@@ -3,5 +3,5 @@
         <img src="{{ asset('images/Shopleap-Logo-White.png') }}" alt="Shopleap"
             class="h-full w-full rounded-lg object-contain">
     </div>
-    <span class="font-logo text-[1.375rem] font-medium leading-none tracking-tight">Shopleap</span>
+    <span class="font-logo text-[1.65rem] font-medium leading-none tracking-tight">Shopleap</span>
 </a>

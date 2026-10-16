@@ -1,0 +1,42 @@
+/* Collapsed (icon-only) state for the desktop sidebar */
+#sidebarNav.is-collapsed {
+    width: 5rem;
+}
+
+#sidebarNav.is-collapsed .nav-label,
+#sidebarNav.is-collapsed .brand-text,
+#sidebarNav.is-collapsed .nav-section-title,
+#sidebarNav.is-collapsed img,
+#sidebarNav.is-collapsed .sidebar-header-inner {
+    display: none !important;
+}
+
+/* Center the toggle button perfectly when collapsed */
+#sidebarNav.is-collapsed .sidebar-header-container {
+    justify-content: center !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+/* Remove the vertical divider when collapsed so centering isn't thrown off */
+#sidebarNav.is-collapsed .sidebar-header-container .border-l {
+    border-left: none !important;
+    padding-left: 0 !important;
+}
+
+#sidebarNav.is-collapsed .nav-link {
+    justify-content: center;
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+}
+
+#sidebarNav.is-collapsed .logout-form button {
+    justify-content: center;
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+}
+
+/* Prevent transition flicker when the saved state is applied on load */
+#sidebarNav.no-transition {
+    transition: none !important;
+}
