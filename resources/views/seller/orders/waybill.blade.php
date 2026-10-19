@@ -126,7 +126,6 @@
 
     @php
         $sellerProfile = $order->seller->sellerProfile;
-        $buyerProfile = $order->buyer?->buyerProfile; // kept for any leftover references below
         $ship = $order->ship_to;
         $maxItems = 5;
         $visibleItems = $order->items->take($maxItems);
@@ -162,18 +161,6 @@
         @if ($ship['municipality'])
             {{ $ship['street'] }}, {{ $ship['barangay'] }}, {{ $ship['municipality'] }}, {{ $ship['province'] }}<br>
             Contact: {{ $ship['contact_no'] }}
-        @else
-            —
-        @endif
-    </div>
-
-    <p class="section-title">Ship To (Buyer)</p>
-    <div class="box">
-        <div class="name">{{ $order->buyer_name ?? ($order->buyer->name ?? '—') }}</div>
-        @if ($buyerProfile)
-            {{ $buyerProfile->house_number }} {{ $buyerProfile->street }},
-            {{ $buyerProfile->barangay }}, {{ $buyerProfile->municipality }}, {{ $buyerProfile->province }}<br>
-            Contact: {{ $buyerProfile->contact_no }}
         @else
             —
         @endif

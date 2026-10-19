@@ -90,13 +90,13 @@
                         @elseif ($tab === 'out')
                             <div class="flex flex-wrap items-start gap-3">
                                 <form method="POST" action="{{ route('logistics.deliveries.delivered', $order) }}"
-                                    onsubmit="return confirm('Confirm the parcel was handed over and ₱{{ number_format($order->grand_total, 2) }} was collected?')"
-                                    @csrf <button type="submit"
-                                    class="rounded-xl bg-leaf-green px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110">
-                                    Mark
-                                    Delivered</button>
+                                    onsubmit="return confirm('Confirm the parcel was handed over and ₱{{ number_format($order->grand_total, 2) }} was collected?')">
+                                    @csrf
+                                    <button type="submit"
+                                        class="rounded-xl bg-leaf-green px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110">
+                                        Mark Delivered
+                                    </button>
                                 </form>
-
                                 <details class="min-w-[18rem] flex-1">
                                     <summary
                                         class="cursor-pointer rounded-xl border border-sale-red/30 px-4 py-2.5 text-sm font-semibold text-sale-red">
@@ -149,9 +149,15 @@
                             </form>
                         @else
                             <p class="text-xs text-charcoal/50">
-                                Delivered {{ $order->updated_at->diffForHumans() }}. Shipping fee earned:
-                                <b>₱{{ number_format($order->shipping_fee, 2) }}</b>. Waiting for the buyer to confirm
-                                receipt.
+                                Delivered {{ ($order->delivered_at ?? $order->updated_at)->diffForHumans() }}.
+                                COD collected:
+                                <b>₱{{ number_format($order->cod_collected_amount ?? $order->grand_total, 2) }}</b>
+                                (shipping fee <b>₱{{ number_format($order->shipping_fee, 2) }}</b>).
+                                Waiting for the buyer to confirm receipt
+                                @if ($order->delivered_at)
+                                    or automatic completion on
+                                    {{ $order->delivered_at->copy()->addDays(\App\Models\Order::AUTO_COMPLETE_DAYS)->format('M d') }}
+                                @endif.
                             </p>
                         @endif
                     </div>

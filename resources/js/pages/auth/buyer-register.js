@@ -1,3 +1,5 @@
+import { initPsgcCascade } from '../../shared/psgcCascade.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------
     // PASSWORD VISIBILITY
@@ -27,6 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const ageInput = document.getElementById('age');
 
     function calculateAge() {
+        if (!birthdayInput || !ageInput) return;
+
         if (!birthdayInput.value) {
             ageInput.value = '';
             return;
@@ -67,96 +71,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ---------------------------------------------------
-    // CASCADING ADDRESS DROPDOWNS (PSGC API)
+    // CASCADING ADDRESS DROPDOWNS
+    // Shared PSGC cascade: option VALUES are names (never codes),
+    // so the same spelling is saved for buyers, sellers and hubs.
     // ---------------------------------------------------
-    const PSGC_BASE = 'https://psgc.gitlab.io/api';
-
     const provinceSelect = document.getElementById('province');
     const municipalitySelect = document.getElementById('municipality');
     const barangaySelect = document.getElementById('barangay');
 
-    async function loadProvinces() {
-        const oldValue = provinceSelect.dataset.oldValue;
-        try {
-            const res = await fetch(`${PSGC_BASE}/provinces/`);
-            const data = await res.json();
-
-            provinceSelect.innerHTML = '<option value="" disabled selected>Select province</option>';
-            data.sort((a, b) => a.name.localeCompare(b.name)).forEach(p => {
-                const opt = document.createElement('option');
-                opt.value = p.code;
-                opt.textContent = p.name;
-                if (oldValue && (oldValue === p.code || oldValue === p.name)) opt.selected = true;
-                provinceSelect.appendChild(opt);
-            });
-
-            if (provinceSelect.value) {
-                loadMunicipalities(provinceSelect.value);
-            }
-        } catch (err) {
-            provinceSelect.innerHTML = '<option value="">Failed to load provinces</option>';
-        }
-    }
-
-    async function loadMunicipalities(provinceCode) {
-        const oldValue = municipalitySelect.dataset.oldValue;
-        municipalitySelect.disabled = true;
-        municipalitySelect.innerHTML = '<option value="">Loading municipalities...</option>';
-        barangaySelect.disabled = true;
-        barangaySelect.innerHTML = '<option value="">Select municipality first</option>';
-
-        try {
-            const res = await fetch(`${PSGC_BASE}/provinces/${provinceCode}/cities-municipalities/`);
-            const data = await res.json();
-
-            municipalitySelect.innerHTML = '<option value="" disabled selected>Select municipality</option>';
-            data.sort((a, b) => a.name.localeCompare(b.name)).forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m.code;
-                opt.textContent = m.name;
-                if (oldValue && (oldValue === m.code || oldValue === m.name)) opt.selected = true;
-                municipalitySelect.appendChild(opt);
-            });
-            municipalitySelect.disabled = false;
-
-            if (municipalitySelect.value) {
-                loadBarangays(municipalitySelect.value);
-            }
-        } catch (err) {
-            municipalitySelect.innerHTML = '<option value="">Failed to load municipalities</option>';
-        }
-    }
-
-    async function loadBarangays(municipalityCode) {
-        const oldValue = barangaySelect.dataset.oldValue;
-        barangaySelect.disabled = true;
-        barangaySelect.innerHTML = '<option value="">Loading barangays...</option>';
-
-        try {
-            const res = await fetch(`${PSGC_BASE}/cities-municipalities/${municipalityCode}/barangays/`);
-            const data = await res.json();
-
-            barangaySelect.innerHTML = '<option value="" disabled selected>Select barangay</option>';
-            data.sort((a, b) => a.name.localeCompare(b.name)).forEach(b => {
-                const opt = document.createElement('option');
-                opt.value = b.code;
-                opt.textContent = b.name;
-                if (oldValue && (oldValue === b.code || oldValue === b.name)) opt.selected = true;
-                barangaySelect.appendChild(opt);
-            });
-            barangaySelect.disabled = false;
-        } catch (err) {
-            barangaySelect.innerHTML = '<option value="">Failed to load barangays</option>';
-        }
-    }
-
-    provinceSelect?.addEventListener('change', (e) => {
-        if (e.target.value) loadMunicipalities(e.target.value);
+    initPsgcCascade({
+        province: provinceSelect,
+        municipality: municipalitySelect,
+        barangay: barangaySelect,
+        initial: {
+            province: provinceSelect?.dataset.oldValue,
+            municipality: municipalitySelect?.dataset.oldValue,
+            barangay: barangaySelect?.dataset.oldValue,
+        },
     });
-
-    municipalitySelect?.addEventListener('change', (e) => {
-        if (e.target.value) loadBarangays(e.target.value);
-    });
-
-    loadProvinces();
 });

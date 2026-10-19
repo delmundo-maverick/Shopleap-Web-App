@@ -126,6 +126,10 @@ class PickupController extends Controller
             return back()->withErrors(['action' => 'Assign a rider before confirming pickup.']);
         }
 
+        if (! $order->waybill_printed_at) {
+            return back()->withErrors(['action' => 'The seller has not printed the shipping label yet.']);
+        }
+
         DB::transaction(function () use ($order) {
             $order->update(['status' => Order::STATUS_PICKED_UP]);
             $order->logStatusEvent('Collected from the seller.');

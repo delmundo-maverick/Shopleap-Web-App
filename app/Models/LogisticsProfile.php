@@ -20,6 +20,7 @@ class LogisticsProfile extends Model
         'barangay',
         'street_address',
         'business_name',
+        'company_name',
         'id_upload_path',
         'business_permit_path',
         'status',
@@ -80,5 +81,13 @@ class LogisticsProfile extends Model
                     ->whereRaw('LOWER(logistics_profiles.province) = ?', [$province])
                     ->whereRaw('LOWER(logistics_profiles.municipality) = ?', [$municipality]));
         });
+    }
+
+    /** Approved, active hubs that cover BOTH the pickup area and the delivery area. */
+    public function scopeServing($query, ?string $fromProvince, ?string $fromMunicipality, ?string $toProvince, ?string $toMunicipality)
+    {
+        return $query->available()
+            ->covering($fromProvince, $fromMunicipality)
+            ->covering($toProvince, $toMunicipality);
     }
 }

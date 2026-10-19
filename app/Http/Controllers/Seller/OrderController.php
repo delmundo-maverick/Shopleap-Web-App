@@ -59,9 +59,15 @@ class OrderController extends Controller
 
         if ($order->status === Order::STATUS_PREPARING) {
             $sellerProfile = $request->user()->sellerProfile;
+            $dest = $order->ship_to;
 
-            $hubs = LogisticsProfile::available()
-                ->covering($sellerProfile->province, $sellerProfile->municipality)
+            // Only hubs that cover BOTH the seller's area and the buyer's area.
+            $hubs = LogisticsProfile::serving(
+                $sellerProfile->province,
+                $sellerProfile->municipality,
+                $dest['province'],
+                $dest['municipality'],
+            )
                 ->withCount(['riders as active_riders_count' => fn($q) => $q
                     ->where('status', 'approved')->where('is_active', true)])
                 ->orderBy('business_name')
@@ -76,7 +82,7 @@ class OrderController extends Controller
         return view('seller.orders.show', compact('order', 'hubs', 'lastHubId'));
     }
 
-    /** AJAX — manual status changes (Placed / Confirmed / Preparing / Cancelled). */
+    /** AJAX: manual status changes, one step at a time (Placed → Confirmed → Preparing; Cancel anytime before pickup). */
     public function updateStatus(Request $request, Order $order)
     {
         $this->authorizeOwnership($request, $order);
@@ -93,16 +99,48 @@ class OrderController extends Controller
             'status' => ['required', Rule::in(Order::SELLER_EDITABLE_STATUSES)],
         ]);
 
-        if ($request->status !== $order->status) {
-            DB::transaction(function () use ($order, $request) {
-                $order->update(['status' => $request->status]);
+        $from = $order->status;
+        $to = $request->status;
 
-                if ($order->status === Order::STATUS_CANCELLED) {
-                    $order->restoreStock();
-                }
+        if ($to === $from) {
+            return response()->json([
+                'success' => true,
+                'message' => "Order #{$order->id} is already marked as {$order->status_label}.",
+                'status' => $order->status,
+            ]);
+        }
 
-                $order->logStatusEvent();
-            });
+        if (! in_array($to, Order::SELLER_TRANSITIONS[$from] ?? [], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => "An order can't move from " . Order::STATUS_LABELS[$from] . ' to ' . Order::STATUS_LABELS[$to] . '.',
+            ], 422);
+        }
+
+        $moved = false;
+
+        DB::transaction(function () use ($order, $from, $to, &$moved) {
+            // Conditional update: a double-click or a second tab can't apply the move twice.
+            $moved = Order::whereKey($order->id)->where('status', $from)->update(['status' => $to]) > 0;
+
+            if (! $moved) {
+                return;
+            }
+
+            $order->refresh();
+
+            if ($to === Order::STATUS_CANCELLED) {
+                $order->restoreStock();
+            }
+
+            $order->logStatusEvent();
+        });
+
+        if (! $moved) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This order was just updated. Please refresh the page.',
+            ], 422);
         }
 
         return response()->json([
@@ -121,21 +159,29 @@ class OrderController extends Controller
             return back()->withErrors(['pickup' => 'Only orders that are being prepared can be marked ready for pickup.']);
         }
 
+        if (! $order->waybill_printed_at) {
+            return back()->withErrors(['pickup' => 'Print the shipping label before requesting a pickup.']);
+        }
+
         $validated = $request->validate([
             'logistics_profile_id' => ['required', 'integer'],
             'pickup_date' => ['required', 'date', 'after_or_equal:today', 'before_or_equal:' . now()->addDays(7)->toDateString()],
             'pickup_time_slot' => ['required', Rule::in(array_keys(Order::PICKUP_SLOTS))],
         ]);
 
-        // Re-check server-side that this hub really serves the seller's area.
+        // Re-check server-side that this hub covers BOTH the seller's area and the buyer's area.
         $sellerProfile = $request->user()->sellerProfile;
+        $dest = $order->ship_to;
 
-        $hub = LogisticsProfile::available()
-            ->covering($sellerProfile->province, $sellerProfile->municipality)
-            ->find($validated['logistics_profile_id']);
+        $hub = LogisticsProfile::serving(
+            $sellerProfile->province,
+            $sellerProfile->municipality,
+            $dest['province'],
+            $dest['municipality'],
+        )->find($validated['logistics_profile_id']);
 
         if (! $hub) {
-            return back()->withErrors(['logistics_profile_id' => 'That sorting center does not serve your area.'])->withInput();
+            return back()->withErrors(['logistics_profile_id' => "That sorting center does not cover both your area and the buyer's area."])->withInput();
         }
 
         DB::transaction(function () use ($order, $hub, $validated) {

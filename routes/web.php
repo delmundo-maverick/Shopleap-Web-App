@@ -57,6 +57,8 @@ use App\Http\Controllers\Buyer\{
     ShopController,
 };
 
+use Illuminate\Support\Facades\Schedule;
+
 /*
 |--------------------------------------------------------------------------
 | Public Routes
@@ -80,7 +82,7 @@ Route::controller(LoginController::class)->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| Registration (role selection → role form → OTP → profile)
+| Registration (role selection → role form → OTP → pending approval)
 |--------------------------------------------------------------------------
 */
 
@@ -104,7 +106,7 @@ Route::prefix('register')->group(function () {
         Route::post('/logistics', 'store');
     });
 
-    // Steps 2 & 3: OTP verification and profile completion
+    // Step 2: OTP verification (creates the user + profile, then awaits admin approval)
     Route::prefix('{role}')
         ->where(['role' => 'buyer|seller|logistics'])
         ->controller(LoginController::class)
@@ -116,12 +118,6 @@ Route::prefix('register')->group(function () {
             Route::post('/resend-otp', 'resendOtp')
                 ->middleware('throttle:3,1')
                 ->name('register.resend-otp');
-
-            // Step 3: Profile (requires the OTP-created user to be logged in)
-            Route::middleware('auth')->group(function () {
-                Route::get('/profile', 'showProfileForm')->name('register.profile.form');
-                Route::post('/profile', 'storeProfile')->name('register.profile.store');
-            });
         });
 });
 
@@ -425,3 +421,5 @@ Route::middleware(['auth', 'buyer'])->prefix('buyer')->name('buyer.')->group(fun
             ->name('review.store');
     });
 });
+
+Schedule::command('orders:auto-complete')->dailyAt('02:00');

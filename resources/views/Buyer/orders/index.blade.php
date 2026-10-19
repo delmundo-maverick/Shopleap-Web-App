@@ -232,6 +232,10 @@
                             @if ($isDelivered)
                                 <p class="mr-auto text-xs text-charcoal/60">
                                     Your parcel was delivered. Please confirm you received it in good condition.
+                                    @if ($order->delivered_at)
+                                        If you don't respond, it will be completed automatically on
+                                        {{ $order->delivered_at->copy()->addDays(Order::AUTO_COMPLETE_DAYS)->format('M d') }}.
+                                    @endif
                                 </p>
 
                                 <form method="POST" action="{{ route('buyer.orders.confirm', $order) }}">
