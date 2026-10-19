@@ -56,7 +56,10 @@ class SortingController extends Controller
         }
 
         $order->load('buyer.buyerProfile');
-        $this->sortOrder($order, $this->areasFor($hub));
+
+        if (! $this->sortOrder($order, $this->areasFor($hub))) {
+            return back()->withErrors(['action' => "Order #{$order->id} is going to {$order->ship_to['municipality']}, which is not in your service areas. Add it under Service Areas first."]);
+        }
 
         return back()->with('status', "Order #{$order->id} sorted for {$order->delivery_area}.");
     }
@@ -75,9 +78,37 @@ class SortingController extends Controller
         }
 
         $areas = $this->areasFor($hub);
-        DB::transaction(fn() => $orders->each(fn($o) => $this->sortOrder($o, $areas)));
+        $sorted = 0;
+        $skipped = 0;
 
-        return back()->with('status', "{$orders->count()} parcel(s) sorted.");
+        DB::transaction(function () use ($orders, $areas, &$sorted, &$skipped) {
+            foreach ($orders as $o) {
+                $this->sortOrder($o, $areas) ? $sorted++ : $skipped++;
+            }
+        });
+
+        if ($sorted === 0) {
+            return back()->withErrors(['action' => 'None of these parcels are going to your service areas. Add the destinations under Service Areas first.']);
+        }
+
+        return back()->with('status', "{$sorted} parcel(s) sorted." . ($skipped ? " {$skipped} skipped: destination not in your service areas." : ''));
+    }
+
+    private function sortOrder(Order $order, Collection $areas): bool
+    {
+        $dest = $order->ship_to;
+        $area = $areas->get(HubServiceArea::keyFor($dest['province'], $dest['municipality']));
+
+        if (! $area) {
+            return false;
+        }
+
+        $label = $area->zone_name ?: $dest['municipality'];
+
+        $order->update(['status' => Order::STATUS_SORTED, 'delivery_area' => $label]);
+        $order->logStatusEvent('Sorted for delivery to ' . $dest['municipality'] . '.');
+
+        return true;
     }
 
     public function assign(Request $request, Order $order)
@@ -133,16 +164,6 @@ class SortingController extends Controller
         DB::transaction(fn() => $orders->each(fn($o) => $this->assignRider($o, $rider)));
 
         return back()->with('status', "{$orders->count()} parcel(s) assigned to {$rider->full_name}.");
-    }
-
-    private function sortOrder(Order $order, Collection $areas): void
-    {
-        $dest = $order->ship_to;
-        $area = $areas->get(HubServiceArea::keyFor($dest['province'], $dest['municipality']));
-        $label = $area?->zone_name ?: ($dest['municipality'] ?: 'Unassigned');
-
-        $order->update(['status' => Order::STATUS_SORTED, 'delivery_area' => $label]);
-        $order->logStatusEvent('Sorted for delivery to ' . ($dest['municipality'] ?: 'your area') . '.');
     }
 
     private function assignRider(Order $order, CourierProfile $rider): void

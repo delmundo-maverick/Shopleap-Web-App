@@ -1,10 +1,5 @@
 const PSGC_BASE = 'https://psgc.gitlab.io/api';
 
-/**
- * Province → Municipality → Barangay cascade using option NAMES as values
- * (matches how seller registration stored them). `initial` restores a saved
- * address: each level selects its saved name once its list has loaded.
- */
 export function initPsgcCascade({ province, municipality, barangay, helpEl = null, initial = {} }) {
     const levels = [
         {
@@ -16,6 +11,7 @@ export function initPsgcCascade({ province, municipality, barangay, helpEl = nul
             url: (code) => `${PSGC_BASE}/provinces/${code}/cities-municipalities/`, initial: initial.municipality, token: 0,
         },
         {
+            select: barangay, placeholder: 'Select barangay', resetText: 'Select a municipality first',
             url: (code) => `${PSGC_BASE}/cities-municipalities/${code}/barangays/`, initial: initial.barangay, token: 0,
         },
     ].filter((level) => level.select);

@@ -58,9 +58,9 @@ class DeliveryController extends Controller
         $orders = $query->paginate(15)->withQueryString();
         $riders = $this->activeRiders($hub->id);
 
-        // Shipping fees earned on parcels this hub has delivered.
+        // Shipping fees earned on parcels this hub has delivered (cash collected).
         $shippingEarned = (float) $hub->orders()
-            ->whereIn('status', [Order::STATUS_DELIVERED, Order::STATUS_COMPLETED])
+            ->whereIn('status', Order::GROUP_SHIPPING_EARNED)
             ->sum('shipping_fee');
 
         return view('logistics.deliveries.index', [
@@ -97,10 +97,32 @@ class DeliveryController extends Controller
             return $this->wrongStage();
         }
 
-        DB::transaction(function () use ($order) {
-            $order->update(['status' => Order::STATUS_DELIVERED]);
+        $collected = $order->grand_total; // COD amount = items + shipping
+        $moved = false;
+
+        DB::transaction(function () use ($order, $collected, &$moved) {
+            // Conditional update: a double-click can't record the delivery (and the cash) twice.
+            $moved = Order::whereKey($order->id)
+                ->where('status', Order::STATUS_OUT_FOR_DELIVERY)
+                ->update([
+                    'status' => Order::STATUS_DELIVERED,
+                    'delivered_at' => now(),
+                    'cod_collected_amount' => $collected,
+                    'cod_collected_at' => now(),
+                ]) > 0;
+
+            if (! $moved) {
+                return;
+            }
+
+            $order->refresh();
             $order->logStatusEvent('Waiting for the buyer to confirm receipt.');
+            $order->logInternalEvent('COD collected', '₱' . number_format($collected, 2) . ' collected on delivery.');
         });
+
+        if (! $moved) {
+            return $this->wrongStage();
+        }
 
         return back()->with('status', "Order #{$order->id} marked delivered. The buyer can now confirm receipt.");
     }

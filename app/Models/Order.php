@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
-
 class Order extends Model
 {
     protected $fillable = [
@@ -17,6 +16,7 @@ class Order extends Model
         'total_amount',
         'shipping_fee',
         'shipping_zone',
+        'buyer_note',
         'commission_amount',
         'ship_province',
         'ship_municipality',
@@ -34,6 +34,9 @@ class Order extends Model
         'delivery_attempts',
         'waybill_printed_at',
         'stock_restored_at',
+        'delivered_at',
+        'cod_collected_amount',
+        'cod_collected_at',
     ];
 
     protected function casts(): array
@@ -43,10 +46,14 @@ class Order extends Model
             'pickup_date' => 'date',
             'waybill_printed_at' => 'datetime',
             'stock_restored_at' => 'datetime',
+            'delivered_at' => 'datetime',
+            'cod_collected_at' => 'datetime',
+            'cod_collected_amount' => 'decimal:2',
         ];
     }
 
     // ── Status chain (Buyer → Seller → Rider → Sorting Center → Rider → Buyer) ──
+
     const STATUS_PLACED = 'PLACED';
     const STATUS_CONFIRMED = 'CONFIRMED';
     const STATUS_PREPARING = 'PREPARING';
@@ -70,35 +77,68 @@ class Order extends Model
         self::STATUS_PREPARING,
         self::STATUS_CANCELLED,
     ];
+
     const SELLER_MODIFIABLE_FROM = [
         self::STATUS_PLACED,
         self::STATUS_CONFIRMED,
         self::STATUS_PREPARING,
     ];
 
-    // Seller sidebar links
-    const GROUP_NEW = [self::STATUS_PLACED];
-    const GROUP_PREPARE = [self::STATUS_CONFIRMED, self::STATUS_PREPARING, self::STATUS_READY_FOR_PICKUP];
+    const SELLER_TRANSITIONS = [
+        self::STATUS_PLACED => [
+            self::STATUS_CONFIRMED,
+            self::STATUS_CANCELLED,
+        ],
+        self::STATUS_CONFIRMED => [
+            self::STATUS_PREPARING,
+            self::STATUS_CANCELLED,
+        ],
+        self::STATUS_PREPARING => [
+            self::STATUS_CANCELLED,
+        ],
+    ];
 
-    // Buyer order tabs. DELIVERY_FAILED is recoverable (reschedule), so it stays under "To Deliver".
+    // Seller sidebar links
+    const GROUP_NEW = [
+        self::STATUS_PLACED,
+    ];
+
+    const GROUP_PREPARE = [
+        self::STATUS_CONFIRMED,
+        self::STATUS_PREPARING,
+        self::STATUS_READY_FOR_PICKUP,
+    ];
+
+    // Buyer order tabs. DELIVERY_FAILED is recoverable (reschedule),
+    // so it stays under "To Deliver".
     const GROUP_TO_SHIP = [
         self::STATUS_PLACED,
         self::STATUS_CONFIRMED,
         self::STATUS_PREPARING,
         self::STATUS_READY_FOR_PICKUP,
     ];
+
     const GROUP_TO_DELIVER = [
         self::STATUS_PICKED_UP,
         self::STATUS_AT_SORTING_CENTER,
         self::STATUS_SORTED,
         self::STATUS_ASSIGNED_TO_RIDER,
         self::STATUS_OUT_FOR_DELIVERY,
-        self::STATUS_DELIVERED,
         self::STATUS_DELIVERY_FAILED,
     ];
-    const GROUP_COMPLETED = [self::STATUS_COMPLETED];
-    const GROUP_RETURN_REFUND = [self::STATUS_RETURNED];
-    const GROUP_CANCELLED = [self::STATUS_CANCELLED];
+
+    const GROUP_COMPLETED = [
+        self::STATUS_DELIVERED,
+        self::STATUS_COMPLETED,
+    ];
+
+    const GROUP_RETURN_REFUND = [
+        self::STATUS_RETURNED,
+    ];
+
+    const GROUP_CANCELLED = [
+        self::STATUS_CANCELLED,
+    ];
 
     const TAB_GROUPS = [
         'to_ship' => self::GROUP_TO_SHIP,
@@ -118,7 +158,10 @@ class Order extends Model
     ];
 
     // Seller reports
-    const GROUP_REALIZED = [self::STATUS_COMPLETED];
+    const GROUP_REALIZED = [
+        self::STATUS_COMPLETED,
+    ];
+
     const GROUP_IN_PROGRESS = [
         self::STATUS_PLACED,
         self::STATUS_CONFIRMED,
@@ -132,9 +175,23 @@ class Order extends Model
         self::STATUS_DELIVERED,
         self::STATUS_DELIVERY_FAILED,
     ];
-    const GROUP_LOST = [self::STATUS_CANCELLED, self::STATUS_RETURNED];
 
-    // Waybill can be (re)printed once the seller is preparing the order
+    const GROUP_LOST = [
+        self::STATUS_CANCELLED,
+        self::STATUS_RETURNED,
+    ];
+
+    // Shipping fees are earned by logistics once the parcel is delivered
+    // and the COD cash is collected. GMV and commission still count only at COMPLETED.
+    const GROUP_SHIPPING_EARNED = [
+        self::STATUS_DELIVERED,
+        self::STATUS_COMPLETED,
+    ];
+
+    // A DELIVERED order completes by itself if the buyer never confirms.
+    const AUTO_COMPLETE_DAYS = 7;
+
+    // Waybill can be (re)printed once the seller is preparing the order.
     const WAYBILL_STATUSES = [
         self::STATUS_PREPARING,
         self::STATUS_READY_FOR_PICKUP,
@@ -207,6 +264,7 @@ class Order extends Model
     ];
 
     // ── Relations ──
+
     public function seller()
     {
         return $this->belongsTo(User::class, 'seller_id');
@@ -243,20 +301,46 @@ class Order extends Model
     }
 
     // ── Accessors ──
+
     public function getStatusLabelAttribute(): string
     {
-        return self::STATUS_LABELS[$this->status] ?? str_replace('_', ' ', $this->status);
+        return self::STATUS_LABELS[$this->status]
+            ?? str_replace('_', ' ', $this->status);
     }
 
     public function getStatusColorAttribute(): string
     {
-        return self::STATUS_COLORS[$this->status] ?? 'bg-light-gray text-charcoal';
+        return self::STATUS_COLORS[$this->status]
+            ?? 'bg-light-gray text-charcoal';
     }
 
-    /** What the buyer actually pays (COD amount): items + shipping. total_amount stays items-only. */
+    /**
+     * What the buyer actually pays (COD amount): items + shipping.
+     * total_amount remains items-only.
+     */
     public function getGrandTotalAttribute(): float
     {
         return (float) $this->total_amount + (float) $this->shipping_fee;
+    }
+
+    /**
+     * Commission rate that applied to this order.
+     * Calculated from the saved amounts, so later rate changes do not alter it.
+     */
+    public function getCommissionRateLabelAttribute(): string
+    {
+        if ((float) $this->total_amount <= 0) {
+            return '0%';
+        }
+
+        $rate = round(
+            (float) $this->commission_amount
+                / (float) $this->total_amount
+                * 100,
+            2
+        );
+
+        return rtrim(rtrim(number_format($rate, 2), '0'), '.') . '%';
     }
 
     /**
@@ -273,26 +357,39 @@ class Order extends Model
             'province' => $this->ship_province ?? $p?->province,
             'municipality' => $this->ship_municipality ?? $p?->municipality,
             'barangay' => $this->ship_barangay ?? $p?->barangay,
-            'street' => $this->ship_street ?? ($p ? trim(($p->house_number ?? '') . ' ' . ($p->street ?? '')) : null),
+            'street' => $this->ship_street
+                ?? ($p
+                    ? trim(
+                        ($p->house_number ?? '')
+                            . ' '
+                            . ($p->street ?? '')
+                    )
+                    : null),
         ];
     }
 
     // ── Tracking timeline ──
 
     /** Public event — shown to the buyer, seller and logistics. */
-    public function logStatusEvent(?string $note = null, ?int $actorId = null): OrderEvent
-    {
+    public function logStatusEvent(
+        ?string $note = null,
+        ?int $actorId = null
+    ): OrderEvent {
         return $this->events()->create([
             'actor_id' => $actorId ?? Auth::id(),
             'status' => $this->status,
-            'title' => self::TIMELINE_TITLES[$this->status] ?? $this->status_label,
+            'title' => self::TIMELINE_TITLES[$this->status]
+                ?? $this->status_label,
             'note' => $note,
         ]);
     }
 
     /** Internal note — seller and logistics only, never shown to the buyer. */
-    public function logInternalEvent(string $title, ?string $note = null, ?int $actorId = null): OrderEvent
-    {
+    public function logInternalEvent(
+        string $title,
+        ?string $note = null,
+        ?int $actorId = null
+    ): OrderEvent {
         return $this->events()->create([
             'actor_id' => $actorId ?? Auth::id(),
             'status' => null,
@@ -309,8 +406,10 @@ class Order extends Model
         }
 
         DB::transaction(function () {
-            // Re-check under a row lock so two simultaneous cancels can't both restore.
-            $locked = static::whereKey($this->id)->lockForUpdate()->first();
+            // Re-check under a row lock so two simultaneous cancels cannot both restore.
+            $locked = static::whereKey($this->id)
+                ->lockForUpdate()
+                ->first();
 
             if (! $locked || $locked->stock_restored_at) {
                 return;
@@ -318,26 +417,53 @@ class Order extends Model
 
             $items = $this->items()->get();
 
-            // Same lock order as checkout and the seller editor: products, then variants, ascending id.
-            $products = Product::whereIn('id', $items->pluck('product_id')->filter()->unique()->sort()->values())
-                ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            // Same lock order as checkout and the seller editor:
+            // products, then variants, ascending ID.
+            $products = Product::whereIn(
+                'id',
+                $items->pluck('product_id')
+                    ->filter()
+                    ->unique()
+                    ->sort()
+                    ->values()
+            )
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
 
-            ProductVariant::whereIn('id', $items->pluck('product_variant_id')->filter()->unique()->sort()->values())
-                ->orderBy('id')->lockForUpdate()->get();
+            ProductVariant::whereIn(
+                'id',
+                $items->pluck('product_variant_id')
+                    ->filter()
+                    ->unique()
+                    ->sort()
+                    ->values()
+            )
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
 
             $touchedVariantProducts = [];
 
             foreach ($items as $item) {
                 if ($item->product_variant_id) {
-                    ProductVariant::whereKey($item->product_variant_id)->increment('stock_quantity', $item->quantity);
+                    ProductVariant::whereKey($item->product_variant_id)
+                        ->increment('stock_quantity', $item->quantity);
 
                     if ($products->has($item->product_id)) {
-                        $touchedVariantProducts[$item->product_id] = $products->get($item->product_id);
+                        $touchedVariantProducts[$item->product_id] =
+                            $products->get($item->product_id);
                     }
-                } elseif ($item->product_id && empty($item->selected_options)) {
-                    // A line with options but no variant id is a variant that was deleted
-                    // long ago; adding it to the base product would corrupt its stock.
-                    Product::whereKey($item->product_id)->increment('stock_quantity', $item->quantity);
+                } elseif (
+                    $item->product_id
+                    && empty($item->selected_options)
+                ) {
+                    // A line with options but no variant ID may reference a
+                    // variant that was deleted. Do not add that stock to the
+                    // base product.
+                    Product::whereKey($item->product_id)
+                        ->increment('stock_quantity', $item->quantity);
                 }
             }
 
@@ -346,7 +472,9 @@ class Order extends Model
                 $product->syncFromVariants();
             }
 
-            $this->update(['stock_restored_at' => now()]);
+            $this->update([
+                'stock_restored_at' => now(),
+            ]);
         });
     }
 }

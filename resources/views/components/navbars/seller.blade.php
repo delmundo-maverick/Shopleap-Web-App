@@ -95,6 +95,19 @@
                 <span class="nav-label">Manage Inventory</span>
             </a>
 
+            <a href="{{ route('seller.orders.index', ['status' => 'new']) }}" title="Order Notifications"
+                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
+                {{ $active === 'orders'
+                    ? 'frost-chip text-primary font-semibold'
+                    : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
+
+                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                        d="M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2m-6 0h6m-6 0H5a2 2 0 01-2-2V7a2 2 0 012-2h3.28a1 1 0 01.948.684l.5 1.5a1 1 0 00.949.685H15.28a1 1 0 01.948.684l.5 1.5a1 1 0 00.949.685H19a2 2 0 012 2v6a2 2 0 01-2 2h-4" />
+                </svg>
+
+                <span class="nav-label">Order Notifications</span>
+            </a>
 
             <a href="{{ route('seller.orders.index', ['status' => 'prepare']) }}" title="Prepare & Ship Orders"
                 class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
@@ -108,20 +121,6 @@
                 </svg>
 
                 <span class="nav-label">Prepare &amp; Ship Orders</span>
-            </a>
-
-            <a href="{{ route('seller.orders.index', ['status' => 'new']) }}" title="Order Notifications"
-                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
-                {{ $active === 'orders'
-                    ? 'frost-chip text-primary font-semibold'
-                    : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
-
-                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                        d="M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2m-6 0h6m-6 0H5a2 2 0 01-2-2V7a2 2 0 012-2h3.28a1 1 0 01.948.684l.5 1.5a1 1 0 00.949.685H15.28a1 1 0 01.948.684l.5 1.5a1 1 0 00.949.685H19a2 2 0 012 2v6a2 2 0 01-2 2h-4" />
-                </svg>
-
-                <span class="nav-label">Order Notifications</span>
             </a>
 
 

@@ -18,7 +18,6 @@ class HubServiceArea extends Model
         return $this->belongsTo(CourierProfile::class, 'rider_id');
     }
 
-    /** Case-insensitive key so "Santa Cruz" and "santa cruz " match. */
     public static function keyFor(?string $province, ?string $municipality): string
     {
         return mb_strtolower(trim((string) $province)) . '|' . mb_strtolower(trim((string) $municipality));

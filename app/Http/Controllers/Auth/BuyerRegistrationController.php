@@ -29,14 +29,19 @@ class BuyerRegistrationController extends Controller
             'sex' => ['required', 'in:male,female'],
             'birthday' => ['required', 'date', 'before:today'],
             'contact_no' => ['required', 'string', 'max:20'],
-            'province' => ['required', 'string'],
-            'municipality' => ['required', 'string'],
-            'barangay' => ['required', 'string'],
+            // Names only: a value made of digits is a PSGC code from a stale script.
+            'province' => ['required', 'string', 'not_regex:/^\d+$/'],
+            'municipality' => ['required', 'string', 'not_regex:/^\d+$/'],
+            'barangay' => ['required', 'string', 'not_regex:/^\d+$/'],
             'house_number' => ['required', 'string', 'max:100'],
             'street' => ['required', 'string', 'max:150'],
             'additional_address' => ['nullable', 'string', 'max:255'],
             'id_upload' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'terms' => ['required', 'accepted'],
+        ], [
+            'province.not_regex' => 'Please select your province from the list.',
+            'municipality.not_regex' => 'Please select your municipality from the list.',
+            'barangay.not_regex' => 'Please select your barangay from the list.',
         ]);
 
         $age = Carbon::parse($validated['birthday'])->age;
