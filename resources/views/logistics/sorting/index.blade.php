@@ -4,7 +4,6 @@
 
 <x-logistics.layout title="Sort & Assign" subtitle="Sort parcels by destination, then assign a delivery rider"
     active="sorting">
-
     {{-- TABS --}}
     <div class="frost-panel-solid flex rounded-2xl">
         @foreach (['to_sort' => 'To Sort', 'to_assign' => 'To Assign'] as $key => $label)
@@ -27,6 +26,7 @@
     @if ($orders->isEmpty())
         <div class="frost-panel-solid flex h-56 flex-col items-center justify-center rounded-2xl text-center">
             <p class="text-sm font-semibold text-charcoal">Nothing here</p>
+
             <p class="mt-1 text-xs text-charcoal/50">
                 {{ $tab === 'to_sort'
                     ? 'Parcels appear once you confirm their arrival under Incoming Parcels.'
@@ -66,6 +66,8 @@
                             $area = $areas->get(
                                 \App\Models\HubServiceArea::keyFor($dest['province'], $dest['municipality']),
                             );
+
+                            $suggestedRider = $suggested[$order->id] ?? null;
                         @endphp
 
                         <tr>
@@ -82,6 +84,7 @@
                                 </span>
                             </td>
 
+                            {{-- UPDATED: ZONE / SUGGESTED BARANGAY RIDER --}}
                             <td class="px-5 py-4">
                                 @if ($area)
                                     <span class="font-medium">
@@ -89,7 +92,7 @@
                                     </span>
 
                                     <span class="block text-xs text-charcoal/50">
-                                        {{ $area->rider?->full_name ?? 'No rider mapped' }}
+                                        {{ $suggestedRider?->full_name ?? 'No rider for this barangay' }}
                                     </span>
                                 @else
                                     <span class="text-xs text-orange-600">
@@ -98,7 +101,7 @@
                                 @endif
                             </td>
 
-                            {{-- UPDATED: SORT BUTTON / SERVICE AREA LINK --}}
+                            {{-- SORT BUTTON / SERVICE AREA LINK --}}
                             <td class="px-5 py-4 text-right">
                                 @if ($area)
                                     <form method="POST" action="{{ route('logistics.sorting.sort', $order) }}">
@@ -129,8 +132,7 @@
                 @php
                     $area = $group['area'];
                     $dest = $group['dest'];
-
-                    $mapped = $area?->rider && $area->rider->is_active && $area->rider->status === 'approved';
+                    $rider = $group['rider'];
                 @endphp
 
                 <div class="frost-panel-solid rounded-2xl p-5">
@@ -142,30 +144,44 @@
                             </p>
 
                             <p class="text-xs text-charcoal/50">
-                                {{ $group['orders']->count() }} parcel(s) ·
+                                {{ $group['orders']->count() }} parcel(s)
 
-                                @if ($area)
-                                    Mapped rider:
-                                    {{ $area->rider?->full_name ?? 'none' }}{{ $area->rider && !$area->rider->is_active ? ' (inactive)' : '' }}
-                                @else
+                                @if ($group['barangays']->isNotEmpty())
+                                    · Brgy. {{ $group['barangays']->implode(', ') }}
+                                @endif
+                            </p>
+
+                            <p class="mt-0.5 text-xs">
+                                @if (!$area)
                                     <span class="text-orange-600">
                                         Not in your service areas. Add it so riders can be mapped automatically.
+                                    </span>
+                                @elseif ($rider)
+                                    <span class="text-charcoal/60">
+                                        Mapped rider: <b>{{ $rider->full_name }}</b>
+                                    </span>
+                                @else
+                                    <span class="text-orange-600">
+                                        No rider mapped for these barangays. Pick one below,
+                                        or map them under Service Areas.
                                     </span>
                                 @endif
                             </p>
                         </div>
 
-                        @if ($mapped)
+                        @if ($rider)
                             <form method="POST" action="{{ route('logistics.sorting.assign-area') }}">
                                 @csrf
 
-                                <input type="hidden" name="province" value="{{ $dest['province'] }}">
-                                <input type="hidden" name="municipality" value="{{ $dest['municipality'] }}">
-                                <input type="hidden" name="rider_id" value="{{ $area->rider_id }}">
+                                <input type="hidden" name="rider_id" value="{{ $rider->id }}">
+
+                                @foreach ($group['orders'] as $groupOrder)
+                                    <input type="hidden" name="order_ids[]" value="{{ $groupOrder->id }}">
+                                @endforeach
 
                                 <button type="submit"
                                     class="rounded-xl bg-leaf-green px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110">
-                                    Assign all to {{ $area->rider->first_name }}
+                                    Assign all {{ $group['orders']->count() }} to {{ $rider->first_name }}
                                 </button>
                             </form>
                         @endif
@@ -181,6 +197,7 @@
 
                                     <p class="text-xs text-charcoal/50">
                                         {{ $order->ship_to['name'] }}
+                                        · Brgy. {{ $order->ship_to['barangay'] }}
                                         · {{ $order->items->sum('quantity') }} item(s)
                                     </p>
                                 </div>
@@ -190,13 +207,13 @@
                                     @csrf
 
                                     <select name="rider_id" required class="{{ $field }}">
-                                        <option value="" disabled @selected(!$area?->rider_id)>
+                                        <option value="" disabled @selected(!$rider)>
                                             Select rider…
                                         </option>
 
-                                        @foreach ($riders as $rider)
-                                            <option value="{{ $rider->id }}" @selected($area?->rider_id === $rider->id)>
-                                                {{ $rider->full_name }}
+                                        @foreach ($riders as $r)
+                                            <option value="{{ $r->id }}" @selected($rider?->id === $r->id)>
+                                                {{ $r->full_name }}
                                             </option>
                                         @endforeach
                                     </select>
@@ -213,5 +230,4 @@
             @endforeach
         </div>
     @endif
-
 </x-logistics.layout>

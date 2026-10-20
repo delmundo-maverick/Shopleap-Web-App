@@ -293,6 +293,7 @@ Route::middleware(['auth', 'logistics'])->prefix('logistics')->name('logistics.'
         Route::get('/', 'index')->name('index');
         Route::post('/', 'store')->name('store');
         Route::post('/{area}', 'update')->name('update');
+        Route::post('/{area}/barangays', 'updateBarangays')->name('barangays');
         Route::delete('/{area}', 'destroy')->name('destroy');
     });
 

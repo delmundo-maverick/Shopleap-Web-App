@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Logistics;
 
 use App\Http\Controllers\Controller;
 use App\Models\CourierProfile;
+use App\Models\HubServiceArea;
 use App\Models\Order;
+use App\Services\OrderTransitions;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -39,10 +41,20 @@ class PickupController extends Controller
 
         $riders = $this->activeRiders($hub->id);
 
-        return view('logistics.pickups.index', compact('orders', 'riders', 'tab', 'counts'));
+        // Suggested pickup rider: the one mapped to the seller's barangay (then the municipality rider).
+        $areas = $hub->serviceAreas()->with(['rider', 'barangays.rider'])->get()->keyBy(fn($a) => $a->area_key);
+
+        $suggested = $orders->getCollection()->mapWithKeys(function ($o) use ($areas) {
+            $seller = $o->seller->sellerProfile;
+            $area = $areas->get(HubServiceArea::keyFor($seller?->province, $seller?->municipality));
+
+            return [$o->id => $area?->riderFor($seller?->barangay)?->id];
+        });
+
+        return view('logistics.pickups.index', compact('orders', 'riders', 'tab', 'counts', 'suggested'));
     }
 
-    /** Assign (or reassign) the pickup rider and confirm the date/window. */
+    /** Assign (or reassign) the pickup rider and confirm the date/window. The rider then accepts in the app. */
     public function assign(Request $request, Order $order)
     {
         $hub = $request->user()->logisticsProfile;
@@ -67,10 +79,15 @@ class PickupController extends Controller
         $changed = $order->pickup_date?->toDateString() !== $validated['pickup_date']
             || $order->pickup_time_slot !== $validated['pickup_time_slot'];
 
-        DB::transaction(function () use ($order, $rider, $validated, $changed) {
+        // Same rider, same schedule: keep their acceptance. Anything else needs a fresh accept.
+        $pickupStatus = ($order->pickup_rider_id === $rider->id && ! $changed)
+            ? ($order->pickup_status ?? 'assigned')
+            : 'assigned';
+
+        DB::transaction(function () use ($order, $rider, $validated, $changed, $pickupStatus) {
             $order->update([
                 'pickup_rider_id' => $rider->id,
-                'pickup_status' => 'accepted',
+                'pickup_status' => $pickupStatus,
                 'pickup_date' => $validated['pickup_date'],
                 'pickup_time_slot' => $validated['pickup_time_slot'],
             ]);
@@ -84,7 +101,7 @@ class PickupController extends Controller
         return back()->with('status', "Order #{$order->id} assigned to {$rider->full_name} for pickup.");
     }
 
-    /** Hub can't serve this pickup — send it back to the seller to choose another hub. */
+    /** Hub can't serve this pickup: send it back to the seller to choose another hub. */
     public function decline(Request $request, Order $order)
     {
         $hub = $request->user()->logisticsProfile;
@@ -114,10 +131,10 @@ class PickupController extends Controller
     }
 
     /**
-     * STAND-IN for the rider's own "Scan/Confirm Parcel" action, until the
-     * Courier mobile app exists. Remove when the app ships.
+     * STAND-IN for the rider's own "Scan/Confirm Parcel" action in the app.
+     * Uses the same transition code as the courier API. Remove once the app is live.
      */
-    public function confirmPickup(Request $request, Order $order)
+    public function confirmPickup(Request $request, Order $order, OrderTransitions $transitions)
     {
         $hub = $request->user()->logisticsProfile;
         $this->authorizeOwnership($order, $hub->id);
@@ -130,10 +147,9 @@ class PickupController extends Controller
             return back()->withErrors(['action' => 'The seller has not printed the shipping label yet.']);
         }
 
-        DB::transaction(function () use ($order) {
-            $order->update(['status' => Order::STATUS_PICKED_UP]);
-            $order->logStatusEvent('Collected from the seller.');
-        });
+        if (! $transitions->confirmPickup($order, $request->user()->id)) {
+            return back()->withErrors(['action' => 'This order was just updated. Please refresh the page.']);
+        }
 
         return back()->with('status', "Order #{$order->id} confirmed picked up.");
     }

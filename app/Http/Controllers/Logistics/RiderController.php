@@ -53,11 +53,14 @@ class RiderController extends Controller
             'rejection_reason' => null,
         ]);
 
-        ActivityLogger::log('rider.approved', 'Logistics', "{$rider->full_name} approved as a rider under {$rider->logisticsProfile->business_name}.", $rider);
+        // The rider's registration barangay becomes theirs automatically (the hub can change it later).
+        $mapping = $rider->fresh()->mapHomeBarangay();
+
+        ActivityLogger::log('rider.approved', 'Logistics', "{$rider->full_name} approved as a rider under {$rider->logisticsProfile->business_name}. {$mapping['message']}", $rider);
 
         // TODO: notify rider by email once that system exists
 
-        return back()->with('status', "{$rider->full_name} has been approved.");
+        return back()->with('status', "{$rider->full_name} has been approved. {$mapping['message']}");
     }
 
     public function reject(Request $request, CourierProfile $rider)

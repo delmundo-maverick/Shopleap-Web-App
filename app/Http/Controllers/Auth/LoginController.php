@@ -53,6 +53,17 @@ class LoginController extends Controller
             ])->onlyInput('email');
         }
 
+        // Couriers must sign in through the Shopleap Rider app.
+        if ($user->role === 'courier') {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()->withErrors([
+                'email' => 'Riders sign in through the Shopleap Rider app.',
+            ])->onlyInput('email');
+        }
+
         $profile = match ($user->role) {
             'seller' => $user->sellerProfile,
             'buyer' => $user->buyerProfile,
@@ -69,7 +80,9 @@ class LoginController extends Controller
                 ? 'Your registration was not approved. Please contact support for details.'
                 : "Your registration is still pending administrator approval. You'll be notified by email once reviewed.";
 
-            return back()->withErrors(['email' => $message])->onlyInput('email');
+            return back()->withErrors([
+                'email' => $message,
+            ])->onlyInput('email');
         }
 
         if ($user->account_status !== 'active') {
@@ -81,7 +94,9 @@ class LoginController extends Controller
                 ? 'Your account has been suspended. Please contact support.'
                 : 'Your account has been deactivated.';
 
-            return back()->withErrors(['email' => $message])->onlyInput('email');
+            return back()->withErrors([
+                'email' => $message,
+            ])->onlyInput('email');
         }
 
         $request->session()->regenerate();
@@ -98,8 +113,10 @@ class LoginController extends Controller
     public function destroy(Request $request)
     {
         Auth::guard('web')->logout();
+
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
         return redirect()->route('login');
     }
 
@@ -108,35 +125,66 @@ class LoginController extends Controller
     public function showOtpForm(string $role)
     {
         $this->checkRole($role);
+
         $pending = session('pending_registration');
 
-        abort_if(!$pending || $pending['role'] !== $role, 403, 'Please start registration again.');
+        abort_if(
+            ! $pending || $pending['role'] !== $role,
+            403,
+            'Please start registration again.'
+        );
 
-        return view('auth.verify-otp', ['role' => $role, 'email' => $pending['email']]);
+        return view('auth.verify-otp', [
+            'role' => $role,
+            'email' => $pending['email'],
+        ]);
     }
 
-    public function verifyOtp(Request $request, string $role, OtpService $otpService)
-    {
+    public function verifyOtp(
+        Request $request,
+        string $role,
+        OtpService $otpService
+    ) {
         $this->checkRole($role);
-        $request->validate(['otp' => 'required|digits:6']);
+
+        $request->validate([
+            'otp' => 'required|digits:6',
+        ]);
 
         $pending = session('pending_registration');
-        abort_if(!$pending || $pending['role'] !== $role, 403, 'Please start registration again.');
 
-        [$ok, $message] = $otpService->verify($pending['email'], $role, $request->otp);
+        abort_if(
+            ! $pending || $pending['role'] !== $role,
+            403,
+            'Please start registration again.'
+        );
 
-        if (!$ok) {
+        [$ok, $message] = $otpService->verify(
+            $pending['email'],
+            $role,
+            $request->otp
+        );
+
+        if (! $ok) {
             if ($request->wantsJson()) {
-                return response()->json(['message' => $message], 422);
+                return response()->json([
+                    'message' => $message,
+                ], 422);
             }
 
-            return back()->withErrors(['otp' => $message]);
+            return back()->withErrors([
+                'otp' => $message,
+            ]);
         }
 
         DB::transaction(function () use ($pending, $role) {
-            $user = User::create($pending['user'] + ['email_verified_at' => now()]);
+            $user = User::create(
+                $pending['user'] + ['email_verified_at' => now()]
+            );
 
-            $profileData = $pending['profile'] + ['user_id' => $user->id];
+            $profileData = $pending['profile'] + [
+                'user_id' => $user->id,
+            ];
 
             match ($role) {
                 'buyer' => BuyerProfile::create($profileData),
@@ -148,7 +196,9 @@ class LoginController extends Controller
         session()->forget('pending_registration');
 
         if ($request->wantsJson()) {
-            return response()->json(['message' => 'verified']);
+            return response()->json([
+                'message' => 'verified',
+            ]);
         }
 
         return redirect()->route('login')->with(
@@ -157,16 +207,27 @@ class LoginController extends Controller
         );
     }
 
-    public function resendOtp(Request $request, string $role, OtpService $otpService)
-    {
+    public function resendOtp(
+        Request $request,
+        string $role,
+        OtpService $otpService
+    ) {
         $this->checkRole($role);
+
         $pending = session('pending_registration');
-        abort_if(!$pending || $pending['role'] !== $role, 403, 'Please start registration again.');
+
+        abort_if(
+            ! $pending || $pending['role'] !== $role,
+            403,
+            'Please start registration again.'
+        );
 
         $otpService->generateAndSend($pending['email'], $role);
 
         if ($request->wantsJson()) {
-            return response()->json(['message' => 'A new code has been sent.']);
+            return response()->json([
+                'message' => 'A new code has been sent.',
+            ]);
         }
 
         return back()->with('status', 'A new code has been sent.');

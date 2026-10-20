@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CourierProfile;
 use App\Models\HubServiceArea;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ServiceAreaController extends Controller
 {
@@ -13,7 +14,10 @@ class ServiceAreaController extends Controller
     {
         $hub = $request->user()->logisticsProfile;
 
-        $areas = $hub->serviceAreas()->with('rider')->orderBy('province')->orderBy('municipality')->get();
+        $areas = $hub->serviceAreas()
+            ->with(['rider', 'barangays.rider'])
+            ->orderBy('province')->orderBy('municipality')->get();
+
         $riders = CourierProfile::where('logistics_profile_id', $hub->id)
             ->where('status', 'approved')->orderBy('first_name')->get();
 
@@ -63,6 +67,50 @@ class ServiceAreaController extends Controller
         ]);
 
         return back()->with('status', "{$area->municipality} updated.");
+    }
+
+    /** Assign (or clear, with no rider chosen) one rider for the ticked barangays of this municipality. */
+    public function updateBarangays(Request $request, HubServiceArea $area)
+    {
+        $hub = $request->user()->logisticsProfile;
+        abort_unless($area->logistics_profile_id === $hub->id, 403);
+
+        $validated = $request->validate([
+            'barangays' => ['required', 'array', 'min:1', 'max:300'],
+            'barangays.*' => ['required', 'string', 'max:150', 'not_regex:/^\d+$/'],
+            'rider_id' => ['nullable', 'integer'],
+        ], [
+            'barangays.required' => 'Tick at least one barangay first.',
+            'barangays.min' => 'Tick at least one barangay first.',
+        ]);
+
+        $riderId = $this->resolveRiderId($hub->id, $validated['rider_id'] ?? null);
+
+        $existing = $area->barangays()->get()->keyBy(fn($b) => HubServiceArea::barangayKey($b->barangay));
+        $names = collect($validated['barangays'])->unique(fn($n) => HubServiceArea::barangayKey($n))->values();
+
+        DB::transaction(function () use ($area, $names, $existing, $riderId) {
+            foreach ($names as $name) {
+                $row = $existing->get(HubServiceArea::barangayKey($name));
+
+                if ($riderId === null) {
+                    $row?->delete();
+                    continue;
+                }
+
+                if ($row) {
+                    $row->update(['rider_id' => $riderId]);
+                } else {
+                    $area->barangays()->create(['barangay' => trim($name), 'rider_id' => $riderId]);
+                }
+            }
+        });
+
+        $message = $riderId === null
+            ? "{$names->count()} barangay(s) in {$area->municipality} cleared."
+            : "{$names->count()} barangay(s) in {$area->municipality} assigned.";
+
+        return back()->with('status', $message);
     }
 
     public function destroy(Request $request, HubServiceArea $area)

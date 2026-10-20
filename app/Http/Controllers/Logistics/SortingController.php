@@ -34,16 +34,30 @@ class SortingController extends Controller
         $areas = $this->areasFor($hub);
         $riders = $this->activeRiders($hub->id);
 
-        // Parcels grouped by destination, with the hub's mapped zone/rider for each.
-        $groups = $orders
-            ->groupBy(fn($o) => HubServiceArea::keyFor($o->ship_to['province'], $o->ship_to['municipality']))
-            ->map(fn($group, $key) => [
-                'area' => $areas->get($key),
-                'dest' => $group->first()->ship_to,
-                'orders' => $group,
-            ]);
+        // Suggested delivery rider per parcel: the barangay's rider, then the municipality rider.
+        $suggested = $orders->mapWithKeys(fn($o) => [$o->id => $this->suggestedRider($areas, $o)]);
 
-        return view('logistics.sorting.index', compact('tab', 'counts', 'orders', 'groups', 'areas', 'riders'));
+        // Parcels grouped by destination municipality AND suggested rider.
+        $groups = $orders
+            ->groupBy(function ($o) use ($suggested) {
+                $d = $o->ship_to;
+
+                return HubServiceArea::keyFor($d['province'], $d['municipality']) . '|' . ($suggested[$o->id]?->id ?? 'none');
+            })
+            ->map(function ($group) use ($areas, $suggested) {
+                $first = $group->first();
+                $dest = $first->ship_to;
+
+                return [
+                    'area' => $areas->get(HubServiceArea::keyFor($dest['province'], $dest['municipality'])),
+                    'dest' => $dest,
+                    'rider' => $suggested[$first->id],
+                    'barangays' => $group->map(fn($o) => $o->ship_to['barangay'])->filter()->unique()->values(),
+                    'orders' => $group,
+                ];
+            });
+
+        return view('logistics.sorting.index', compact('tab', 'counts', 'orders', 'groups', 'areas', 'riders', 'suggested'));
     }
 
     public function sort(Request $request, Order $order)
@@ -94,23 +108,6 @@ class SortingController extends Controller
         return back()->with('status', "{$sorted} parcel(s) sorted." . ($skipped ? " {$skipped} skipped: destination not in your service areas." : ''));
     }
 
-    private function sortOrder(Order $order, Collection $areas): bool
-    {
-        $dest = $order->ship_to;
-        $area = $areas->get(HubServiceArea::keyFor($dest['province'], $dest['municipality']));
-
-        if (! $area) {
-            return false;
-        }
-
-        $label = $area->zone_name ?: $dest['municipality'];
-
-        $order->update(['status' => Order::STATUS_SORTED, 'delivery_area' => $label]);
-        $order->logStatusEvent('Sorted for delivery to ' . $dest['municipality'] . '.');
-
-        return true;
-    }
-
     public function assign(Request $request, Order $order)
     {
         $hub = $request->user()->logisticsProfile;
@@ -132,14 +129,14 @@ class SortingController extends Controller
         return back()->with('status', "Order #{$order->id} assigned to {$rider->full_name}.");
     }
 
-    /** Assign every sorted parcel heading to one municipality to a single rider. */
+    /** Assign a whole group of sorted parcels (the order ids sent by the page) to one rider. */
     public function assignArea(Request $request)
     {
         $hub = $request->user()->logisticsProfile;
 
         $validated = $request->validate([
-            'province' => ['required', 'string'],
-            'municipality' => ['required', 'string'],
+            'order_ids' => ['required', 'array', 'min:1'],
+            'order_ids.*' => ['integer'],
             'rider_id' => ['required', 'integer'],
         ]);
 
@@ -149,21 +146,44 @@ class SortingController extends Controller
             return back()->withErrors(['rider_id' => 'Choose one of your active, approved riders.']);
         }
 
-        $key = HubServiceArea::keyFor($validated['province'], $validated['municipality']);
-
         $orders = Order::where('logistics_profile_id', $hub->id)
             ->where('status', Order::STATUS_SORTED)
-            ->with('buyer.buyerProfile')
-            ->get()
-            ->filter(fn($o) => HubServiceArea::keyFor($o->ship_to['province'], $o->ship_to['municipality']) === $key);
+            ->whereIn('id', $validated['order_ids'])
+            ->get();
 
         if ($orders->isEmpty()) {
-            return back()->withErrors(['action' => 'No sorted parcels found for that area.']);
+            return back()->withErrors(['action' => 'No sorted parcels found to assign.']);
         }
 
         DB::transaction(fn() => $orders->each(fn($o) => $this->assignRider($o, $rider)));
 
         return back()->with('status', "{$orders->count()} parcel(s) assigned to {$rider->full_name}.");
+    }
+
+    private function suggestedRider(Collection $areas, Order $order): ?CourierProfile
+    {
+        $dest = $order->ship_to;
+
+        return $areas->get(HubServiceArea::keyFor($dest['province'], $dest['municipality']))
+            ?->riderFor($dest['barangay']);
+    }
+
+    /** Sorts the parcel only if its destination is one of this hub's service areas. */
+    private function sortOrder(Order $order, Collection $areas): bool
+    {
+        $dest = $order->ship_to;
+        $area = $areas->get(HubServiceArea::keyFor($dest['province'], $dest['municipality']));
+
+        if (! $area) {
+            return false;
+        }
+
+        $label = $area->zone_name ?: $dest['municipality'];
+
+        $order->update(['status' => Order::STATUS_SORTED, 'delivery_area' => $label]);
+        $order->logStatusEvent('Sorted for delivery to ' . $dest['municipality'] . '.');
+
+        return true;
     }
 
     private function assignRider(Order $order, CourierProfile $rider): void
@@ -179,7 +199,7 @@ class SortingController extends Controller
 
     private function areasFor(LogisticsProfile $hub): Collection
     {
-        return $hub->serviceAreas()->with('rider')->get()->keyBy(fn($a) => $a->area_key);
+        return $hub->serviceAreas()->with(['rider', 'barangays.rider'])->get()->keyBy(fn($a) => $a->area_key);
     }
 
     private function activeRiders(int $hubId)
