@@ -1,0 +1,141 @@
+/*
+|--------------------------------------------------------------------------
+| Seller Order Details
+|--------------------------------------------------------------------------
+| Shared panels, colors, typography, inputs, and status badges are defined
+| in app.css. Keep this file focused on this page's responsive adjustments.
+*/
+
+.seller-order-show,
+.seller-order-show main,
+.seller-order-show main>div,
+.seller-order-show .frost-panel {
+    min-width: 0;
+}
+
+.seller-order-show dd,
+.seller-order-show dt,
+.seller-order-show p,
+.seller-order-show span,
+.seller-order-show label {
+    overflow-wrap: anywhere;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Order status badge
+|--------------------------------------------------------------------------
+| Reuse .status-badge and the semantic .badge--* classes from app.css.
+*/
+
+.seller-order-show .seller-order-status-badge {
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: 0.025em;
+}
+
+.seller-order-show .seller-order-status-badge::before {
+    flex: 0 0 auto;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Product images
+|--------------------------------------------------------------------------
+*/
+
+.seller-order-show .seller-order-item-image {
+    flex-shrink: 0;
+}
+
+.seller-order-show .seller-order-item-image img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Order totals
+|--------------------------------------------------------------------------
+*/
+
+.seller-order-show .seller-order-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.seller-order-show .seller-order-summary-row> :first-child {
+    min-width: 0;
+}
+
+.seller-order-show .seller-order-summary-row> :last-child {
+    text-align: right;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Toast notifications
+|--------------------------------------------------------------------------
+*/
+
+.seller-order-show .seller-order-toast {
+    overflow-wrap: anywhere;
+}
+
+.seller-order-show .seller-order-toast--success {
+    background: rgb(76 175 125 / 92%);
+}
+
+.seller-order-show .seller-order-toast--error {
+    background: rgb(228 87 46 / 92%);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Mobile layout
+|--------------------------------------------------------------------------
+*/
+
+@media (max-width: 639px) {
+    .seller-order-show header {
+        align-items: flex-start;
+    }
+
+    .seller-order-show .seller-order-status-badge {
+        font-size: 0.65rem;
+        line-height: 1rem;
+    }
+
+    .seller-order-show .seller-order-summary-row {
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    .seller-order-show .seller-order-summary-row> :last-child {
+        flex-shrink: 0;
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Reduced motion accessibility
+|--------------------------------------------------------------------------
+*/
+
+@media (prefers-reduced-motion: reduce) {
+
+    .seller-order-show *,
+    .seller-order-show *::before,
+    .seller-order-show *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}

@@ -1,0 +1,119 @@
+<?php
+
+namespace App\Http\Controllers\Api\Courier;
+
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Logistics\DeliveryController as HubDeliveryController;
+use App\Models\CourierProfile;
+use App\Models\Order;
+use App\Services\OrderTransitions;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+
+class DeliveryController extends Controller
+{
+    /** My deliveries: assigned to me and not finished yet. */
+    public function index(Request $request): JsonResponse
+    {
+        $courier = $request->attributes->get('courier');
+
+        $orders = Order::with(['items', 'seller.sellerProfile', 'buyer.buyerProfile'])
+            ->where('delivery_rider_id', $courier->id)
+            ->whereIn('status', [Order::STATUS_ASSIGNED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY])
+            ->orderBy('delivery_area')->orderBy('ship_municipality')->orderBy('ship_barangay')->orderBy('id')
+            ->get();
+
+        return response()->json([
+            'data' => $orders->map(fn($o) => $this->payload($o)),
+            'failure_reasons' => HubDeliveryController::FAILURE_REASONS,
+        ]);
+    }
+
+    public function out(Request $request, Order $order, OrderTransitions $transitions): JsonResponse
+    {
+        $this->owned($request, $order);
+
+        if (! $transitions->outForDelivery($order, $request->user()->id)) {
+            return $this->wrongStage();
+        }
+
+        return response()->json(['message' => 'Marked as out for delivery.', 'data' => $this->payload($order->fresh(['items', 'seller.sellerProfile', 'buyer.buyerProfile']))]);
+    }
+
+    /** Delivered: the rider sends the cash actually collected. A difference from the order total is flagged to the hub. */
+    public function delivered(Request $request, Order $order, OrderTransitions $transitions): JsonResponse
+    {
+        $this->owned($request, $order);
+        $data = $request->validate(['amount' => ['required', 'numeric', 'min:0']]);
+
+        if (! $transitions->delivered($order, $request->user()->id, (float) $data['amount'])) {
+            return $this->wrongStage();
+        }
+
+        return response()->json(['message' => 'Delivery recorded. Thank you.']);
+    }
+
+    public function failed(Request $request, Order $order, OrderTransitions $transitions): JsonResponse
+    {
+        $this->owned($request, $order);
+
+        $data = $request->validate([
+            'reason' => ['required', Rule::in(HubDeliveryController::FAILURE_REASONS)],
+            'note' => ['nullable', 'string', 'max:200'],
+        ]);
+
+        $attempt = $transitions->failed($order, $data['reason'], $data['note'] ?? null, $request->user()->id);
+
+        if ($attempt === null) {
+            return $this->wrongStage();
+        }
+
+        return response()->json([
+            'message' => "Failed delivery recorded (attempt {$attempt} of " . Order::MAX_DELIVERY_ATTEMPTS . '). The sorting center will decide the next step.',
+        ]);
+    }
+
+    private function owned(Request $request, Order $order): CourierProfile
+    {
+        $courier = $request->attributes->get('courier');
+
+        abort_unless($order->delivery_rider_id === $courier->id, 403, 'This delivery is not assigned to you.');
+
+        return $courier;
+    }
+
+    private function wrongStage(): JsonResponse
+    {
+        return response()->json(['message' => 'This order is not at the right stage for that action.'], 422);
+    }
+
+    private function payload(Order $o): array
+    {
+        $ship = $o->ship_to;
+
+        return [
+            'order_id' => $o->id,
+            'status' => $o->status,
+            'delivery_area' => $o->delivery_area,
+            'buyer' => [
+                'name' => $ship['name'],
+                'contact_no' => $ship['contact_no'],
+                'address' => trim(implode(', ', array_filter([
+                    $ship['street'],
+                    $ship['barangay'],
+                    $ship['municipality'],
+                    $ship['province'],
+                ]))),
+                'barangay' => $ship['barangay'],
+                'municipality' => $ship['municipality'],
+            ],
+            'note_from_buyer' => $o->buyer_note,
+            'cod_amount' => round($o->grand_total, 2),
+            'attempts' => (int) $o->delivery_attempts,
+            'max_attempts' => Order::MAX_DELIVERY_ATTEMPTS,
+            'items_count' => $o->items->sum('quantity'),
+            'seller' => $o->seller->sellerProfile->business_name ?? $o->seller->name,
+        ];
+    }
+}
