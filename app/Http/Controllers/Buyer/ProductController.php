@@ -146,6 +146,20 @@ class ProductController extends Controller
                 ])->values(),
             ]);
 
+        // Seller stats for the seller card (same queries the shop page uses)
+        $sellerSummary = Review::where('seller_id', $product->seller_id)
+            ->toBase()
+            ->selectRaw('COUNT(*) AS total, AVG(rating) AS average')
+            ->first();
+
+        $sellerRatingCount = (int) ($sellerSummary->total ?? 0);
+
+        $sellerStats = [
+            'products'       => Product::where('seller_id', $product->seller_id)->active()->count(),
+            'rating_count'   => $sellerRatingCount,
+            'rating_average' => $sellerRatingCount > 0 ? round((float) $sellerSummary->average, 1) : null,
+        ];
+
         return view('Buyer.products.show', array_merge(
             compact(
                 'product',
@@ -155,7 +169,8 @@ class ProductController extends Controller
                 'reviewStats',
                 'ratingDistribution',
                 'ratingFilter',
-                'mediaFilter'
+                'mediaFilter',
+                'sellerStats'
             ),
             $this->cartSummary($request)
         ));

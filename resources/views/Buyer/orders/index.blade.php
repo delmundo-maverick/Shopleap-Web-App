@@ -14,11 +14,13 @@
 @use('App\Models\Order')
 @use('Illuminate\Support\Str')
 
-<body class="min-h-screen bg-ice-blue text-charcoal">
+<body class="flex min-h-screen flex-col bg-ice-blue text-charcoal">
 
+    {{-- Header --}}
     <x-Buyer.header :cart-count="$cartCount" :cart-preview-items="$cartPreviewItems" />
 
-    <main class="mx-auto max-w-5xl px-5 py-6 sm:px-8">
+    {{-- Main Content --}}
+    <main class="mx-auto w-full max-w-7xl flex-1 px-3 py-5 md:px-8 md:py-6">
 
         @if (session('status'))
             <div class="mb-5 rounded-xl border border-leaf-green/20 bg-leaf-green/10 px-4 py-3 text-sm text-leaf-green">
@@ -26,30 +28,15 @@
             </div>
         @endif
 
-        @if ($tab === 'all')
-            <form method="GET" class="mb-5">
-                <div class="relative">
-                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-                        <svg class="h-4 w-4 text-charcoal/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                                d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                    </div>
-                    <input type="text" name="search" value="{{ request('search') }}"
-                        placeholder="Search by order # or shop name..."
-                        class="w-full rounded-xl border border-light-gray bg-white py-3 pl-10 pr-4 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
-                </div>
-            </form>
-        @endif
-
-        <!-- TABS -->
+        {{-- TABS --}}
         <div class="mb-5 rounded-lg bg-white shadow-sm shadow-charcoal/5">
             <div class="flex">
                 @foreach (Order::TAB_LABELS as $key => $label)
                     <a href="{{ route('buyer.orders.index', $key === 'all' ? [] : ['tab' => $key]) }}"
-                        class="flex flex-1 items-center justify-center gap-1.5 border-b-2 px-3 py-3.5 text-center text-xs font-semibold transition sm:text-sm
+                        class="flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-3.5 text-center text-xs font-semibold transition sm:gap-1.5 sm:px-3 sm:text-sm
                             {{ $tab === $key ? 'border-primary text-primary' : 'border-transparent text-charcoal/50 hover:text-charcoal' }}">
                         {{ $label }}
+
                         @if (($counts[$key] ?? 0) > 0)
                             <span
                                 class="rounded-full px-1.5 py-0.5 text-[10px] font-bold
@@ -62,23 +49,59 @@
             </div>
         </div>
 
+        {{-- SEARCH BAR: BELOW TABS, ONLY IN ALL TAB --}}
+        @if ($tab === 'all')
+            <form method="GET" action="{{ route('buyer.orders.index') }}" class="mb-5">
+                <input type="hidden" name="tab" value="all">
+
+                <div class="relative">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+                        <svg class="h-4 w-4 text-charcoal/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+
+                    <input type="text" name="search" value="{{ request('search') }}"
+                        placeholder="Search by order # or shop name..."
+                        aria-label="Search orders by order number or shop name"
+                        class="w-full rounded-xl border border-light-gray bg-white py-3 pl-10 pr-4 text-sm text-charcoal outline-none transition placeholder:text-charcoal/40 focus:border-primary focus:ring-4 focus:ring-primary/10">
+                </div>
+            </form>
+        @endif
+
+        {{-- EMPTY STATE --}}
         @if ($orders->isEmpty())
 
             <div
-                class="flex flex-col items-center justify-center rounded-lg bg-white p-16 text-center shadow-sm shadow-charcoal/5">
+                class="flex flex-col items-center justify-center rounded-lg bg-white p-8 text-center shadow-sm shadow-charcoal/5 sm:p-16">
                 <svg class="h-14 w-14 text-charcoal/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                         d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
+
                 <p class="mt-4 text-sm font-semibold text-charcoal">
-                    {{ $tab === 'all' ? "You haven't placed any orders yet" : 'No orders in this category' }}
+                    @if ($tab === 'all' && request('search'))
+                        No orders found matching "{{ request('search') }}"
+                    @else
+                        {{ $tab === 'all' ? "You haven't placed any orders yet" : 'No orders in this category' }}
+                    @endif
                 </p>
-                <a href="{{ route('buyer.home') }}"
-                    class="mt-5 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white transition hover:bg-sky-blue">
-                    Start Shopping
-                </a>
+
+                @if ($tab === 'all' && request('search'))
+                    <a href="{{ route('buyer.orders.index') }}"
+                        class="mt-5 rounded-xl border border-primary px-6 py-2.5 text-sm font-bold text-primary transition hover:bg-primary/5">
+                        Clear Search
+                    </a>
+                @else
+                    <a href="{{ route('buyer.home') }}"
+                        class="mt-5 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white transition hover:bg-sky-blue">
+                        Start Shopping
+                    </a>
+                @endif
             </div>
         @else
+            {{-- ORDER LIST --}}
             <div class="space-y-4">
                 @foreach ($orders as $order)
                     @php
@@ -104,27 +127,31 @@
 
                     <div class="overflow-hidden rounded-lg bg-white shadow-sm shadow-charcoal/5">
 
-                        <!-- SHOP HEADER -->
-                        <div class="flex items-center justify-between gap-3 border-b border-light-gray px-5 py-3.5">
+                        {{-- SHOP HEADER --}}
+                        <div
+                            class="flex flex-wrap items-center justify-between gap-3 border-b border-light-gray px-4 py-3.5 sm:px-5">
                             <div class="flex min-w-0 items-center gap-2.5">
                                 <svg class="h-4 w-4 shrink-0 text-primary" fill="none" stroke="currentColor"
                                     viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                         d="M3 9l1.5-5h15L21 9M3 9v1a3 3 0 006 0 3 3 0 006 0 3 3 0 006 0V9M3 9h18M5 13v7h14v-7" />
                                 </svg>
+
                                 <p class="truncate text-sm font-bold text-charcoal">{{ $shopName }}</p>
+
                                 <a href="{{ route('buyer.shop.show', $order->seller_id) }}"
                                     class="shrink-0 rounded-md border border-charcoal/15 px-2.5 py-1 text-[11px] font-semibold text-charcoal/70 transition hover:border-primary hover:text-primary">
                                     View Shop
                                 </a>
                             </div>
+
                             <span
                                 class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold {{ $order->status_color }}">
                                 {{ $order->status_label }}
                             </span>
                         </div>
 
-                        <!-- ITEMS -->
+                        {{-- ITEMS --}}
                         <div class="divide-y divide-light-gray">
                             @foreach ($order->items as $item)
                                 @php
@@ -137,7 +164,7 @@
                                         ->implode(' · ');
                                 @endphp
 
-                                <div class="flex gap-4 px-5 py-4">
+                                <div class="flex gap-3 px-4 py-4 sm:gap-4 sm:px-5">
                                     <div class="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-ice-blue/60">
                                         @if ($item->product && $item->product->main_image_url)
                                             <img src="{{ $item->product->main_image_url }}"
@@ -147,11 +174,15 @@
 
                                     <div class="min-w-0 flex-1">
                                         <p class="line-clamp-2 text-sm font-semibold text-charcoal">
-                                            {{ $item->product_name }}</p>
+                                            {{ $item->product_name }}
+                                        </p>
+
                                         @if ($options !== '')
                                             <p class="mt-0.5 text-xs text-charcoal/50">{{ $options }}</p>
                                         @endif
+
                                         <p class="mt-1 text-xs text-charcoal/50">x{{ $item->quantity }}</p>
+
                                         @if ($isCompleted && $item->review)
                                             <span
                                                 class="mt-1.5 inline-block rounded-md bg-leaf-green/10 px-2 py-0.5 text-[11px] font-bold text-leaf-green">
@@ -160,34 +191,37 @@
                                         @endif
                                     </div>
 
-                                    <p class="shrink-0 text-sm font-semibold text-charcoal">
+                                    <p class="shrink-0 text-right text-sm font-semibold text-charcoal">
                                         ₱{{ number_format($item->price_at_purchase, 2) }}
                                     </p>
                                 </div>
                             @endforeach
                         </div>
 
-                        <!-- TOTAL -->
-                        <div class="border-t border-light-gray px-5 py-3.5">
-                            <div class="flex items-center justify-between gap-3">
+                        {{-- TOTAL --}}
+                        <div class="border-t border-light-gray px-4 py-3.5 sm:px-5">
+                            <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                                 <span class="text-xs text-charcoal/50">
                                     Order #{{ $order->id }} · {{ $order->created_at->format('M d, Y') }}
                                 </span>
-                                <div class="space-y-0.5 text-right text-xs text-charcoal/60">
+
+                                <div class="space-y-0.5 text-left text-xs text-charcoal/60 sm:text-right">
                                     <p>Merchandise Subtotal: ₱{{ number_format($order->total_amount, 2) }}</p>
                                     <p>Shipping Fee: ₱{{ number_format($order->shipping_fee, 2) }}</p>
                                     <p class="text-sm text-charcoal">
                                         {{ $order->items->sum('quantity') }} item(s) ·
-                                        Order Total: <span
-                                            class="text-base font-bold text-primary">₱{{ number_format($order->grand_total, 2) }}</span>
+                                        Order Total:
+                                        <span class="text-base font-bold text-primary">
+                                            ₱{{ number_format($order->grand_total, 2) }}
+                                        </span>
                                     </p>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- TRACKING -->
+                        {{-- TRACKING --}}
                         @if ($latest)
-                            <div x-data="{ open: false }" class="border-t border-light-gray px-5 py-3">
+                            <div x-data="{ open: false }" class="border-t border-light-gray px-4 py-3 sm:px-5">
                                 <button type="button" @click="open = !open"
                                     class="flex w-full items-center justify-between gap-3 text-left">
                                     <span class="flex min-w-0 items-center gap-2 text-xs">
@@ -196,11 +230,16 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                                 d="M3 7h11v9H3zM14 10h4l3 3v3h-7zM7 19a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM17 19a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
                                         </svg>
-                                        <span
-                                            class="truncate font-semibold text-leaf-green">{{ $latest->title }}</span>
-                                        <span
-                                            class="hidden shrink-0 text-charcoal/40 sm:inline">{{ $latest->created_at->format('M d, g:i A') }}</span>
+
+                                        <span class="truncate font-semibold text-leaf-green">
+                                            {{ $latest->title }}
+                                        </span>
+
+                                        <span class="hidden shrink-0 text-charcoal/40 sm:inline">
+                                            {{ $latest->created_at->format('M d, g:i A') }}
+                                        </span>
                                     </span>
+
                                     <span class="shrink-0 text-xs font-semibold text-primary"
                                         x-text="open ? 'Hide' : 'Details'">Details</span>
                                 </button>
@@ -211,27 +250,33 @@
                                         <li class="relative">
                                             <span
                                                 class="absolute -left-[1.7rem] top-1 h-3 w-3 rounded-full ring-4 ring-white {{ $loop->first ? 'bg-primary' : 'bg-charcoal/25' }}"></span>
+
                                             <p
                                                 class="text-sm {{ $loop->first ? 'font-bold text-charcoal' : 'text-charcoal/70' }}">
-                                                {{ $event->title }}</p>
+                                                {{ $event->title }}
+                                            </p>
+
                                             @if ($event->note)
                                                 <p class="text-xs text-charcoal/50">{{ $event->note }}</p>
                                             @endif
+
                                             <p class="text-[11px] text-charcoal/40">
-                                                {{ $event->created_at->format('M d, Y · g:i A') }}</p>
+                                                {{ $event->created_at->format('M d, Y · g:i A') }}
+                                            </p>
                                         </li>
                                     @endforeach
                                 </ol>
                             </div>
                         @endif
 
-                        <!-- ACTIONS -->
+                        {{-- ACTIONS --}}
                         <div
-                            class="flex flex-wrap items-center justify-end gap-2 border-t border-light-gray bg-ice-blue/30 px-5 py-4">
+                            class="flex flex-wrap items-center justify-end gap-2 border-t border-light-gray bg-ice-blue/30 px-4 py-4 sm:px-5">
 
                             @if ($isDelivered)
-                                <p class="mr-auto text-xs text-charcoal/60">
+                                <p class="mr-auto w-full text-xs text-charcoal/60 sm:w-auto sm:flex-1">
                                     Your parcel was delivered. Please confirm you received it in good condition.
+
                                     @if ($order->delivered_at)
                                         If you don't respond, it will be completed automatically on
                                         {{ $order->delivered_at->copy()->addDays(Order::AUTO_COMPLETE_DAYS)->format('M d') }}.
@@ -293,16 +338,19 @@
                 @endforeach
             </div>
 
-            <div class="mt-6">{{ $orders->onEachSide(1)->links() }}</div>
+            {{-- PAGINATION --}}
+            <div class="mt-6">
+                {{ $orders->onEachSide(1)->links() }}
+            </div>
 
         @endif
 
     </main>
 
-
-    <!-- WRITE A REVIEW MODAL -->
+    {{-- WRITE A REVIEW MODAL --}}
     <div id="reviewModalOverlay"
         class="fixed inset-0 z-[95] hidden items-end justify-center bg-charcoal/50 p-0 sm:items-center sm:p-4">
+
         <div
             class="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-6 shadow-2xl sm:max-w-md sm:rounded-2xl">
 
@@ -311,6 +359,7 @@
                     <p class="text-xs font-bold uppercase tracking-wide text-primary">Write a Review</p>
                     <p id="reviewModalProductName" class="mt-1 text-sm font-semibold text-charcoal">Product name</p>
                 </div>
+
                 <button type="button" id="reviewModalCloseBtn"
                     class="shrink-0 rounded-full p-1.5 text-charcoal/40 transition hover:bg-ice-blue hover:text-charcoal">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -325,9 +374,11 @@
             <input type="hidden" id="reviewRatingInput">
 
             <p class="mb-2 text-sm font-semibold text-charcoal">Your Rating</p>
+
             <div class="flex gap-1.5">
                 @for ($i = 0; $i < 5; $i++)
-                    <button type="button" class="star-btn rounded p-0.5">
+                    <button type="button" class="star-btn rounded p-0.5"
+                        aria-label="Rate {{ $i + 1 }} out of 5">
                         <svg class="h-8 w-8" fill="none" stroke="#94A3B8" stroke-width="1.5"
                             viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -338,21 +389,28 @@
             </div>
 
             <p class="mb-2 mt-5 text-sm font-semibold text-charcoal">Your Review</p>
+
             <textarea id="reviewComment" rows="4" maxlength="1000"
                 placeholder="Share your experience with this product..."
                 class="w-full resize-none rounded-xl border border-light-gray px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"></textarea>
 
-            <p class="mb-2 mt-5 text-sm font-semibold text-charcoal">Add Photos/Videos <span
-                    class="font-normal text-charcoal/40">(optional)</span></p>
+            <p class="mb-2 mt-5 text-sm font-semibold text-charcoal">
+                Add Photos/Videos
+                <span class="font-normal text-charcoal/40">(optional)</span>
+            </p>
+
             <label for="reviewMediaInput"
                 class="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-light-gray bg-ice-blue/40 px-4 py-3 text-xs font-semibold text-charcoal/60 transition hover:border-primary/40">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                         d="M12 16V4m0 0L8 8m4-4l4 4M5 20h14" />
                 </svg>
+
                 Upload up to 5 photos or videos
+
                 <input type="file" id="reviewMediaInput" multiple accept="image/*,video/*" class="sr-only">
             </label>
+
             <div id="reviewMediaPreview" class="mt-3 grid grid-cols-5 gap-2"></div>
 
             <p id="reviewError"
@@ -365,7 +423,11 @@
 
         </div>
     </div>
+
+    {{-- Footer and Message Widget --}}
     <x-Buyer.message-widget />
+    <x-footer />
+
 </body>
 
 </html>

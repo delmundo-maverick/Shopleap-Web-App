@@ -48,7 +48,7 @@
                     </div>
 
                     <div class="mt-3 grid grid-cols-2 gap-2">
-                        <!-- Existing Follow button -->
+                        <!-- Follow button (placeholder: no follow feature yet) -->
                         <button type="button"
                             class="flex items-center justify-center gap-2 border border-white/80 bg-transparent px-3 py-2 text-xs font-bold text-white transition hover:bg-white/10">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -59,7 +59,7 @@
                             Follow
                         </button>
 
-                        <!-- Existing Chat link -->
+                        <!-- Chat link -->
                         <a href="{{ route('messages.index') }}?contact={{ $seller->id }}"
                             class="flex items-center justify-center gap-2 border border-white/80 bg-transparent px-3 py-2 text-xs font-bold text-white transition hover:bg-white/10">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -99,6 +99,17 @@
                             @endif
                         </p>
                     </a>
+
+                    {{-- Followers: placeholder until the follow feature exists --}}
+                    <div class="flex items-center gap-3">
+                        <svg class="h-4 w-4 shrink-0 text-charcoal" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"
+                                d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-4.13a4 4 0 11-8 0 4 4 0 018 0zm6 0a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <p class="text-sm text-charcoal">Followers: <span class="font-medium text-primary">--</span>
+                        </p>
+                    </div>
 
                     @if ($shop->location)
                         <div class="flex items-center gap-3">
@@ -141,14 +152,16 @@
                 <a href="#all-products"
                     class="shrink-0 border-b-2 border-transparent py-4 text-sm font-medium text-charcoal hover:text-primary">All
                     Products</a>
+                <a href="#shop-reviews"
+                    class="shrink-0 border-b-2 border-transparent py-4 text-sm font-medium text-charcoal hover:text-primary">Reviews</a>
             </nav>
         </section>
 
         <!-- PRODUCTS GRID -->
         <section id="all-products"
-            class="mt-4 sm:mt-6 rounded-2xl bg-white p-4 sm:p-6 shadow-sm shadow-charcoal/5 ring-1 ring-charcoal/5">
-            <div class="mb-4 sm:mb-5 flex items-center justify-between border-b border-light-gray pb-3 sm:pb-4">
-                <h2 class="text-base sm:text-lg font-black tracking-tight text-charcoal">All Products</h2>
+            class="mt-4 scroll-mt-24 rounded-2xl bg-white p-4 shadow-sm shadow-charcoal/5 ring-1 ring-charcoal/5 sm:mt-6 sm:p-6">
+            <div class="mb-4 flex items-center justify-between border-b border-light-gray pb-3 sm:mb-5 sm:pb-4">
+                <h2 class="text-base font-black tracking-tight text-charcoal sm:text-lg">All Products</h2>
                 <span class="text-xs font-medium text-charcoal/50">{{ $products->total() }} item(s)</span>
             </div>
 
@@ -163,7 +176,7 @@
                     <p class="mt-1 text-xs text-charcoal/50">This seller hasn't listed any active products.</p>
                 </div>
             @else
-                <div class="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
                     @foreach ($products as $product)
                         <a href="{{ route('buyer.products.show', $product) }}"
                             class="group overflow-hidden rounded-xl border border-light-gray bg-white transition duration-200 hover:border-primary/40 hover:shadow-lg">
@@ -175,12 +188,12 @@
                             </div>
                             <div class="p-2.5 sm:p-3">
                                 <p class="line-clamp-2 text-xs font-medium text-charcoal">{{ $product->name }}</p>
-                                <p class="mt-2 text-xs sm:text-sm font-black text-primary">
+                                <p class="mt-2 text-xs font-black text-primary sm:text-sm">
                                     ₱{{ number_format($product->display_price, 2) }}
                                 </p>
                                 @if (($product->reviews_count ?? 0) > 0)
                                     <p class="mt-1.5 flex items-center gap-1 text-[11px] text-charcoal/50">
-                                        <span class="text-amber-400 font-bold">★</span>
+                                        <span class="font-bold text-amber-400">★</span>
                                         <span
                                             class="font-semibold text-charcoal/70">{{ number_format($product->reviews_avg_rating, 1) }}</span>
                                         <span>({{ $product->reviews_count }})</span>
@@ -193,6 +206,85 @@
 
                 <div class="pagination-frost mt-8 flex justify-center">
                     {{ $products->onEachSide(1)->links() }}
+                </div>
+            @endif
+        </section>
+
+        <!-- SHOP REVIEWS -->
+        <section id="shop-reviews"
+            class="mt-4 scroll-mt-24 rounded-2xl bg-white p-4 shadow-sm shadow-charcoal/5 ring-1 ring-charcoal/5 sm:mt-6 sm:p-6">
+            <div class="mb-4 flex items-center justify-between border-b border-light-gray pb-3 sm:pb-4">
+                <h2 class="text-base font-black tracking-tight text-charcoal sm:text-lg">Shop Reviews</h2>
+                @if ($shopRating['count'] > 0)
+                    <span class="text-xs font-medium text-charcoal/50">
+                        <span class="text-amber-400">★</span> {{ number_format($shopRating['average'], 1) }}
+                        ({{ number_format($shopRating['count']) }})
+                    </span>
+                @endif
+            </div>
+
+            @if ($latestReviews->isEmpty())
+                <p class="py-8 text-center text-sm text-charcoal/50">No reviews yet.</p>
+            @else
+                <div class="divide-y divide-light-gray">
+                    @foreach ($latestReviews as $review)
+                        <article class="py-4">
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-sm font-semibold text-charcoal">{{ $review['buyer'] }}</p>
+                                <p class="text-xs text-charcoal/40">{{ $review['created_at']->format('M d, Y') }}
+                                </p>
+                            </div>
+
+                            <p class="mt-1 text-sm leading-none">
+                                <span class="text-amber-400">{{ str_repeat('★', $review['rating']) }}</span><span
+                                    class="text-charcoal/15">{{ str_repeat('★', 5 - $review['rating']) }}</span>
+                            </p>
+
+                            <p class="mt-1 text-xs text-charcoal/50">
+                                @if ($review['product_url'])
+                                    <a href="{{ $review['product_url'] }}"
+                                        class="hover:text-primary hover:underline">{{ $review['product'] }}</a>
+                                @else
+                                    {{ $review['product'] }}
+                                @endif
+                            </p>
+
+                            @if (filled($review['comment']))
+                                <p
+                                    class="mt-2 whitespace-pre-line break-words text-sm leading-relaxed text-charcoal/80">
+                                    {{ $review['comment'] }}
+                                </p>
+                            @endif
+
+                            @if ($review['media']->isNotEmpty())
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    @foreach ($review['media'] as $media)
+                                        @if ($media['is_video'])
+                                            <video src="{{ $media['url'] }}" controls preload="metadata"
+                                                class="h-24 w-32 rounded-lg bg-charcoal/10 object-cover"></video>
+                                        @else
+                                            <a href="{{ $media['url'] }}" target="_blank" rel="noopener"
+                                                class="block h-20 w-20 overflow-hidden rounded-lg bg-charcoal/10">
+                                                <img src="{{ $media['url'] }}" alt="Review photo" loading="lazy"
+                                                    class="h-full w-full object-cover">
+                                            </a>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            @if (filled($review['reply']))
+                                <div class="mt-3 rounded-lg bg-ice-blue/60 px-3 py-3">
+                                    <p class="text-xs font-bold text-primary">Response from {{ $shop->shop_name }}
+                                    </p>
+                                    <p
+                                        class="mt-1 whitespace-pre-line break-words text-sm leading-relaxed text-charcoal/70">
+                                        {{ $review['reply'] }}
+                                    </p>
+                                </div>
+                            @endif
+                        </article>
+                    @endforeach
                 </div>
             @endif
         </section>

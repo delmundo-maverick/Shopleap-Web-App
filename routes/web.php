@@ -55,6 +55,7 @@ use App\Http\Controllers\Buyer\{
     ProductController as BuyerProductController,
     ReviewController as BuyerReviewController,
     ShopController,
+    AccountController as BuyerAccountController,
 };
 
 use Illuminate\Support\Facades\Schedule;
@@ -420,6 +421,16 @@ Route::middleware(['auth', 'buyer'])->prefix('buyer')->name('buyer.')->group(fun
         Route::post('/{order}/items/{item}/review', [BuyerReviewController::class, 'store'])
             ->middleware('throttle:20,1')
             ->name('review.store');
+    });
+
+    // Account
+    Route::prefix('account')->name('account.')->controller(BuyerAccountController::class)->group(function () {
+        Route::get('/', 'show')->name('index');
+        Route::post('/profile', 'updateProfile')->name('profile');
+        Route::post('/address', 'updateAddress')->name('address');
+        Route::post('/password', 'updatePassword')->name('password');
+        Route::post('/avatar', 'updateAvatar')->name('avatar');
+        Route::delete('/avatar', 'destroyAvatar')->name('avatar.destroy');
     });
 });
 
