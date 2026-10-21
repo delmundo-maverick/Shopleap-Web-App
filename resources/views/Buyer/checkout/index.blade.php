@@ -373,7 +373,7 @@
     </main>
 
     <x-Buyer.message-widget />
-
+    <x-footer />
 </body>
 
 </html>

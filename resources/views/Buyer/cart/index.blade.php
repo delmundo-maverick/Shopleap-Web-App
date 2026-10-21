@@ -27,6 +27,7 @@
 
     $gridCols = 'sm:grid-cols-[minmax(0,1fr)_6rem_7.5rem_6rem_2.5rem]';
 @endphp
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -40,97 +41,124 @@
     <title>My Cart | Shopleap</title>
 </head>
 
-<body class="min-h-screen bg-ice-blue pb-28 text-charcoal">
+<body class="flex min-h-screen flex-col bg-ice-blue text-charcoal">
 
+    {{-- Header --}}
     <x-Buyer.header :cart-count="$headerCartCount" :cart-preview-items="$headerCartPreview" />
 
-    <main class="mx-auto max-w-5xl px-4 py-6 sm:px-8">
+    {{-- Main Content --}}
+    <main class="mx-auto w-full max-w-7xl flex-1 px-3 py-5 pb-32 md:px-8 md:py-6 md:pb-32">
 
         @if ($cartItems->isEmpty())
 
+            {{-- Empty Cart --}}
             <div
-                class="flex flex-col items-center justify-center rounded-lg bg-white p-16 text-center shadow-sm shadow-charcoal/5">
+                class="flex flex-col items-center justify-center rounded-xl bg-white p-8 text-center shadow-sm shadow-charcoal/5 sm:p-16">
                 <svg class="h-14 w-14 text-charcoal/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                     aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                         d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
+
                 <p class="mt-4 text-sm font-semibold text-charcoal">Your cart is empty</p>
-                <p class="mt-1 text-xs text-charcoal/50">Browse the shop and add something you like.</p>
+                <p class="mt-1 text-xs text-charcoal/50">
+                    Browse the shop and add something you like.
+                </p>
+
                 <a href="{{ route('buyer.home') }}"
                     class="mt-5 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white transition hover:bg-sky-blue">
                     Continue Shopping
                 </a>
             </div>
         @else
+            {{-- Unavailable Items Notice --}}
             <div id="unavailableBanner" role="status"
                 class="mb-3 hidden items-center justify-between gap-3 rounded-lg border border-sale-red/20 bg-sale-red/5 px-4 py-3 text-sm text-sale-red">
-                <p><span id="unavailableCount">0</span> item(s) in your cart can't be purchased right now.</p>
-                <button type="button" id="removeUnavailableBtn" class="shrink-0 font-semibold underline">Remove
-                    them</button>
+                <p>
+                    <span id="unavailableCount">0</span>
+                    item(s) in your cart can't be purchased right now.
+                </p>
+
+                <button type="button" id="removeUnavailableBtn" class="shrink-0 font-semibold underline">
+                    Remove them
+                </button>
             </div>
 
-            @if ($shops->count() > 1)
-            @endif
-
-            {{-- Column headings (desktop) --}}
+            {{-- Column Headings (Desktop) --}}
             <div
                 class="mb-3 hidden items-center gap-x-4 rounded-lg bg-white px-4 py-3 text-xs font-semibold uppercase tracking-wide text-charcoal/40 shadow-sm shadow-charcoal/5 sm:grid {{ $gridCols }}">
+
                 <label class="flex items-center gap-3">
                     <input type="checkbox" id="selectAllTop" aria-label="Select all items"
                         class="h-4 w-4 shrink-0 rounded border-light-gray text-primary focus:ring-primary">
                     <span>Product</span>
                 </label>
+
                 <span class="text-right">Unit Price</span>
                 <span class="text-center">Quantity</span>
                 <span class="text-right">Total Price</span>
                 <span class="sr-only">Actions</span>
             </div>
 
+            {{-- Cart Items --}}
             <div class="space-y-4" id="cartItemsList">
+
                 @foreach ($shops as $sellerId => $items)
                     @php
                         $seller = $items->first()->product->seller;
                         $name = $shopName($seller);
                     @endphp
 
-                    <section class="shop-group overflow-hidden rounded-lg bg-white shadow-sm shadow-charcoal/5"
+                    <section class="shop-group overflow-hidden rounded-xl bg-white shadow-sm shadow-charcoal/5"
                         data-shop-id="{{ $sellerId }}" aria-label="Items from {{ $name }}">
 
-                        {{-- Shop header --}}
-                        <div class="flex items-center gap-3 border-b border-light-gray bg-ice-blue/40 px-4 py-3">
+                        {{-- Shop Header --}}
+                        <div
+                            class="flex flex-wrap items-center gap-3 border-b border-light-gray bg-ice-blue/40 px-4 py-3">
                             <input type="checkbox"
                                 class="shop-checkbox h-4 w-4 shrink-0 rounded border-light-gray text-primary focus:ring-primary"
                                 aria-label="Select all items from {{ $name }}">
+
                             <svg class="h-4.5 w-4.5 shrink-0 text-primary" fill="none" stroke="currentColor"
                                 viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                     d="M3 9l1-5h16l1 5M3 9v11h18V9M3 9h18M9 20v-6h6v6" />
                             </svg>
+
                             @if ($seller)
                                 <a href="{{ route('buyer.shop.show', $seller) }}"
-                                    class="min-w-0 truncate text-sm font-bold text-charcoal hover:text-primary">{{ $name }}</a>
+                                    class="min-w-0 truncate text-sm font-bold text-charcoal hover:text-primary">
+                                    {{ $name }}
+                                </a>
                             @else
-                                <span
-                                    class="min-w-0 truncate text-sm font-bold text-charcoal">{{ $name }}</span>
+                                <span class="min-w-0 truncate text-sm font-bold text-charcoal">
+                                    {{ $name }}
+                                </span>
                             @endif
-                            <span class="shrink-0 text-xs text-charcoal/45">{{ $items->count() }}
-                                {{ $items->count() === 1 ? 'item' : 'items' }}</span>
+
+                            <span class="shrink-0 text-xs text-charcoal/45">
+                                {{ $items->count() }}
+                                {{ $items->count() === 1 ? 'item' : 'items' }}
+                            </span>
+
                             <span class="shop-subtotal ml-auto shrink-0 text-xs font-semibold text-primary"></span>
                         </div>
 
-                        {{-- Shop items --}}
+                        {{-- Shop Items --}}
                         <div class="divide-y divide-light-gray">
+
                             @foreach ($items as $item)
                                 @php
                                     $state = $lineState($item);
                                     $available = $state['reason'] === null;
                                     $overStock = $available && $item->quantity > $state['stock'];
+
                                     $notice =
                                         $state['reason'] ??
                                         ($overStock
                                             ? "Only {$state['stock']} left. Please reduce the quantity."
                                             : null);
+
                                     $itemName = $item->product->name;
                                 @endphp
 
@@ -143,12 +171,14 @@
 
                                     {{-- Product --}}
                                     <div class="flex min-w-0 items-center gap-3">
+
                                         <input type="checkbox" @disabled(!$available)
                                             aria-label="Select {{ $itemName }}"
                                             class="item-checkbox h-4 w-4 shrink-0 rounded border-light-gray text-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-40">
 
                                         <a href="{{ route('buyer.products.show', $item->product) }}"
-                                            class="row-thumb h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-ice-blue/60 {{ $available ? '' : 'opacity-50' }}">
+                                            class="row-thumb h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-ice-blue/60 sm:h-20 sm:w-20 {{ $available ? '' : 'opacity-50' }}">
+
                                             @if ($item->product->main_image_url)
                                                 <img src="{{ $item->product->main_image_url }}"
                                                     alt="{{ $itemName }}" loading="lazy"
@@ -157,12 +187,14 @@
                                         </a>
 
                                         <div class="min-w-0 flex-1">
+
                                             <a href="{{ route('buyer.products.show', $item->product) }}"
                                                 class="line-clamp-2 text-sm font-medium text-charcoal hover:text-primary">
                                                 {{ $itemName }}
                                             </a>
 
                                             <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+
                                                 <p
                                                     class="selected-options-label text-xs text-charcoal/45 {{ $item->selected_options ? '' : 'hidden' }}">
                                                     {{ $item->selected_options ? collect($item->selected_options)->map(fn($v, $k) => "{$k}: {$v}")->implode(', ') : '' }}
@@ -174,125 +206,165 @@
                                                         Change
                                                     </button>
                                                 @endif
+
                                             </div>
 
                                             <p
                                                 class="row-notice mt-1 text-xs font-semibold text-sale-red {{ $notice ? '' : 'hidden' }}">
-                                                {{ $notice }}</p>
+                                                {{ $notice }}
+                                            </p>
 
                                             <p class="unit-price-cell mt-1 text-sm font-bold text-primary sm:hidden">
-                                                ₱{{ number_format($item->unit_price, 2) }}</p>
+                                                ₱{{ number_format($item->unit_price, 2) }}
+                                            </p>
+
                                         </div>
                                     </div>
 
-                                    {{-- Unit price (desktop) --}}
+                                    {{-- Unit Price (Desktop) --}}
                                     <p class="unit-price-cell hidden text-right text-sm text-charcoal/70 sm:block">
                                         ₱{{ number_format($item->unit_price, 2) }}
                                     </p>
 
-                                    {{-- Quantity / total / remove (own row on mobile, grid cells on desktop) --}}
-                                    <div class="flex items-center justify-between gap-3 sm:contents">
+                                    {{-- Quantity, Total and Remove --}}
+                                    <div class="flex min-w-0 items-center justify-between gap-3 sm:contents">
+
                                         <div
-                                            class="flex w-28 items-center justify-center rounded-lg border border-light-gray sm:justify-self-center">
+                                            class="flex w-28 shrink-0 items-center justify-center rounded-lg border border-light-gray sm:justify-self-center">
+
                                             <button type="button" @disabled(!$available)
                                                 aria-label="Decrease quantity of {{ $itemName }}"
-                                                class="qty-minus px-2.5 py-1.5 text-charcoal/60 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40">−</button>
+                                                class="qty-minus px-2.5 py-1.5 text-charcoal/60 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40">
+                                                −
+                                            </button>
+
                                             <input type="number" inputmode="numeric" @disabled(!$available)
                                                 aria-label="Quantity of {{ $itemName }}"
                                                 class="qty-input w-10 border-x border-light-gray py-1.5 text-center text-sm outline-none disabled:bg-transparent"
                                                 value="{{ $item->quantity }}" min="1"
                                                 max="{{ max(1, $state['stock']) }}">
+
                                             <button type="button" @disabled(!$available)
                                                 aria-label="Increase quantity of {{ $itemName }}"
-                                                class="qty-plus px-2.5 py-1.5 text-charcoal/60 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40">+</button>
+                                                class="qty-plus px-2.5 py-1.5 text-charcoal/60 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40">
+                                                +
+                                            </button>
                                         </div>
 
-                                        <p class="line-total text-right text-sm font-bold text-sale-red">
+                                        <p class="line-total shrink-0 text-right text-sm font-bold text-sale-red">
                                             ₱{{ number_format($item->line_total, 2) }}
                                         </p>
 
                                         <button type="button" aria-label="Remove {{ $itemName }} from cart"
-                                            class="remove-btn justify-self-end rounded-lg p-2 text-charcoal/40 transition hover:bg-sale-red/10 hover:text-sale-red">
+                                            class="remove-btn shrink-0 rounded-lg p-2 text-charcoal/40 transition hover:bg-sale-red/10 hover:text-sale-red sm:justify-self-end">
+
                                             <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24" aria-hidden="true">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
                                             </svg>
+
                                         </button>
                                     </div>
 
                                 </div>
                             @endforeach
+
                         </div>
                     </section>
                 @endforeach
+
             </div>
 
         @endif
 
     </main>
 
+    {{-- Fixed Checkout Bar --}}
     @if (!$cartItems->isEmpty())
         <div
-            class="fixed inset-x-0 bottom-0 z-30 border-t border-light-gray bg-white px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:px-8">
-            <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            class="fixed inset-x-0 bottom-0 z-30 border-t border-light-gray bg-white px-3 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:px-6 md:px-8">
 
-                <div class="flex items-center gap-4 text-sm">
-                    <label class="flex items-center gap-2 font-medium text-charcoal">
+            <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-3">
+
+                <div class="flex flex-wrap items-center gap-3 sm:gap-4">
+
+                    <label class="flex items-center gap-2 text-xs font-medium text-charcoal sm:text-sm">
                         <input type="checkbox" id="selectAllBottom"
                             class="h-4 w-4 rounded border-light-gray text-primary focus:ring-primary">
+
                         Select All (<span id="totalItemCount">{{ $cartItems->count() }}</span>)
                     </label>
+
                     <button type="button" id="deleteSelectedBtn"
-                        class="font-medium text-sale-red transition hover:underline disabled:cursor-not-allowed disabled:text-charcoal/30 disabled:hover:no-underline"
+                        class="text-xs font-medium text-sale-red transition hover:underline disabled:cursor-not-allowed disabled:text-charcoal/30 disabled:hover:no-underline sm:text-sm"
                         disabled>
                         Delete
                     </button>
+
                 </div>
 
-                <div class="flex items-center gap-4">
+                <div class="ml-auto flex items-center gap-3 sm:gap-4">
+
                     <div class="text-right">
-                        <p class="text-xs text-charcoal/50">
+                        <p class="text-[11px] text-charcoal/50 sm:text-xs">
                             Total (<span id="selectedCount">0</span> item<span id="selectedCountPlural">s</span>):
                         </p>
-                        <p id="selectedSubtotal" class="text-lg font-bold text-sale-red">₱0.00</p>
+
+                        <p id="selectedSubtotal" class="text-base font-bold text-sale-red sm:text-lg">
+                            ₱0.00
+                        </p>
+
                         <p id="selectedShops" class="hidden text-[11px] text-charcoal/45"></p>
                     </div>
+
                     <button type="button" id="checkoutBtn"
-                        class="rounded-xl bg-primary px-8 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:bg-charcoal/20 disabled:shadow-none"
+                        class="rounded-xl bg-primary px-4 py-3 text-xs font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:bg-charcoal/20 disabled:shadow-none sm:px-8 sm:text-sm"
                         disabled>
                         Check Out
                     </button>
+
                 </div>
 
             </div>
         </div>
     @endif
 
+    {{-- Toast Notifications --}}
     <div id="toast" role="status" aria-live="polite"
         class="fixed bottom-28 right-4 z-[80] hidden max-w-sm rounded-xl px-5 py-3.5 text-sm font-medium text-white shadow-xl transition sm:right-6">
     </div>
 
-
-    <!-- CHANGE VARIANT MODAL -->
+    {{-- Change Variant Modal --}}
     <div id="cartVariantModalOverlay"
         class="fixed inset-0 z-[95] hidden items-end justify-center bg-charcoal/50 p-0 sm:items-center sm:p-4">
+
         <div role="dialog" aria-modal="true" aria-labelledby="cartVariantModalTitle"
             class="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-6 shadow-2xl sm:max-w-md sm:rounded-2xl">
 
             <div class="flex items-start justify-between gap-3">
+
                 <div class="min-w-0">
                     <p id="cartVariantModalTitle" class="line-clamp-2 text-sm font-semibold text-charcoal"></p>
-                    <p id="cartVariantModalPrice" class="mt-1 text-xl font-bold text-primary">₱0.00</p>
-                    <p id="cartVariantModalStock" class="mt-1 text-xs text-charcoal/50">0 in stock</p>
+
+                    <p id="cartVariantModalPrice" class="mt-1 text-xl font-bold text-primary">
+                        ₱0.00
+                    </p>
+
+                    <p id="cartVariantModalStock" class="mt-1 text-xs text-charcoal/50">
+                        0 in stock
+                    </p>
                 </div>
+
                 <button type="button" id="cartVariantModalCloseBtn" aria-label="Close"
                     class="shrink-0 rounded-full p-1.5 text-charcoal/40 transition hover:bg-ice-blue hover:text-charcoal">
+
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                         aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M6 18L18 6M6 6l12 12" />
                     </svg>
+
                 </button>
             </div>
 
@@ -312,15 +384,15 @@
         </div>
     </div>
 
-
-    <!-- Data bridge for external JS -->
+    {{-- Data Bridge for External JavaScript --}}
     <div id="cartPageData" hidden data-checkout-route="{{ route('buyer.checkout.index') }}"
         data-update-url="{{ route('buyer.cart.update', '__ID__') }}"
         data-destroy-url="{{ route('buyer.cart.destroy', '__ID__') }}"
-        data-bulk-destroy-url="{{ route('buyer.cart.destroyMany') }}"></div>
+        data-bulk-destroy-url="{{ route('buyer.cart.destroyMany') }}">
+    </div>
 
     @php
-        // Only lines with options need variant data (for the "Change" modal); archived variants are excluded.
+        // Only lines with options need variant data (for the Change modal); archived variants are excluded.
         $cartDataForJs = $cartItems
             ->filter(fn($item) => $item->product->options->isNotEmpty())
             ->map(
@@ -348,11 +420,17 @@
             )
             ->values();
     @endphp
+
     <script id="cartData" type="application/json">
         @json($cartDataForJs)
     </script>
 
+    {{-- Shared Message Widget --}}
     <x-Buyer.message-widget />
+
+    {{-- Shared Footer --}}
+    <x-footer />
+
 </body>
 
 </html>
