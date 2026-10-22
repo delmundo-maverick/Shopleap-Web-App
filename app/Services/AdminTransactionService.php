@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Order;
+use App\Models\OrderReturn;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -11,17 +12,24 @@ class AdminTransactionService
 {
     public function build(Carbon $from, Carbon $to): array
     {
+        // Amounts are net of approved/paid refunds (Order::scopeWithRefundTotals).
         $orders = Order::whereBetween('created_at', [$from, $to])
-            ->get(['id', 'seller_id', 'buyer_id', 'status', 'total_amount', 'commission_amount', 'created_at']);
+            ->select(['id', 'seller_id', 'buyer_id', 'status', 'total_amount', 'commission_amount', 'created_at'])
+            ->withRefundTotals()
+            ->get();
 
         $realized = $orders->whereIn('status', Order::GROUP_REALIZED);
         $inProgress = $orders->whereIn('status', Order::GROUP_IN_PROGRESS);
         $lost = $orders->whereIn('status', Order::GROUP_LOST);
 
+        $gmv = fn(Collection $c) => (float) $c->sum(fn($o) => $o->net_items_amount);
+        $commission = fn(Collection $c) => (float) $c->sum(fn($o) => $o->net_commission_amount);
+
         $money = fn(Collection $c) => [
-            'gmv' => round((float) $c->sum('total_amount'), 2),
-            'commission' => round((float) $c->sum('commission_amount'), 2),
-            'payout' => round((float) $c->sum('total_amount') - (float) $c->sum('commission_amount'), 2),
+            'gmv' => round($gmv($c), 2),
+            'commission' => round($commission($c), 2),
+            'payout' => round($gmv($c) - $commission($c), 2),
+            'refunded' => round((float) $c->sum(fn($o) => $o->refunded_items ?? 0), 2),
             'count' => $c->count(),
         ];
 
@@ -35,8 +43,8 @@ class AdminTransactionService
                 continue;
             }
             $buckets[$key]['orders']++;
-            $buckets[$key]['gmv'] += (float) $order->total_amount;
-            $buckets[$key]['commission'] += (float) $order->commission_amount;
+            $buckets[$key]['gmv'] += $order->net_items_amount;
+            $buckets[$key]['commission'] += $order->net_commission_amount;
         }
         foreach ($buckets as &$b) {
             $b['gmv'] = round($b['gmv'], 2);
@@ -68,23 +76,30 @@ class AdminTransactionService
         ];
     }
 
-    /** One row per seller shop, by realized commission (used by the Top Sellers table). */
+    /** One row per seller shop, by realized sales after refunds (used by the Top Sellers table). */
     public function topSellers(Carbon $from, Carbon $to): Collection
     {
+        $refunds = DB::table('order_returns')
+            ->whereIn('status', OrderReturn::REFUND_COUNTED)
+            ->groupBy('order_id')
+            ->selectRaw('order_id, SUM(items_amount) as items_amount, SUM(commission_reversal) as commission_reversal');
+
         return DB::table('orders')
             ->join('seller_profiles', 'seller_profiles.user_id', '=', 'orders.seller_id')
+            ->leftJoinSub($refunds, 'rf', 'rf.order_id', '=', 'orders.id')
             ->whereBetween('orders.created_at', [$from, $to])
             ->whereIn('orders.status', Order::GROUP_REALIZED)
             ->groupBy('orders.seller_id', 'seller_profiles.business_name')
-            ->selectRaw('seller_profiles.business_name as shop_name, COUNT(*) as orders, SUM(orders.total_amount) as gmv, SUM(orders.commission_amount) as commission')
+            ->selectRaw('seller_profiles.business_name as shop_name, COUNT(*) as orders, SUM(orders.total_amount - COALESCE(rf.items_amount, 0)) as gmv, SUM(orders.commission_amount - COALESCE(rf.commission_reversal, 0)) as commission')
             ->orderByDesc('gmv')
             ->get();
     }
 
-    /** One row per order (used by the ledger table and CSV export). */
+    /** One row per order (used by the ledger table and CSV export). Includes refund totals: see the net_* accessors on Order. */
     public function ledger(Carbon $from, Carbon $to)
     {
         return Order::with(['seller.sellerProfile', 'buyer'])
+            ->withRefundTotals()
             ->whereBetween('created_at', [$from, $to])
             ->orderByDesc('created_at');
     }

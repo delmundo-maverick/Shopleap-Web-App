@@ -20,6 +20,12 @@
         $ship = $order->ship_to;
         $sellerProfile = auth()->user()->sellerProfile;
         $nextStatuses = \App\Models\Order::SELLER_TRANSITIONS[$order->status] ?? [];
+
+        $canCancel = in_array($order->status, \App\Models\Order::SELLER_CANCEL_FROM, true);
+        $cancelRequestPending =
+            $order->cancel_request_status === 'pending' &&
+            in_array($order->status, \App\Models\Order::BUYER_CANCEL_REQUEST_FROM, true);
+
         $defaultHubId = old('logistics_profile_id', $lastHubId ?? ($hubs->count() === 1 ? $hubs->first()->id : null));
         $inputClass =
             'frost-input w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition focus:ring-4 focus:ring-primary/10';
@@ -198,6 +204,113 @@
 
                         {{-- Shipping, pickup, status, and timeline --}}
                         <div class="min-w-0 space-y-4 sm:space-y-5 xl:col-span-5 2xl:col-span-4">
+
+                            {{-- Cancelled --}}
+                            @if ($order->status === \App\Models\Order::STATUS_CANCELLED)
+                                <section class="frost-panel min-w-0 rounded-2xl border border-sale-red/20 p-4 sm:p-5">
+                                    <h2 class="mb-2 text-section-label">Order Cancelled</h2>
+                                    <p class="text-sm font-semibold text-sale-red">
+                                        Cancelled by
+                                        {{ \App\Models\Order::CANCELLED_BY_LABELS[$order->cancelled_by] ?? 'the seller' }}
+                                    </p>
+
+                                    @if ($order->cancel_reason)
+                                        <p class="mt-1 text-sm text-charcoal">{{ $order->cancel_reason }}</p>
+                                    @endif
+
+                                    @if ($order->cancel_note)
+                                        <p class="mt-1 text-xs text-charcoal/60">{{ $order->cancel_note }}</p>
+                                    @endif
+
+                                    @if ($order->cancelled_at)
+                                        <p class="mt-2 text-[11px] text-charcoal/40">
+                                            {{ $order->cancelled_at->format('M d, Y · g:i A') }}
+                                        </p>
+                                    @endif
+                                </section>
+                            @endif
+
+                            {{-- Buyer cancellation request --}}
+                            @if ($cancelRequestPending)
+                                <section class="frost-panel min-w-0 rounded-2xl border border-warning/30 p-4 sm:p-5">
+                                    <h2 class="mb-2 text-section-label">Cancellation Request</h2>
+                                    <p class="text-sm text-charcoal">The buyer asked to cancel this order.</p>
+
+                                    <dl class="mt-3 space-y-2 text-sm">
+                                        <div>
+                                            <dt class="text-xs text-charcoal/50">Reason</dt>
+                                            <dd class="font-medium">{{ $order->cancel_request_reason }}</dd>
+                                        </div>
+
+                                        @if ($order->cancel_request_note)
+                                            <div>
+                                                <dt class="text-xs text-charcoal/50">Note</dt>
+                                                <dd class="font-medium">{{ $order->cancel_request_note }}</dd>
+                                            </div>
+                                        @endif
+
+                                        <div>
+                                            <dt class="text-xs text-charcoal/50">Answer before</dt>
+                                            <dd class="font-medium">
+                                                {{ $order->cancel_requested_at?->copy()->addHours(\App\Models\Order::CANCEL_REQUEST_AUTO_APPROVE_HOURS)->format('M d, g:i A') ?? '—' }}
+                                                <span class="block text-xs font-normal text-charcoal/50">
+                                                    No answer means it is approved automatically.
+                                                </span>
+                                            </dd>
+                                        </div>
+                                    </dl>
+
+                                    <form method="POST"
+                                        action="{{ route('seller.orders.cancel-request.approve', $order) }}"
+                                        onsubmit="return confirm('Approve this request? The order will be cancelled and the stock returned.')"
+                                        class="mt-4">
+                                        @csrf
+                                        <button type="submit"
+                                            class="w-full rounded-xl bg-sale-red px-4 py-2.5 text-sm font-bold text-white transition hover:brightness-105">
+                                            Approve &amp; cancel order
+                                        </button>
+                                    </form>
+
+                                    <details class="mt-3">
+                                        <summary
+                                            class="cursor-pointer text-xs font-semibold text-primary hover:underline">
+                                            Decline the request…
+                                        </summary>
+
+                                        <form method="POST"
+                                            action="{{ route('seller.orders.cancel-request.decline', $order) }}"
+                                            class="mt-2 space-y-2">
+                                            @csrf
+                                            <input type="text" name="reason" required maxlength="255"
+                                                placeholder="Reason (the buyer will see this)"
+                                                class="{{ $inputClass }}">
+
+                                            <button type="submit"
+                                                class="w-full rounded-xl border border-charcoal/20 px-4 py-2.5 text-sm font-bold text-charcoal transition hover:bg-ice-blue">
+                                                Decline request
+                                            </button>
+                                        </form>
+                                    </details>
+                                </section>
+                            @endif
+
+                            {{-- Return / refund --}}
+                            @php $returnRecord = $order->returns->sortByDesc('id')->first(); @endphp
+                            @if ($returnRecord)
+                                <section class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5">
+                                    <h2 class="mb-2 text-section-label">Return / Refund</h2>
+                                    <p class="text-sm text-charcoal">{{ $returnRecord->reason_label }}</p>
+                                    <span
+                                        class="mt-2 inline-block rounded-full px-2.5 py-1 text-xs font-semibold {{ $returnRecord->status_color }}">
+                                        {{ $returnRecord->status_label }}
+                                    </span>
+                                    <a href="{{ route('seller.returns.show', $returnRecord) }}"
+                                        class="mt-3 block w-full rounded-xl border-2 border-primary px-4 py-2.5 text-center text-sm font-bold text-primary transition hover:bg-primary/5">
+                                        Open request
+                                    </a>
+                                </section>
+                            @endif
+
                             {{-- Shipping label --}}
                             @if (in_array($order->status, \App\Models\Order::WAYBILL_STATUSES, true))
                                 <section class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5">
@@ -320,23 +433,28 @@
                                                         class="{{ $inputClass }}">
                                                         @foreach (\App\Models\Order::PICKUP_SLOTS as $key => $label)
                                                             <option value="{{ $key }}"
-                                                                @selected(old('pickup_time_slot', 'morning') === $key)>{{ $label }}
+                                                                @selected(old('pickup_time_slot', 'morning') === $key)>
+                                                                {{ $label }}
                                                             </option>
                                                         @endforeach
                                                     </select>
                                                 </div>
                                             </div>
 
-                                            <button type="submit" @disabled(!$order->waybill_printed_at)
+                                            <button type="submit" @disabled(!$order->waybill_printed_at || $cancelRequestPending)
                                                 class="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:opacity-50">
                                                 Request Pickup &amp; Mark Ready
                                             </button>
 
-                                            @unless ($order->waybill_printed_at)
+                                            @if ($cancelRequestPending)
+                                                <p class="text-[11px] text-warning">
+                                                    Answer the buyer's cancellation request first.
+                                                </p>
+                                            @elseif (!$order->waybill_printed_at)
                                                 <p class="text-[11px] text-warning">
                                                     Print the waybill first. It unlocks this button.
                                                 </p>
-                                            @endunless
+                                            @endif
 
                                             <p class="text-[11px] text-charcoal/40">
                                                 The sorting center may adjust the schedule. The confirmed date will show
@@ -412,7 +530,7 @@
                             <section class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5">
                                 <h2 class="mb-3 text-section-label">Update Order Status</h2>
 
-                                @if (in_array($order->status, \App\Models\Order::SELLER_MODIFIABLE_FROM, true))
+                                @if (in_array($order->status, \App\Models\Order::SELLER_MODIFIABLE_FROM, true) && count($nextStatuses))
                                     <label for="next_order_status" class="sr-only">Select next order status</label>
                                     <select id="next_order_status" x-model="next"
                                         class="frost-input mb-3 w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition focus:ring-4 focus:ring-primary/10">
@@ -431,14 +549,63 @@
 
                                     <p class="mt-3 text-xs text-charcoal/50">
                                         Placed → Confirmed → Preparing, then request a pickup above.
-                                        Cancel only if the order cannot be fulfilled; it can't be undone.
                                     </p>
+                                @elseif ($order->status === \App\Models\Order::STATUS_PREPARING)
+                                    <div class="rounded-xl bg-ice-blue/60 p-4 text-xs text-charcoal/60">
+                                        Pack the order and print the label, then request a pickup above.
+                                    </div>
+                                @elseif ($order->status === \App\Models\Order::STATUS_CANCELLED)
+                                    <div class="rounded-xl bg-ice-blue/60 p-4 text-xs text-charcoal/60">
+                                        This order was cancelled.
+                                    </div>
                                 @else
                                     <div class="rounded-xl bg-ice-blue/60 p-4 text-xs text-charcoal/60">
                                         This order is now with delivery. Follow its progress in the timeline below.
                                     </div>
                                 @endif
                             </section>
+
+                            {{-- Cancel order --}}
+                            @if ($canCancel)
+                                <section class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5">
+                                    <h2 class="mb-3 text-section-label">Cancel Order</h2>
+
+                                    <details>
+                                        <summary
+                                            class="cursor-pointer text-xs font-bold text-sale-red hover:underline">
+                                            I can't fulfil this order…
+                                        </summary>
+
+                                        <form method="POST" action="{{ route('seller.orders.cancel', $order) }}"
+                                            onsubmit="return confirm('Cancel this order? The stock will be returned and this cannot be undone.')"
+                                            class="mt-3 space-y-3">
+                                            @csrf
+
+                                            <select name="reason" required class="{{ $inputClass }}">
+                                                <option value="" disabled selected>Select a reason…</option>
+                                                @foreach (\App\Models\Order::SELLER_CANCEL_REASONS as $reason)
+                                                    <option value="{{ $reason }}">{{ $reason }}</option>
+                                                @endforeach
+                                            </select>
+
+                                            <textarea name="note" rows="2" maxlength="255" placeholder="Note to the buyer (optional)"
+                                                class="{{ $inputClass }} resize-none"></textarea>
+
+                                            <button type="submit"
+                                                class="w-full rounded-xl bg-sale-red px-4 py-2.5 text-sm font-bold text-white transition hover:brightness-105">
+                                                Cancel order
+                                            </button>
+
+                                            <p class="text-[11px] text-charcoal/50">
+                                                The buyer will see the reason you choose.
+                                                @if ($order->status === \App\Models\Order::STATUS_READY_FOR_PICKUP)
+                                                    The sorting center's pickup for this order is cancelled too.
+                                                @endif
+                                            </p>
+                                        </form>
+                                    </details>
+                                </section>
+                            @endif
 
                             {{-- Order timeline --}}
                             @if ($order->events->isNotEmpty())

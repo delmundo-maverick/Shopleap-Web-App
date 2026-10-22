@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Seller;
 use App\Http\Controllers\Controller;
 use App\Models\LogisticsProfile;
 use App\Models\Order;
+use App\Services\OrderCancellation;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,13 +33,19 @@ class OrderController extends Controller
             $query->whereIn('status', Order::GROUP_NEW);
         } elseif ($status === 'prepare') {
             $query->whereIn('status', Order::GROUP_PREPARE);
+        } elseif ($status === 'cancel_requests') {
+            $query->pendingCancelRequest();
         } elseif ($status !== 'all') {
             $query->where('status', $status);
         }
 
         $orders = $query->paginate(15)->withQueryString();
 
-        return view('seller.orders.index', compact('orders', 'status'));
+        $pendingCancelRequests = Order::where('seller_id', $request->user()->id)
+            ->pendingCancelRequest()
+            ->count();
+
+        return view('seller.orders.index', compact('orders', 'status', 'pendingCancelRequests'));
     }
 
     public function show(Request $request, Order $order)
@@ -51,6 +58,7 @@ class OrderController extends Controller
             'logisticsProfile',
             'pickupRider',
             'events.actor',
+            'returns',
         ]);
 
         // Hubs the seller can pick for pickup: those covering the seller's own municipality.
@@ -82,7 +90,7 @@ class OrderController extends Controller
         return view('seller.orders.show', compact('order', 'hubs', 'lastHubId'));
     }
 
-    /** AJAX: manual status changes, one step at a time (Placed → Confirmed → Preparing; Cancel anytime before pickup). */
+    /** AJAX: forward status changes, one step at a time (Placed → Confirmed → Preparing). Cancelling has its own action. */
     public function updateStatus(Request $request, Order $order)
     {
         $this->authorizeOwnership($request, $order);
@@ -128,11 +136,6 @@ class OrderController extends Controller
             }
 
             $order->refresh();
-
-            if ($to === Order::STATUS_CANCELLED) {
-                $order->restoreStock();
-            }
-
             $order->logStatusEvent();
         });
 
@@ -150,6 +153,72 @@ class OrderController extends Controller
         ]);
     }
 
+    /** Seller cancels the order with a reason (any time before the courier collects it). */
+    public function cancel(Request $request, Order $order, OrderCancellation $cancellation)
+    {
+        $this->authorizeOwnership($request, $order);
+
+        $data = $request->validate([
+            'reason' => ['required', Rule::in(Order::SELLER_CANCEL_REASONS)],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $note = filled($data['note'] ?? null) ? trim($data['note']) : null;
+
+        $done = $cancellation->cancel(
+            $order,
+            'seller',
+            $data['reason'],
+            $note,
+            $request->user()->id,
+            Order::SELLER_CANCEL_FROM
+        );
+
+        if (! $done) {
+            $message = $order->fresh()->status === Order::STATUS_CANCELLED
+                ? 'This order is already cancelled.'
+                : "This order has already been picked up by the courier, so it can't be cancelled anymore.";
+
+            return back()->withErrors(['cancel' => $message]);
+        }
+
+        return redirect()
+            ->route('seller.orders.show', $order)
+            ->with('status', "Order #{$order->id} was cancelled and the stock was returned.");
+    }
+
+    public function approveCancel(Request $request, Order $order, OrderCancellation $cancellation)
+    {
+        $this->authorizeOwnership($request, $order);
+
+        if ($order->cancel_request_status !== 'pending') {
+            return back()->withErrors(['cancel' => 'There is no pending cancellation request for this order.']);
+        }
+
+        if ($cancellation->approveRequest($order, $request->user()->id)) {
+            return redirect()
+                ->route('seller.orders.show', $order)
+                ->with('status', 'Cancellation approved. The order was cancelled and the stock was returned.');
+        }
+
+        $cancellation->expire($order);
+
+        return back()->withErrors(['cancel' => 'This order has already been picked up by the courier, so it can no longer be cancelled.']);
+    }
+
+    public function declineCancel(Request $request, Order $order, OrderCancellation $cancellation)
+    {
+        $this->authorizeOwnership($request, $order);
+
+        $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
+
+        if ($cancellation->decline($order, trim($data['reason']), $request->user()->id)) {
+            return back()->with('status', 'Cancellation request declined. The buyer can see your reason.');
+        }
+
+        return back()->withErrors(['cancel' => 'There is no pending cancellation request for this order.']);
+    }
+
     /** Choose a sorting center + pickup date/window and mark the order ready for pickup. */
     public function requestPickup(Request $request, Order $order)
     {
@@ -157,6 +226,10 @@ class OrderController extends Controller
 
         if ($order->status !== Order::STATUS_PREPARING) {
             return back()->withErrors(['pickup' => 'Only orders that are being prepared can be marked ready for pickup.']);
+        }
+
+        if ($order->cancel_request_status === 'pending') {
+            return back()->withErrors(['pickup' => 'The buyer asked to cancel this order. Approve or decline the request first.']);
         }
 
         if (! $order->waybill_printed_at) {

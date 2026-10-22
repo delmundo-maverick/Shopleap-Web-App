@@ -1,6 +1,10 @@
 @props(['active' => null])
 @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/css/navbar.css', 'resources/js/shared/navbar.js'])
 
+@php
+    $adminReturnQueue = \App\Models\OrderReturn::whereIn('status', ['disputed', 'refund_pending'])->count();
+    $unreadNotifications = auth()->user()->unreadNotifications()->count();
+@endphp
 
 <div id="sidebarOverlay" class="fixed inset-0 z-40 hidden bg-charcoal/40 backdrop-blur-sm lg:hidden"></div>
 
@@ -149,6 +153,26 @@
             </a>
 
 
+            <a href="{{ route('notifications.index') }}" title="Notifications"
+                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
+                {{ $active === 'notifications'
+                    ? 'frost-chip text-primary font-semibold'
+                    : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
+
+                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                        d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 00-4-5.7V5a2 2 0 00-4 0v.3A6 6 0 006 11v3.2a2 2 0 01-.6 1.4L4 17h5m2 0v1a2 2 0 004 0v-1" />
+                </svg>
+
+                <span class="nav-label flex-1">Notifications</span>
+
+                @if ($unreadNotifications > 0)
+                    <span
+                        class="nav-label shrink-0 rounded-full bg-sale-red px-1.5 py-0.5 text-[10px] font-bold text-white">{{ $unreadNotifications }}</span>
+                @endif
+            </a>
+
+
             <p class="nav-section-title px-3 pb-2 pt-4 text-xs font-semibold uppercase tracking-wide text-charcoal/40">
                 Financials & Logs
             </p>
@@ -166,6 +190,26 @@
                 </svg>
 
                 <span class="nav-label">All Transactions</span>
+            </a>
+
+
+            <a href="{{ route('admin.returns.index') }}" title="Returns & Refunds"
+                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
+                {{ $active === 'returns'
+                    ? 'frost-chip text-primary font-semibold'
+                    : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
+
+                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                        d="M3 10h10a5 5 0 010 10H9M3 10l4-4M3 10l4 4" />
+                </svg>
+
+                <span class="nav-label flex-1">Returns & Refunds</span>
+
+                @if ($adminReturnQueue > 0)
+                    <span
+                        class="nav-label shrink-0 rounded-full bg-sale-red px-1.5 py-0.5 text-[10px] font-bold text-white">{{ $adminReturnQueue }}</span>
+                @endif
             </a>
 
 

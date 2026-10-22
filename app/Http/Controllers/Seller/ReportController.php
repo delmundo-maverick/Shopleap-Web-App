@@ -52,8 +52,8 @@ class ReportController extends Controller
                 $totals = ['gross' => 0.0, 'commission' => 0.0];
 
                 foreach ($service->ledger($sellerId, $from, $to) as $order) {
-                    $gross = (float) $order->total_amount;
-                    $commission = (float) $order->commission_amount;
+                    $gross = (float) $order->net_items_amount;
+                    $commission = (float) $order->net_commission_amount;
 
                     if (in_array($order->status, Order::GROUP_REALIZED, true)) {
                         $classification = 'Realized';

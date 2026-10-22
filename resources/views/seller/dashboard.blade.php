@@ -5,47 +5,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/pages/seller/dashboard.js'])
 
     <title>Seller Dashboard | Shopleap</title>
 </head>
 
-<body class="min-h-screen text-charcoal">
+<body class="min-h-screen overflow-x-hidden text-charcoal">
 
-    <div class="frost-surface"></div>
+    <div class="frost-surface pointer-events-none" aria-hidden="true"></div>
 
     <div class="flex min-h-screen">
 
         <x-navbars.seller active="dashboard" />
 
-        <div class="flex flex-1 flex-col min-w-0">
+        <div class="flex min-w-0 flex-1 flex-col">
 
             {{-- TOPBAR --}}
-            <header class="frost-panel-solid sticky top-0 z-10 flex h-20 items-center justify-between px-6">
+            <header
+                class="frost-panel-solid sticky top-0 z-10 flex h-16 items-center justify-between gap-3 px-4 sm:h-20 sm:px-6">
 
-                <div class="flex items-center gap-3">
-                    <button type="button" data-sidebar-toggle
-                        class="rounded-xl p-2 text-charcoal/60 transition hover:bg-white/70 hover:text-primary lg:hidden">
+                <div class="flex min-w-0 items-center gap-2 sm:gap-3">
+                    <button type="button" data-sidebar-toggle aria-label="Open menu"
+                        class="shrink-0 rounded-xl p-2 text-charcoal/60 transition hover:bg-white/70 hover:text-primary lg:hidden">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </button>
 
-                    <div>
-                        <h2 class="text-xl font-bold text-charcoal">
+                    <div class="min-w-0">
+                        <h2 class="truncate text-base font-bold text-charcoal sm:text-xl">
                             {{ $sellerProfile->business_name ?? 'Your Store' }}
                         </h2>
 
-                        <p class="text-sm text-charcoal/55">
+                        <p class="truncate text-xs text-charcoal/55 sm:text-sm">
                             Welcome back,
                             {{ $sellerProfile->first_name ?? auth()->user()->name }}
                         </p>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-4">
-                    <div class="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 frost-chip">
+                <div class="flex shrink-0 items-center gap-4">
+                    <div class="frost-chip flex items-center gap-2.5 rounded-full py-1 pl-1 pr-1 sm:pr-3">
                         <div
                             class="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
                             {{ strtoupper(substr($sellerProfile->first_name ?? (auth()->user()->name ?? 'S'), 0, 1)) }}
@@ -63,30 +64,31 @@
             </header>
 
             {{-- CONTENT --}}
-            <main class="flex-1 space-y-6 p-6">
+            <main class="min-w-0 flex-1 space-y-4 p-4 sm:space-y-6 sm:p-6">
 
                 <x-announcement-banner audience="seller" />
 
                 {{-- STAT CARDS --}}
-                <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
 
                     {{-- This Month's Sales --}}
-                    <div class="frost-panel rounded-2xl p-5">
-                        <div class="flex items-center justify-between">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/45">
+                    <div class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5">
+                        <div class="flex items-start justify-between gap-2">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-charcoal/45 sm:text-xs">
                                 This Month's Sales
                             </p>
 
                             <div
-                                class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
-                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 sm:h-9 sm:w-9">
+                                <svg class="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                         d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 2v8m0 0v2m0-2c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                             </div>
                         </div>
 
-                        <p class="mt-2 text-3xl font-bold text-charcoal">
+                        <p class="mt-2 break-words text-xl font-bold text-charcoal sm:text-2xl xl:text-3xl">
                             ₱{{ number_format($stats['sales_this_month'], 2) }}
                         </p>
 
@@ -94,22 +96,23 @@
                     </div>
 
                     {{-- Pending Orders --}}
-                    <div class="frost-panel rounded-2xl p-5">
-                        <div class="flex items-center justify-between">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/45">
+                    <div class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5">
+                        <div class="flex items-start justify-between gap-2">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-charcoal/45 sm:text-xs">
                                 Pending Orders
                             </p>
 
                             <div
-                                class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
-                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 sm:h-9 sm:w-9">
+                                <svg class="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                         d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                                 </svg>
                             </div>
                         </div>
 
-                        <p class="mt-2 text-3xl font-bold text-charcoal">
+                        <p class="mt-2 text-xl font-bold text-charcoal sm:text-2xl xl:text-3xl">
                             {{ $stats['pending_orders'] }}
                         </p>
 
@@ -117,21 +120,23 @@
                     </div>
 
                     {{-- Products Listed --}}
-                    <div class="frost-panel rounded-2xl p-5">
-                        <div class="flex items-center justify-between">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/45">
+                    <div class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5">
+                        <div class="flex items-start justify-between gap-2">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-charcoal/45 sm:text-xs">
                                 Products Listed
                             </p>
 
-                            <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div
+                                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:h-9 sm:w-9">
+                                <svg class="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                         d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                 </svg>
                             </div>
                         </div>
 
-                        <p class="mt-2 text-3xl font-bold text-charcoal">
+                        <p class="mt-2 text-xl font-bold text-charcoal sm:text-2xl xl:text-3xl">
                             {{ $stats['products_listed'] }}
                         </p>
 
@@ -139,22 +144,23 @@
                     </div>
 
                     {{-- Store Rating --}}
-                    <div class="frost-panel rounded-2xl p-5">
-                        <div class="flex items-center justify-between">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/45">
+                    <div class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5">
+                        <div class="flex items-start justify-between gap-2">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-charcoal/45 sm:text-xs">
                                 Store Rating
                             </p>
 
                             <div
-                                class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-400/15 text-amber-500">
-                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-400/15 text-amber-500 sm:h-9 sm:w-9">
+                                <svg class="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                         d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                                 </svg>
                             </div>
                         </div>
 
-                        <p class="mt-2 text-3xl font-bold text-charcoal">
+                        <p class="mt-2 text-xl font-bold text-charcoal sm:text-2xl xl:text-3xl">
                             {{ $stats['store_rating'] !== null ? number_format($stats['store_rating'], 1) : '--' }}
                         </p>
 
@@ -171,22 +177,22 @@
                 </div>
 
                 {{-- CHARTS --}}
-                <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                <div class="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-3">
 
                     {{-- Sales Trend --}}
-                    <div class="frost-panel rounded-2xl p-5 lg:col-span-2">
+                    <div class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5 lg:col-span-2">
                         <div class="mb-4">
                             <h3 class="text-sm font-bold text-charcoal">Sales Trend</h3>
                             <p class="text-xs text-charcoal/50">Last 6 months</p>
                         </div>
 
-                        <div class="relative h-64 w-full">
+                        <div class="relative h-56 w-full sm:h-64">
                             <canvas id="salesTrendChart"></canvas>
                         </div>
                     </div>
 
                     {{-- Order Status --}}
-                    <div class="frost-panel rounded-2xl p-5">
+                    <div class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5">
                         <div class="mb-4">
                             <h3 class="text-sm font-bold text-charcoal">Order Status</h3>
                             <p class="text-xs text-charcoal/50">Current breakdown</p>
@@ -211,10 +217,10 @@
                 </div>
 
                 {{-- CUSTOMER REVIEWS --}}
-                <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                <div class="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-3">
 
                     {{-- Rating summary --}}
-                    <div class="frost-panel rounded-2xl p-5">
+                    <div class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5">
                         <div class="mb-4">
                             <h3 class="text-sm font-bold text-charcoal">Customer Reviews</h3>
                             <p class="text-xs text-charcoal/50">All time</p>
@@ -247,12 +253,12 @@
                                     <div class="flex items-center gap-2 text-xs">
                                         <span
                                             class="w-6 shrink-0 font-semibold text-charcoal/60">{{ $star }}★</span>
-                                        <div class="h-2 flex-1 overflow-hidden rounded-full bg-charcoal/10">
+                                        <div class="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-charcoal/10">
                                             <div class="h-full rounded-full bg-amber-400"
                                                 style="width: {{ $percent }}%"></div>
                                         </div>
                                         <span
-                                            class="w-6 shrink-0 text-right text-charcoal/50">{{ $count }}</span>
+                                            class="w-8 shrink-0 text-right text-charcoal/50">{{ $count }}</span>
                                     </div>
                                 @endforeach
                             </div>
@@ -265,9 +271,9 @@
                     </div>
 
                     {{-- Latest reviews --}}
-                    <div class="frost-panel rounded-2xl p-5 lg:col-span-2">
+                    <div class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5 lg:col-span-2">
                         <div class="mb-4 flex items-start justify-between gap-3">
-                            <div>
+                            <div class="min-w-0">
                                 <h3 class="text-sm font-bold text-charcoal">Latest Reviews</h3>
                                 <p class="text-xs text-charcoal/50">What buyers are saying about your products</p>
                             </div>
@@ -289,7 +295,8 @@
                                     <div class="py-4 first:pt-0 last:pb-0">
                                         <div class="flex items-start justify-between gap-3">
                                             <div class="min-w-0">
-                                                <p class="text-sm font-semibold text-charcoal">{{ $review['buyer'] }}
+                                                <p class="truncate text-sm font-semibold text-charcoal">
+                                                    {{ $review['buyer'] }}
                                                 </p>
                                                 <p class="mt-0.5 text-sm leading-none">
                                                     <span
@@ -303,15 +310,15 @@
                                             </p>
                                         </div>
 
-                                        <p class="mt-2 text-xs text-charcoal/50">
+                                        <p class="mt-2 break-words text-xs text-charcoal/50">
                                             {{ $review['product'] }} ·
                                             <a href="{{ route('seller.orders.show', $review['order_id']) }}"
-                                                class="font-semibold text-primary hover:underline">Order
+                                                class="whitespace-nowrap font-semibold text-primary hover:underline">Order
                                                 #{{ $review['order_id'] }}</a>
                                         </p>
 
                                         @if (filled($review['comment']))
-                                            <p class="mt-2 whitespace-pre-line text-sm text-charcoal/80">
+                                            <p class="mt-2 whitespace-pre-line break-words text-sm text-charcoal/80">
                                                 {{ $review['comment'] }}</p>
                                         @else
                                             <p class="mt-2 text-sm italic text-charcoal/35">Rated without a written
@@ -323,7 +330,7 @@
                                                 @foreach ($review['media'] as $media)
                                                     @if ($media['is_video'])
                                                         <video src="{{ $media['url'] }}" controls preload="metadata"
-                                                            class="h-20 w-28 rounded-lg bg-charcoal/10 object-cover"></video>
+                                                            class="h-20 w-28 max-w-full rounded-lg bg-charcoal/10 object-cover"></video>
                                                     @else
                                                         <a href="{{ $media['url'] }}" target="_blank" rel="noopener"
                                                             class="block h-20 w-20 overflow-hidden rounded-lg bg-charcoal/10">
@@ -343,7 +350,7 @@
                 </div>
 
                 {{-- RECENT ORDERS --}}
-                <div class="frost-panel rounded-2xl p-5">
+                <div class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5">
                     <div class="mb-4 flex items-center justify-between">
                         <h3 class="text-sm font-bold text-charcoal">Recent Orders</h3>
 
@@ -355,17 +362,17 @@
 
                     @if ($recentOrders->isEmpty())
                         <div
-                            class="flex h-40 items-center justify-center rounded-xl border border-dashed border-white/70 bg-white/30 text-sm text-charcoal/40">
+                            class="flex h-40 items-center justify-center rounded-xl border border-dashed border-white/70 bg-white/30 px-4 text-center text-sm text-charcoal/40">
                             No orders yet — new orders will appear here once buyers start purchasing.
                         </div>
                     @else
                         <div class="divide-y divide-white/60">
                             @foreach ($recentOrders as $order)
                                 <a href="{{ route('seller.orders.show', $order) }}"
-                                    class="flex items-center justify-between gap-4 rounded-xl px-2 py-3 transition hover:bg-white/50">
+                                    class="flex flex-col gap-2 rounded-xl px-2 py-3 transition hover:bg-white/50 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
 
                                     <div class="min-w-0">
-                                        <p class="text-sm font-semibold text-charcoal">
+                                        <p class="truncate text-sm font-semibold text-charcoal">
                                             Order #{{ $order->id }} — {{ $order->buyer_name }}
                                         </p>
 
@@ -375,13 +382,13 @@
                                         </p>
                                     </div>
 
-                                    <div class="flex shrink-0 items-center gap-3">
+                                    <div class="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
                                         <span class="text-sm font-bold text-charcoal">
                                             ₱{{ number_format($order->total_amount, 2) }}
                                         </span>
 
                                         <span
-                                            class="rounded-full px-2.5 py-1 text-xs font-semibold capitalize text-primary frost-chip">
+                                            class="frost-chip whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold capitalize text-primary">
                                             {{ ucwords(strtolower(str_replace('_', ' ', $order->status))) }}
                                         </span>
                                     </div>
@@ -397,184 +404,9 @@
 
     </div>
 
-    {{-- Chart.js --}}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const SELLER_PRIMARY = '#1A5FB4';
-
-            // Data from Seller\DashboardController@index
-            const salesTrend = @json($salesTrend);
-            const orderStatusCounts = @json($orderStatusCounts);
-
-            // Order status values (computed first so they're logged even if Chart.js fails)
-            const orderStatusLabels = ['Pending', 'To Ship', 'Shipped', 'Delivered', 'Cancelled'];
-
-            const orderStatusData = [
-                Number(orderStatusCounts.pending ?? 0),
-                Number(orderStatusCounts.to_ship ?? 0),
-                Number(orderStatusCounts.shipped ?? 0),
-                Number(orderStatusCounts.delivered ?? 0),
-                Number(orderStatusCounts.cancelled ?? 0)
-            ];
-
-            const hasOrders = orderStatusData.some(count => Number.isFinite(count) && count > 0);
-
-            console.log('Seller dashboard chart data:', {
-                salesTrend,
-                orderStatusCounts,
-                orderStatusData,
-                hasOrders
-            });
-
-            // Check Chart.js
-            if (typeof Chart === 'undefined') {
-                console.error('Chart.js failed to load. Check your internet connection or CDN availability.');
-                return;
-            }
-
-            // ---------------- Sales Trend Chart ----------------
-            const salesCanvas = document.getElementById('salesTrendChart');
-
-            if (salesCanvas) {
-                try {
-                    new Chart(salesCanvas, {
-                        type: 'line',
-
-                        data: {
-                            labels: salesTrend.labels,
-                            datasets: [{
-                                label: 'Revenue (₱)',
-                                data: salesTrend.totals,
-                                borderColor: SELLER_PRIMARY,
-                                backgroundColor: 'rgba(26, 95, 180, 0.12)',
-                                tension: 0.35,
-                                fill: true,
-                                pointRadius: 3,
-                                pointBackgroundColor: SELLER_PRIMARY,
-                            }]
-                        },
-
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-
-                            plugins: {
-                                legend: {
-                                    display: false
-                                },
-
-                                tooltip: {
-                                    callbacks: {
-                                        label(context) {
-                                            return 'Revenue: ₱' +
-                                                Number(context.raw).toLocaleString('en-PH', {
-                                                    minimumFractionDigits: 2,
-                                                    maximumFractionDigits: 2
-                                                });
-                                        }
-                                    }
-                                }
-                            },
-
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    grid: {
-                                        color: 'rgba(20, 40, 70, 0.08)'
-                                    }
-                                },
-
-                                x: {
-                                    grid: {
-                                        display: false
-                                    }
-                                }
-                            }
-                        }
-                    });
-                } catch (error) {
-                    console.error('Sales trend chart failed:', error);
-                }
-            }
-
-            // ---------------- Order Status Doughnut Chart ----------------
-            const orderStatusCanvas = document.getElementById('orderStatusChart');
-            const orderStatusEmpty = document.getElementById('orderStatusEmpty');
-
-            const showEmptyState = (show) => {
-                if (orderStatusEmpty) {
-                    orderStatusEmpty.style.display = show ? 'flex' : 'none';
-                }
-            };
-
-            if (orderStatusCanvas && hasOrders) {
-                showEmptyState(false);
-
-                try {
-                    new Chart(orderStatusCanvas, {
-                        type: 'doughnut',
-
-                        data: {
-                            labels: orderStatusLabels,
-
-                            datasets: [{
-                                label: 'Orders',
-                                data: orderStatusData,
-
-                                backgroundColor: [
-                                    '#F59E0B',
-                                    '#1A5FB4',
-                                    '#4A90D9',
-                                    '#93C5FD',
-                                    '#DC2626'
-                                ],
-
-                                borderWidth: 2,
-                                borderColor: '#FFFFFF',
-                                hoverOffset: 6
-                            }]
-                        },
-
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            cutout: '65%',
-
-                            plugins: {
-                                legend: {
-                                    position: 'bottom',
-
-                                    labels: {
-                                        boxWidth: 10,
-                                        boxHeight: 10,
-                                        padding: 12,
-
-                                        font: {
-                                            size: 11
-                                        }
-                                    }
-                                },
-
-                                tooltip: {
-                                    callbacks: {
-                                        label(context) {
-                                            return `${context.label}: ${context.raw} orders`;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    });
-                } catch (error) {
-                    console.error('Order status chart failed:', error);
-                    showEmptyState(true);
-                }
-            } else {
-                showEmptyState(true);
-            }
-        });
+    {{-- Data for resources/js/pages/seller/dashboard.js --}}
+    <script id="seller-dashboard-data" type="application/json">
+        @json(['salesTrend' => $salesTrend, 'orderStatusCounts' => $orderStatusCounts])
     </script>
 
 </body>

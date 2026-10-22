@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Announcement;
+use App\Models\Order;
 use App\Models\PlatformPolicy;
 use App\Models\PlatformSetting;
 use App\Models\ShippingRate;
@@ -23,9 +24,10 @@ class PlatformSettingController extends Controller
     public function index()
     {
         $settings = [
-            'platform_name'   => PlatformSetting::get('platform_name', 'Shopleap'),
-            'support_email'   => PlatformSetting::get('support_email', ''),
-            'commission_rate' => PlatformSetting::get('commission_rate', 10),
+            'platform_name'      => PlatformSetting::get('platform_name', 'Shopleap'),
+            'support_email'      => PlatformSetting::get('support_email', ''),
+            'commission_rate'    => PlatformSetting::get('commission_rate', 10),
+            'return_window_days' => PlatformSetting::get('return_window_days', Order::RETURN_WINDOW_DAYS),
         ];
 
         return view('admin.settings.index', compact('settings'));
@@ -63,9 +65,10 @@ class PlatformSettingController extends Controller
     public function updateGeneral(Request $request)
     {
         $validated = $request->validate([
-            'platform_name'   => ['required', 'string', 'max:100'],
-            'support_email'   => ['required', 'email', 'max:255'],
-            'commission_rate' => ['required', 'numeric', 'min:0', 'max:100'],
+            'platform_name'      => ['required', 'string', 'max:100'],
+            'support_email'      => ['required', 'email', 'max:255'],
+            'commission_rate'    => ['required', 'numeric', 'min:0', 'max:100'],
+            'return_window_days' => ['sometimes', 'integer', 'min:1', 'max:30'],
         ]);
 
         foreach ($validated as $key => $value) {

@@ -57,108 +57,76 @@ class TransactionController extends Controller
         );
     }
 
-    public function exportCsv(
-        Request $request,
-        AdminTransactionService $service
-    ) {
+    public function exportCsv(Request $request, AdminTransactionService $service)
+    {
         [$from, $to] = $this->resolveRange($request);
+        $filename = 'shopleap-transactions_' . $from->format('Y-m-d') . '_to_' . $to->format('Y-m-d') . '.csv';
 
-        $filename = 'shopleap-transactions_'
-            . $from->format('Y-m-d')
-            . '_to_'
-            . $to->format('Y-m-d')
-            . '.csv';
+        return response()->streamDownload(function () use ($service, $from, $to) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, [
+                'Order #',
+                'Date',
+                'Buyer',
+                'Seller',
+                'Status',
+                'GMV after refunds (PHP)',
+                'Commission (PHP)',
+                'Seller Payout (PHP)',
+                'Shipping Fee (PHP, paid to logistics)',
+                'Refunded (PHP)',
+            ]);
 
-        return response()->streamDownload(
-            function () use ($service, $from, $to) {
-                $out = fopen('php://output', 'w');
+            $totals = ['gmv' => 0.0, 'commission' => 0.0, 'shipping' => 0.0, 'refunded' => 0.0];
 
-                // UTF-8 BOM for Excel compatibility.
-                fwrite($out, "\xEF\xBB\xBF");
+            foreach ($service->ledger($from, $to)->cursor() as $order) {
+                // Amounts after approved/paid refunds; orders without a refund are unchanged.
+                $gross = $order->net_items_amount;
+                $commission = $order->net_commission_amount;
+                $shippingFee = $order->net_shipping_fee;
+                $refunded = $order->refunded_total;
 
-                fputcsv($out, [
-                    'Order #',
-                    'Date',
-                    'Buyer',
-                    'Seller',
-                    'Status',
-                    'GMV (PHP)',
-                    'Commission (PHP)',
-                    'Seller Payout (PHP)',
-                    'Shipping Fee (PHP, paid to logistics)',
-                ]);
-
-                $totals = [
-                    'gmv' => 0.0,
-                    'commission' => 0.0,
-                    'shipping' => 0.0,
-                ];
-
-                foreach ($service->ledger($from, $to)->cursor() as $order) {
-                    $gross = (float) $order->total_amount;
-                    $commission = (float) $order->commission_amount;
-                    $shippingFee = (float) $order->shipping_fee;
-
-                    // GMV and commission: realized/completed orders only.
-                    if (in_array(
-                        $order->status,
-                        Order::GROUP_REALIZED,
-                        true
-                    )) {
-                        $totals['gmv'] += $gross;
-                        $totals['commission'] += $commission;
-                    }
-
-                    // Shipping: delivered and completed orders.
-                    if (in_array(
-                        $order->status,
-                        Order::GROUP_SHIPPING_EARNED,
-                        true
-                    )) {
-                        $totals['shipping'] += $shippingFee;
-                    }
-
-                    fputcsv($out, [
-                        $order->id,
-                        $order->created_at->format('Y-m-d H:i'),
-                        $this->csvSafe($order->buyer_name),
-                        $this->csvSafe(
-                            $order->seller->sellerProfile->business_name
-                                ?? $order->seller->name
-                                ?? ''
-                        ),
-                        $order->status_label,
-                        number_format($gross, 2, '.', ''),
-                        number_format($commission, 2, '.', ''),
-                        number_format($gross - $commission, 2, '.', ''),
-                        number_format($shippingFee, 2, '.', ''),
-                    ]);
+                if (in_array($order->status, Order::GROUP_REALIZED, true)) {
+                    $totals['gmv'] += $gross;
+                    $totals['commission'] += $commission;
+                    $totals['refunded'] += $refunded;
                 }
 
-                fputcsv($out, []);
+                if (in_array($order->status, Order::GROUP_SHIPPING_EARNED, true)) {
+                    $totals['shipping'] += $shippingFee;
+                }
 
                 fputcsv($out, [
-                    'TOTAL (GMV & commission: Completed orders; shipping: Delivered + Completed)',
-                    '',
-                    '',
-                    '',
-                    '',
-                    number_format($totals['gmv'], 2, '.', ''),
-                    number_format($totals['commission'], 2, '.', ''),
-                    number_format(
-                        $totals['gmv'] - $totals['commission'],
-                        2,
-                        '.',
-                        ''
-                    ),
-                    number_format($totals['shipping'], 2, '.', ''),
+                    $order->id,
+                    $order->created_at->format('Y-m-d H:i'),
+                    $this->csvSafe($order->buyer_name),
+                    $this->csvSafe($order->seller->sellerProfile->business_name ?? $order->seller->name ?? ''),
+                    $order->status_label,
+                    number_format($gross, 2, '.', ''),
+                    number_format($commission, 2, '.', ''),
+                    number_format($gross - $commission, 2, '.', ''),
+                    number_format($shippingFee, 2, '.', ''),
+                    number_format($refunded, 2, '.', ''),
                 ]);
+            }
 
-                fclose($out);
-            },
-            $filename,
-            ['Content-Type' => 'text/csv; charset=UTF-8']
-        );
+            fputcsv($out, []);
+            fputcsv($out, [
+                'TOTAL (GMV & commission: Completed orders; shipping: Delivered + Completed)',
+                '',
+                '',
+                '',
+                '',
+                number_format($totals['gmv'], 2, '.', ''),
+                number_format($totals['commission'], 2, '.', ''),
+                number_format($totals['gmv'] - $totals['commission'], 2, '.', ''),
+                number_format($totals['shipping'], 2, '.', ''),
+                number_format($totals['refunded'], 2, '.', ''),
+            ]);
+
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     private function resolveRange(Request $request): array

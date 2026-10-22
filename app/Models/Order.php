@@ -37,6 +37,18 @@ class Order extends Model
         'delivered_at',
         'cod_collected_amount',
         'cod_collected_at',
+
+        // Cancellation details
+        'cancelled_by',
+        'cancel_reason',
+        'cancel_note',
+        'cancelled_at',
+        'cancel_request_status',
+        'cancel_request_reason',
+        'cancel_request_note',
+        'cancel_requested_at',
+        'cancel_request_response',
+        'cancel_request_resolved_at',
     ];
 
     protected function casts(): array
@@ -49,6 +61,11 @@ class Order extends Model
             'delivered_at' => 'datetime',
             'cod_collected_at' => 'datetime',
             'cod_collected_amount' => 'decimal:2',
+
+            // Cancellation timestamps
+            'cancelled_at' => 'datetime',
+            'cancel_requested_at' => 'datetime',
+            'cancel_request_resolved_at' => 'datetime',
         ];
     }
 
@@ -69,13 +86,12 @@ class Order extends Model
     const STATUS_DELIVERY_FAILED = 'DELIVERY_FAILED';
     const STATUS_RETURNED = 'RETURNED';
 
-    // Seller: statuses they may set by hand. READY_FOR_PICKUP is deliberately absent —
-    // it can only be entered through the "Request pickup" form (hub + date + window).
+    // Seller: statuses they may set by hand.
+    // READY_FOR_PICKUP is only entered through the pickup request form.
     const SELLER_EDITABLE_STATUSES = [
         self::STATUS_PLACED,
         self::STATUS_CONFIRMED,
         self::STATUS_PREPARING,
-        self::STATUS_CANCELLED,
     ];
 
     const SELLER_MODIFIABLE_FROM = [
@@ -87,15 +103,11 @@ class Order extends Model
     const SELLER_TRANSITIONS = [
         self::STATUS_PLACED => [
             self::STATUS_CONFIRMED,
-            self::STATUS_CANCELLED,
         ],
         self::STATUS_CONFIRMED => [
             self::STATUS_PREPARING,
-            self::STATUS_CANCELLED,
         ],
-        self::STATUS_PREPARING => [
-            self::STATUS_CANCELLED,
-        ],
+        self::STATUS_PREPARING => [],
     ];
 
     // Seller sidebar links
@@ -191,6 +203,10 @@ class Order extends Model
     // A DELIVERED order completes by itself if the buyer never confirms.
     const AUTO_COMPLETE_DAYS = 7;
 
+    // Return/refund requests are accepted for this many days after delivery.
+    // The admin setting "return_window_days" overrides it.
+    const RETURN_WINDOW_DAYS = 7;
+
     // Waybill can be (re)printed once the seller is preparing the order.
     const WAYBILL_STATUSES = [
         self::STATUS_PREPARING,
@@ -210,6 +226,52 @@ class Order extends Model
     ];
 
     const MAX_DELIVERY_ATTEMPTS = 3;
+
+    // Buyer cancellation rules
+    const BUYER_CANCEL_INSTANT_FROM = [
+        self::STATUS_PLACED,
+    ];
+
+    const BUYER_CANCEL_REQUEST_FROM = [
+        self::STATUS_CONFIRMED,
+        self::STATUS_PREPARING,
+        self::STATUS_READY_FOR_PICKUP,
+    ];
+
+    // Seller cancellation rules
+    const SELLER_CANCEL_FROM = [
+        self::STATUS_PLACED,
+        self::STATUS_CONFIRMED,
+        self::STATUS_PREPARING,
+        self::STATUS_READY_FOR_PICKUP,
+    ];
+
+    const CANCEL_REQUEST_AUTO_APPROVE_HOURS = 24;
+
+    const CANCELLED_BY_LABELS = [
+        'buyer' => 'the buyer',
+        'seller' => 'the seller',
+        'system' => 'Shopleap',
+    ];
+
+    const BUYER_CANCEL_REASONS = [
+        'Changed my mind',
+        'Want to change delivery address',
+        'Want to change items or variation',
+        'Found a better price elsewhere',
+        'Ordered by mistake',
+        'Seller is taking too long',
+        'Other',
+    ];
+
+    const SELLER_CANCEL_REASONS = [
+        'Out of stock',
+        'Buyer asked to cancel',
+        'Unable to fulfil the order',
+        'Incorrect price or listing details',
+        'Unable to reach the buyer',
+        'Other',
+    ];
 
     const STATUS_LABELS = [
         self::STATUS_PLACED => 'Placed',
@@ -366,6 +428,146 @@ class Order extends Model
                     )
                     : null),
         ];
+    }
+
+    // ── Returns / refunds ──
+
+    public function returns()
+    {
+        return $this->hasMany(OrderReturn::class);
+    }
+
+    public static function returnWindowDays(): int
+    {
+        return max(
+            1,
+            (int) PlatformSetting::get(
+                'return_window_days',
+                self::RETURN_WINDOW_DAYS
+            )
+        );
+    }
+
+    public function returnWindowEndsAt(): ?\Illuminate\Support\Carbon
+    {
+        return $this->delivered_at?->copy()->addDays(
+            self::returnWindowDays()
+        );
+    }
+
+    /**
+     * The return/refund button exists only once the courier has delivered
+     * the parcel, inside the window, and while no earlier request is open
+     * or settled.
+     */
+    public function canRequestReturn(): bool
+    {
+        if (
+            ! in_array(
+                $this->status,
+                [self::STATUS_DELIVERED, self::STATUS_COMPLETED],
+                true
+            )
+            || ! $this->delivered_at
+        ) {
+            return false;
+        }
+
+        if (now()->greaterThan($this->returnWindowEndsAt())) {
+            return false;
+        }
+
+        $returns = $this->relationLoaded('returns')
+            ? $this->returns
+            : $this->returns()->get();
+
+        return $returns
+            ->whereIn('status', OrderReturn::BLOCKING_STATUSES)
+            ->isEmpty();
+    }
+
+    /**
+     * The buyer's Return/Refund tab: parcels sent back after a failed
+     * delivery, plus orders that have return/refund requests.
+     */
+    public function scopeReturnOrRefund($query)
+    {
+        return $query->where(
+            fn($q) => $q
+                ->whereIn('status', self::GROUP_RETURN_REFUND)
+                ->orWhereHas('returns')
+        );
+    }
+
+        // ── Refunds in reports ──
+
+    public function scopeWithRefundTotals($query)
+    {
+        $counted = fn($q) => $q->whereIn('status', OrderReturn::REFUND_COUNTED);
+
+        return $query
+            ->withSum(['returns as refunded_items' => $counted], 'items_amount')
+            ->withSum(['returns as refunded_commission' => $counted], 'commission_reversal')
+            ->withSum(['returns as refunded_shipping' => $counted], 'shipping_amount');
+    }
+
+    public function getNetItemsAmountAttribute(): float
+    {
+        return round((float) $this->total_amount - (float) ($this->refunded_items ?? 0), 2);
+    }
+
+    public function getNetCommissionAmountAttribute(): float
+    {
+        return round((float) $this->commission_amount - (float) ($this->refunded_commission ?? 0), 2);
+    }
+
+    public function getNetShippingFeeAttribute(): float
+    {
+        return round((float) $this->shipping_fee - (float) ($this->refunded_shipping ?? 0), 2);
+    }
+
+    public function getRefundedTotalAttribute(): float
+    {
+        return round((float) ($this->refunded_items ?? 0) + (float) ($this->refunded_shipping ?? 0), 2);
+    }
+
+    // ── Cancellation helpers ──
+
+    public function buyerCancelMode(): ?string
+    {
+        if (
+            in_array(
+                $this->status,
+                self::BUYER_CANCEL_INSTANT_FROM,
+                true
+            )
+        ) {
+            return 'instant';
+        }
+
+        if (
+            in_array(
+                $this->status,
+                self::BUYER_CANCEL_REQUEST_FROM,
+                true
+            )
+            && in_array(
+                $this->cancel_request_status,
+                [null, 'withdrawn'],
+                true
+            )
+        ) {
+            return 'request';
+        }
+
+        return null;
+    }
+
+    public function scopePendingCancelRequest($query)
+    {
+        return $query
+            ->where('cancel_request_status', 'pending')
+            ->whereIn('status', self::BUYER_CANCEL_REQUEST_FROM);
     }
 
     // ── Tracking timeline ──
