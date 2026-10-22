@@ -37,6 +37,52 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    /* ───────────── Cancel order modal ───────────── */
+
+    const cancelOverlay = document.getElementById('cancelModalOverlay');
+
+    if (cancelOverlay) {
+        const cancelForm = document.getElementById('cancelModalForm');
+        const cancelTitle = document.getElementById('cancelModalOrder');
+        const cancelHelp = document.getElementById('cancelModalHelp');
+        const cancelSubmit = document.getElementById('cancelModalSubmit');
+        const hours = cancelOverlay.dataset.hours || '24';
+
+        const closeCancel = () => {
+            cancelOverlay.classList.add('hidden');
+            cancelOverlay.classList.remove('flex');
+        };
+
+        document.querySelectorAll('.cancel-order-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const isRequest = btn.dataset.mode === 'request';
+
+                cancelForm.reset();
+                cancelForm.action = btn.dataset.action;
+                cancelTitle.textContent = `Order #${btn.dataset.orderId}`;
+                cancelHelp.textContent = isRequest
+                    ? `The seller has already started on this order, so your cancellation needs their approval. If they don't answer within ${hours} hours, it is cancelled automatically.`
+                    : 'The seller has not confirmed this order yet, so it will be cancelled right away.';
+                cancelSubmit.textContent = isRequest ? 'Send Request' : 'Cancel Order';
+                cancelSubmit.disabled = false;
+
+                cancelOverlay.classList.remove('hidden');
+                cancelOverlay.classList.add('flex');
+            });
+        });
+
+        document.getElementById('cancelModalCloseBtn')?.addEventListener('click', closeCancel);
+        document.getElementById('cancelModalKeepBtn')?.addEventListener('click', closeCancel);
+        cancelOverlay.addEventListener('click', e => {
+            if (e.target === cancelOverlay) closeCancel();
+        });
+
+        // One click only: a double click can't send the form twice.
+        cancelForm.addEventListener('submit', () => {
+            cancelSubmit.disabled = true;
+        });
+    }
+
     /* ───────────── Review modal ───────────── */
 
     const overlay = document.getElementById('reviewModalOverlay');

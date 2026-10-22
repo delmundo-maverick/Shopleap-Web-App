@@ -99,6 +99,9 @@ class PickupController extends Controller
 
     private function owned(Request $request, Order $order): CourierProfile
     {
+
+        abort_if($order->status === Order::STATUS_CANCELLED, 422, 'This order was cancelled. Do not collect the parcel.');
+        
         $courier = $request->attributes->get('courier');
 
         abort_unless($order->pickup_rider_id === $courier->id, 403, 'This pickup is not assigned to you.');

@@ -59,6 +59,20 @@
                     </p>
                 </div>
 
+                <div>
+                    <label for="return_window_days" class="mb-2 block text-sm font-semibold text-charcoal">
+                        Return/refund window (days after delivery)
+                    </label>
+                    <input type="number" id="return_window_days" name="return_window_days" min="1" max="30"
+                        required value="{{ old('return_window_days', $settings['return_window_days']) }}"
+                        class="frost-input w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition focus:ring-4 focus:ring-primary/10">
+                    <p class="mt-1 text-xs text-charcoal/50">
+                        Buyers can request a return or refund for this many days after the courier delivers. It applies to
+                        new
+                        requests only.
+                    </p>
+                </div>
+
                 <div class="flex justify-end border-t border-white/50 pt-5">
                     <button type="submit"
                         class="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white transition hover:bg-sky-blue">

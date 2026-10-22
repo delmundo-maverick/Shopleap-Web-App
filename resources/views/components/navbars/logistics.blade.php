@@ -2,7 +2,7 @@
 @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/css/navbar.css', 'resources/js/shared/navbar.js'])
 
 @php
-    // Add/rename/reorder logistics links here. `route => null` renders a "Soon" placeholder.
+    $unreadNotifications = auth()->user()->unreadNotifications()->count();
     $sections = [
         'Overview' => [
             [
@@ -70,6 +70,14 @@
                 'badge' => true,
                 'icon' =>
                     'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
+            ],
+            [
+                'key' => 'notifications',
+                'label' => 'Notifications',
+                'route' => 'notifications.index',
+                'count' => $unreadNotifications,
+                'icon' =>
+                    'M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 00-4-5.7V5a2 2 0 00-4 0v.3A6 6 0 006 11v3.2a2 2 0 01-.6 1.4L4 17h5m2 0v1a2 2 0 004 0v-1',
             ],
             [
                 'key' => 'help',
@@ -170,6 +178,9 @@
                         @elseif (!empty($link['badge']))
                             <span data-message-badge
                                 class="nav-label hidden shrink-0 rounded-full bg-sale-red px-1.5 py-0.5 text-[10px] font-bold text-white"></span>
+                        @elseif (!empty($link['count']))
+                            <span
+                                class="nav-label shrink-0 rounded-full bg-sale-red px-1.5 py-0.5 text-[10px] font-bold text-white">{{ $link['count'] }}</span>
                         @endif
                     </a>
                 @endforeach

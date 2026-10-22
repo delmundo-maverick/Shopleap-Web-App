@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Order;
+use App\Models\OrderReturn;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -11,19 +12,26 @@ class SellerReportService
 {
     public function build(int $sellerId, Carbon $from, Carbon $to): array
     {
+        // Amounts are net of approved/paid refunds (Order::scopeWithRefundTotals).
         $orders = Order::where('seller_id', $sellerId)
             ->whereBetween('created_at', [$from, $to])
-            ->get(['id', 'buyer_id', 'status', 'total_amount', 'commission_amount', 'created_at']);
+            ->select(['id', 'buyer_id', 'status', 'total_amount', 'commission_amount', 'created_at'])
+            ->withRefundTotals()
+            ->get();
 
         $realized = $orders->whereIn('status', Order::GROUP_REALIZED);
         $inProgress = $orders->whereIn('status', Order::GROUP_IN_PROGRESS);
         $lost = $orders->whereIn('status', Order::GROUP_LOST);
         $valid = $orders->whereNotIn('status', Order::GROUP_LOST);
 
+        $gross = fn(Collection $c) => (float) $c->sum(fn($o) => $o->net_items_amount);
+        $commission = fn(Collection $c) => (float) $c->sum(fn($o) => $o->net_commission_amount);
+
         $money = fn(Collection $c) => [
-            'gross' => round((float) $c->sum('total_amount'), 2),
-            'commission' => round((float) $c->sum('commission_amount'), 2),
-            'net' => round((float) $c->sum('total_amount') - (float) $c->sum('commission_amount'), 2),
+            'gross' => round($gross($c), 2),
+            'commission' => round($commission($c), 2),
+            'net' => round($gross($c) - $commission($c), 2),
+            'refunded' => round((float) $c->sum(fn($o) => $o->refunded_items ?? 0), 2),
             'count' => $c->count(),
         ];
 
@@ -35,8 +43,12 @@ class SellerReportService
 
         $validCount = $valid->count();
         $totalCount = $orders->count();
-        $validGross = (float) $valid->sum('total_amount');
+        $validGross = $gross($valid);
         $buyerOrderCounts = $valid->whereNotNull('buyer_id')->groupBy('buyer_id')->map->count();
+
+        $unitsSold = (int) $this->itemsQuery($sellerId, $from, $to)
+            ->selectRaw('COALESCE(SUM(order_items.quantity - COALESCE(ri.quantity, 0)), 0) as units')
+            ->value('units');
 
         $sales = [
             'total_orders' => $totalCount,
@@ -45,7 +57,7 @@ class SellerReportService
             'in_progress_orders' => $inProgress->count(),
             'lost_orders' => $lost->count(),
             'gross_sales' => round($validGross, 2),
-            'units_sold' => (int) $this->itemsQuery($sellerId, $from, $to)->sum('order_items.quantity'),
+            'units_sold' => $unitsSold,
             'average_order_value' => $validCount ? round($validGross / $validCount, 2) : 0.0,
             'cancellation_rate' => $totalCount ? round($lost->count() / $totalCount * 100, 1) : 0.0,
             'unique_buyers' => $buyerOrderCounts->count(),
@@ -64,12 +76,12 @@ class SellerReportService
             }
 
             $buckets[$key]['sales_orders']++;
-            $buckets[$key]['sales_gross'] += (float) $order->total_amount;
+            $buckets[$key]['sales_gross'] += $order->net_items_amount;
 
             if (in_array($order->status, Order::GROUP_REALIZED, true)) {
                 $buckets[$key]['earned_orders']++;
-                $buckets[$key]['earned_gross'] += (float) $order->total_amount;
-                $buckets[$key]['earned_commission'] += (float) $order->commission_amount;
+                $buckets[$key]['earned_gross'] += $order->net_items_amount;
+                $buckets[$key]['earned_commission'] += $order->net_commission_amount;
             }
         }
 
@@ -109,23 +121,24 @@ class SellerReportService
         ];
     }
 
-    /** Every product sold in the range (used by the Sales CSV export). */
+    /** Every product sold in the range, net of refunded items (used by the Sales CSV export). */
     public function productPerformance(int $sellerId, Carbon $from, Carbon $to): Collection
     {
         return $this->itemsQuery($sellerId, $from, $to)
             ->groupBy('order_items.product_id', 'order_items.product_name')
-            ->selectRaw('order_items.product_name as name, COUNT(DISTINCT order_items.order_id) as orders, SUM(order_items.quantity) as units, SUM(order_items.subtotal) as revenue')
+            ->selectRaw('order_items.product_name as name, COUNT(DISTINCT order_items.order_id) as orders, SUM(order_items.quantity - COALESCE(ri.quantity, 0)) as units, SUM(order_items.subtotal - COALESCE(ri.amount, 0)) as revenue')
             ->orderByDesc('units')
             ->orderByDesc('revenue')
             ->get();
     }
 
-    /** One row per order (used by the Financial CSV export). */
+    /** One row per order (used by the Financial CSV export). Includes refund totals: see the net_* accessors on Order. */
     public function ledger(int $sellerId, Carbon $from, Carbon $to): Collection
     {
         return Order::where('seller_id', $sellerId)
             ->whereBetween('created_at', [$from, $to])
             ->withSum('items', 'quantity')
+            ->withRefundTotals()
             ->orderBy('created_at')
             ->get();
     }
@@ -134,9 +147,20 @@ class SellerReportService
     {
         return DB::table('order_items')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->leftJoinSub($this->refundedLines(), 'ri', 'ri.order_item_id', '=', 'order_items.id')
             ->where('orders.seller_id', $sellerId)
             ->whereBetween('orders.created_at', [$from, $to])
             ->whereNotIn('orders.status', Order::GROUP_LOST);
+    }
+
+    /** Lines (and quantities) of approved or paid refunds, per order item. */
+    private function refundedLines()
+    {
+        return DB::table('order_return_items')
+            ->join('order_returns', 'order_returns.id', '=', 'order_return_items.order_return_id')
+            ->whereIn('order_returns.status', OrderReturn::REFUND_COUNTED)
+            ->groupBy('order_return_items.order_item_id')
+            ->selectRaw('order_return_items.order_item_id as order_item_id, SUM(order_return_items.quantity) as quantity, SUM(order_return_items.amount) as amount');
     }
 
     private function bucketKey(Carbon $date, string $granularity): string

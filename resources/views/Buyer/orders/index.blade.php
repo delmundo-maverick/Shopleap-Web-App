@@ -5,12 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-
     @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/pages/buyer/orders.js'])
-
     <title>My Orders | Shopleap</title>
 </head>
-
 @use('App\Models\Order')
 @use('Illuminate\Support\Str')
 
@@ -21,11 +18,27 @@
 
     {{-- Main Content --}}
     <main class="mx-auto w-full max-w-7xl flex-1 px-3 py-5 md:px-8 md:py-6">
-
         @if (session('status'))
             <div class="mb-5 rounded-xl border border-leaf-green/20 bg-leaf-green/10 px-4 py-3 text-sm text-leaf-green">
                 {{ session('status') }}
             </div>
+        @endif
+
+        {{-- ERROR BANNER --}}
+        @if ($errors->any())
+            <div role="alert"
+                class="mb-5 rounded-xl border border-sale-red/20 bg-sale-red/10 px-4 py-3 text-sm text-sale-red">
+                {{ $errors->first() }}
+            </div>
+        @endif
+
+        @php $unreadNotifications = auth()->user()->unreadNotifications()->count(); @endphp
+        @if ($unreadNotifications > 0)
+            <a href="{{ route('notifications.index') }}"
+                class="mb-5 flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-charcoal transition hover:bg-primary/10">
+                <span>You have <b>{{ $unreadNotifications }}</b> new update(s) about your orders.</span>
+                <span class="text-xs font-semibold text-primary">View</span>
+            </a>
         @endif
 
         {{-- TABS --}}
@@ -34,13 +47,12 @@
                 @foreach (Order::TAB_LABELS as $key => $label)
                     <a href="{{ route('buyer.orders.index', $key === 'all' ? [] : ['tab' => $key]) }}"
                         class="flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-3.5 text-center text-xs font-semibold transition sm:gap-1.5 sm:px-3 sm:text-sm
-                            {{ $tab === $key ? 'border-primary text-primary' : 'border-transparent text-charcoal/50 hover:text-charcoal' }}">
+                                {{ $tab === $key ? 'border-primary text-primary' : 'border-transparent text-charcoal/50 hover:text-charcoal' }}">
                         {{ $label }}
-
                         @if (($counts[$key] ?? 0) > 0)
                             <span
                                 class="rounded-full px-1.5 py-0.5 text-[10px] font-bold
-                                {{ $tab === $key ? 'bg-primary/10 text-primary' : 'bg-light-gray text-charcoal/50' }}">
+                                    {{ $tab === $key ? 'bg-primary/10 text-primary' : 'bg-light-gray text-charcoal/50' }}">
                                 {{ $counts[$key] }}
                             </span>
                         @endif
@@ -53,7 +65,6 @@
         @if ($tab === 'all')
             <form method="GET" action="{{ route('buyer.orders.index') }}" class="mb-5">
                 <input type="hidden" name="tab" value="all">
-
                 <div class="relative">
                     <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
                         <svg class="h-4 w-4 text-charcoal/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -61,7 +72,6 @@
                                 d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                     </div>
-
                     <input type="text" name="search" value="{{ request('search') }}"
                         placeholder="Search by order # or shop name..."
                         aria-label="Search orders by order number or shop name"
@@ -72,14 +82,12 @@
 
         {{-- EMPTY STATE --}}
         @if ($orders->isEmpty())
-
             <div
                 class="flex flex-col items-center justify-center rounded-lg bg-white p-8 text-center shadow-sm shadow-charcoal/5 sm:p-16">
                 <svg class="h-14 w-14 text-charcoal/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                         d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
-
                 <p class="mt-4 text-sm font-semibold text-charcoal">
                     @if ($tab === 'all' && request('search'))
                         No orders found matching "{{ request('search') }}"
@@ -87,7 +95,6 @@
                         {{ $tab === 'all' ? "You haven't placed any orders yet" : 'No orders in this category' }}
                     @endif
                 </p>
-
                 @if ($tab === 'all' && request('search'))
                     <a href="{{ route('buyer.orders.index') }}"
                         class="mt-5 rounded-xl border border-primary px-6 py-2.5 text-sm font-bold text-primary transition hover:bg-primary/5">
@@ -113,18 +120,22 @@
                             Order::STATUS_CANCELLED,
                             Order::STATUS_RETURNED,
                         ]);
-
                         $unreviewed = $order->items->filter(fn($i) => !$i->review);
                         $nextToRate = $unreviewed->first();
                         $canReorder = $order->items->contains(
                             fn($i) => $i->product && $i->product->status === 'active',
                         );
                         $chatProductId = $order->items->first(fn($i) => $i->product)?->product_id;
-
                         $timeline = $order->events->whereNotNull('status')->sortByDesc('id')->values();
                         $latest = $timeline->first();
+                        $cancelMode = $order->buyerCancelMode();
+                        $isCancelled = $order->status === Order::STATUS_CANCELLED;
+                        $inCancelWindow = in_array($order->status, Order::BUYER_CANCEL_REQUEST_FROM, true);
+                        $cancelPending = $order->cancel_request_status === 'pending' && $inCancelWindow;
+                        $cancelDeclined = $order->cancel_request_status === 'declined' && $inCancelWindow;
+                        $canReturn = $order->canRequestReturn();
+                        $returnRecord = $order->returns->sortByDesc('id')->first();
                     @endphp
-
                     <div class="overflow-hidden rounded-lg bg-white shadow-sm shadow-charcoal/5">
 
                         {{-- SHOP HEADER --}}
@@ -136,15 +147,12 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                         d="M3 9l1.5-5h15L21 9M3 9v1a3 3 0 006 0 3 3 0 006 0 3 3 0 006 0V9M3 9h18M5 13v7h14v-7" />
                                 </svg>
-
                                 <p class="truncate text-sm font-bold text-charcoal">{{ $shopName }}</p>
-
                                 <a href="{{ route('buyer.shop.show', $order->seller_id) }}"
                                     class="shrink-0 rounded-md border border-charcoal/15 px-2.5 py-1 text-[11px] font-semibold text-charcoal/70 transition hover:border-primary hover:text-primary">
                                     View Shop
                                 </a>
                             </div>
-
                             <span
                                 class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold {{ $order->status_color }}">
                                 {{ $order->status_label }}
@@ -163,7 +171,6 @@
                                         ->filter()
                                         ->implode(' · ');
                                 @endphp
-
                                 <div class="flex gap-3 px-4 py-4 sm:gap-4 sm:px-5">
                                     <div class="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-ice-blue/60">
                                         @if ($item->product && $item->product->main_image_url)
@@ -171,18 +178,14 @@
                                                 alt="{{ $item->product_name }}" class="h-full w-full object-cover">
                                         @endif
                                     </div>
-
                                     <div class="min-w-0 flex-1">
                                         <p class="line-clamp-2 text-sm font-semibold text-charcoal">
                                             {{ $item->product_name }}
                                         </p>
-
                                         @if ($options !== '')
                                             <p class="mt-0.5 text-xs text-charcoal/50">{{ $options }}</p>
                                         @endif
-
                                         <p class="mt-1 text-xs text-charcoal/50">x{{ $item->quantity }}</p>
-
                                         @if ($isCompleted && $item->review)
                                             <span
                                                 class="mt-1.5 inline-block rounded-md bg-leaf-green/10 px-2 py-0.5 text-[11px] font-bold text-leaf-green">
@@ -190,7 +193,6 @@
                                             </span>
                                         @endif
                                     </div>
-
                                     <p class="shrink-0 text-right text-sm font-semibold text-charcoal">
                                         ₱{{ number_format($item->price_at_purchase, 2) }}
                                     </p>
@@ -204,7 +206,6 @@
                                 <span class="text-xs text-charcoal/50">
                                     Order #{{ $order->id }} · {{ $order->created_at->format('M d, Y') }}
                                 </span>
-
                                 <div class="space-y-0.5 text-left text-xs text-charcoal/60 sm:text-right">
                                     <p>Merchandise Subtotal: ₱{{ number_format($order->total_amount, 2) }}</p>
                                     <p>Shipping Fee: ₱{{ number_format($order->shipping_fee, 2) }}</p>
@@ -230,36 +231,29 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                                 d="M3 7h11v9H3zM14 10h4l3 3v3h-7zM7 19a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM17 19a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
                                         </svg>
-
                                         <span class="truncate font-semibold text-leaf-green">
                                             {{ $latest->title }}
                                         </span>
-
                                         <span class="hidden shrink-0 text-charcoal/40 sm:inline">
                                             {{ $latest->created_at->format('M d, g:i A') }}
                                         </span>
                                     </span>
-
                                     <span class="shrink-0 text-xs font-semibold text-primary"
                                         x-text="open ? 'Hide' : 'Details'">Details</span>
                                 </button>
-
                                 <ol x-show="open" style="display: none;"
                                     class="mt-4 space-y-5 border-l-2 border-light-gray pl-5">
                                     @foreach ($timeline as $event)
                                         <li class="relative">
                                             <span
                                                 class="absolute -left-[1.7rem] top-1 h-3 w-3 rounded-full ring-4 ring-white {{ $loop->first ? 'bg-primary' : 'bg-charcoal/25' }}"></span>
-
                                             <p
                                                 class="text-sm {{ $loop->first ? 'font-bold text-charcoal' : 'text-charcoal/70' }}">
                                                 {{ $event->title }}
                                             </p>
-
                                             @if ($event->note)
                                                 <p class="text-xs text-charcoal/50">{{ $event->note }}</p>
                                             @endif
-
                                             <p class="text-[11px] text-charcoal/40">
                                                 {{ $event->created_at->format('M d, Y · g:i A') }}
                                             </p>
@@ -269,20 +263,69 @@
                             </div>
                         @endif
 
+                        {{-- CANCELLATION NOTICES --}}
+                        @if ($isCancelled)
+                            <div
+                                class="border-t border-light-gray bg-sale-red/5 px-4 py-3 text-xs text-charcoal/70 sm:px-5">
+                                <b class="text-sale-red">
+                                    Cancelled by
+                                    {{ $order->cancelled_by === 'buyer' ? 'you' : Order::CANCELLED_BY_LABELS[$order->cancelled_by] ?? 'the seller' }}
+                                </b>
+                                @if ($order->cancel_reason)
+                                    · {{ $order->cancel_reason }}
+                                @endif
+                                @if ($order->cancel_note)
+                                    <span class="block text-charcoal/50">{{ $order->cancel_note }}</span>
+                                @endif
+                            </div>
+                        @endif
+                        @if ($cancelPending)
+                            <div
+                                class="flex flex-wrap items-center justify-between gap-3 border-t border-light-gray bg-warning/10 px-4 py-3 text-xs sm:px-5">
+                                <p class="min-w-0 flex-1 text-charcoal/70">
+                                    <b>Cancellation requested</b> · waiting for the seller. If they don't respond by
+                                    {{ $order->cancel_requested_at->copy()->addHours(Order::CANCEL_REQUEST_AUTO_APPROVE_HOURS)->format('M d, g:i A') }},
+                                    your order is cancelled automatically.
+                                </p>
+                                <form method="POST"
+                                    action="{{ route('buyer.orders.cancel-request.withdraw', $order) }}">
+                                    @csrf
+                                    <button type="submit"
+                                        class="rounded-lg border border-charcoal/20 bg-white px-4 py-1.5 text-xs font-bold text-charcoal transition hover:border-primary hover:text-primary">
+                                        Withdraw request
+                                    </button>
+                                </form>
+                            </div>
+                        @endif
+                        @if ($cancelDeclined)
+                            <div
+                                class="border-t border-light-gray bg-sale-red/5 px-4 py-3 text-xs text-charcoal/70 sm:px-5">
+                                <b class="text-sale-red">The seller declined your cancellation request.</b>
+                                @if ($order->cancel_request_response)
+                                    <span class="block">Reason: {{ $order->cancel_request_response }}</span>
+                                @endif
+                                <span class="block text-charcoal/50">Use Contact Seller if you still need help.</span>
+                            </div>
+                        @endif
+                        @if ($canReturn)
+                            <div
+                                class="border-t border-light-gray bg-ice-blue/40 px-4 py-3 text-xs text-charcoal/60 sm:px-5">
+                                Something wrong with your order? You can request a return or refund until
+                                <b>{{ $order->returnWindowEndsAt()->format('M d') }}</b>.
+                            </div>
+                        @endif
+
                         {{-- ACTIONS --}}
                         <div
                             class="flex flex-wrap items-center justify-end gap-2 border-t border-light-gray bg-ice-blue/30 px-4 py-4 sm:px-5">
-
                             @if ($isDelivered)
                                 <p class="mr-auto w-full text-xs text-charcoal/60 sm:w-auto sm:flex-1">
                                     Your parcel was delivered. Please confirm you received it in good condition.
-
                                     @if ($order->delivered_at)
                                         If you don't respond, it will be completed automatically on
                                         {{ $order->delivered_at->copy()->addDays(Order::AUTO_COMPLETE_DAYS)->format('M d') }}.
                                     @endif
                                 </p>
-
                                 <form method="POST" action="{{ route('buyer.orders.confirm', $order) }}">
                                     @csrf
                                     <button type="submit"
@@ -291,7 +334,6 @@
                                     </button>
                                 </form>
                             @endif
-
                             @if ($isCompleted)
                                 @if ($nextToRate)
                                     <button type="button"
@@ -308,6 +350,31 @@
                                 @endif
                             @endif
 
+                            {{-- CANCEL ORDER BUTTON --}}
+                            @if ($cancelMode)
+                                <button type="button"
+                                    class="cancel-order-btn rounded-lg border border-sale-red/30 bg-white px-5 py-2 text-xs font-bold text-sale-red transition hover:bg-sale-red/5"
+                                    data-action="{{ route('buyer.orders.cancel', $order) }}"
+                                    data-mode="{{ $cancelMode }}" data-order-id="{{ $order->id }}">
+                                    {{ $cancelMode === 'request' ? 'Request Cancellation' : 'Cancel Order' }}
+                                </button>
+                            @endif
+                            @if ($canReturn)
+                                <a href="{{ route('buyer.orders.return.create', $order) }}"
+                                    class="rounded-lg border border-sale-red/30 bg-white px-5 py-2 text-xs font-bold text-sale-red transition hover:bg-sale-red/5">
+                                    Return / Refund
+                                </a>
+                            @endif
+                            @if ($returnRecord)
+                                <a href="{{ route('buyer.returns.show', $returnRecord) }}"
+                                    class="inline-flex items-center gap-2 rounded-lg border border-charcoal/20 bg-white px-5 py-2 text-xs font-bold text-charcoal transition hover:border-primary hover:text-primary">
+                                    View Return
+                                    <span
+                                        class="rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $returnRecord->status_color }}">
+                                        {{ $returnRecord->status_label }}
+                                    </span>
+                                </a>
+                            @endif
                             <button type="button"
                                 class="contact-seller-btn rounded-lg border border-charcoal/20 bg-white px-5 py-2 text-xs font-bold text-charcoal transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
                                 data-open-url="{{ route('messages.open') }}"
@@ -315,7 +382,6 @@
                                 data-recipient-id="{{ $order->seller_id }}" data-product-id="{{ $chatProductId }}">
                                 Contact Seller
                             </button>
-
                             @if ($canBuyAgain)
                                 @if ($canReorder)
                                     <form method="POST" action="{{ route('buyer.orders.buy-again', $order) }}">
@@ -333,7 +399,6 @@
                                 @endif
                             @endif
                         </div>
-
                     </div>
                 @endforeach
             </div>
@@ -342,24 +407,69 @@
             <div class="mt-6">
                 {{ $orders->onEachSide(1)->links() }}
             </div>
-
         @endif
-
     </main>
+
+    {{-- CANCEL ORDER MODAL --}}
+    <div id="cancelModalOverlay" data-hours="{{ Order::CANCEL_REQUEST_AUTO_APPROVE_HOURS }}"
+        class="fixed inset-0 z-[95] hidden items-end justify-center bg-charcoal/50 p-0 sm:items-center sm:p-4">
+        <form id="cancelModalForm" method="POST"
+            class="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-6 shadow-2xl sm:max-w-md sm:rounded-2xl">
+            @csrf
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wide text-sale-red">Cancel Order</p>
+                    <p id="cancelModalOrder" class="mt-1 text-sm font-semibold text-charcoal">#</p>
+                </div>
+                <button type="button" id="cancelModalCloseBtn" aria-label="Close"
+                    class="shrink-0 rounded-full p-1.5 text-charcoal/40 transition hover:bg-ice-blue hover:text-charcoal">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <p id="cancelModalHelp"
+                class="mt-4 rounded-xl bg-ice-blue/60 p-3 text-xs leading-relaxed text-charcoal/70">
+            </p>
+            <label for="cancelReason" class="mb-2 mt-5 block text-sm font-semibold text-charcoal">
+                Reason <span class="text-sale-red">\*</span>
+            </label>
+            <select id="cancelReason" name="reason" required
+                class="w-full rounded-xl border border-light-gray bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
+                <option value="" disabled selected>Select a reason…</option>
+                @foreach (Order::BUYER_CANCEL_REASONS as $reason)
+                    <option value="{{ $reason }}">{{ $reason }}</option>
+                @endforeach
+            </select>
+            <label for="cancelNote" class="mb-2 mt-4 block text-sm font-semibold text-charcoal">
+                Note <span class="font-normal text-charcoal/40">(optional)</span>
+            </label>
+            <textarea id="cancelNote" name="note" rows="3" maxlength="255"
+                class="w-full resize-none rounded-xl border border-light-gray px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"></textarea>
+            <div class="mt-6 flex gap-3">
+                <button type="button" id="cancelModalKeepBtn"
+                    class="flex-1 rounded-xl border border-charcoal/20 px-4 py-3 text-sm font-bold text-charcoal transition hover:bg-ice-blue">
+                    Keep Order
+                </button>
+                <button type="submit" id="cancelModalSubmit"
+                    class="flex-1 rounded-xl bg-sale-red px-4 py-3 text-sm font-bold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60">
+                    Cancel Order
+                </button>
+            </div>
+        </form>
+    </div>
 
     {{-- WRITE A REVIEW MODAL --}}
     <div id="reviewModalOverlay"
         class="fixed inset-0 z-[95] hidden items-end justify-center bg-charcoal/50 p-0 sm:items-center sm:p-4">
-
         <div
             class="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-6 shadow-2xl sm:max-w-md sm:rounded-2xl">
-
             <div class="flex items-start justify-between">
                 <div>
                     <p class="text-xs font-bold uppercase tracking-wide text-primary">Write a Review</p>
                     <p id="reviewModalProductName" class="mt-1 text-sm font-semibold text-charcoal">Product name</p>
                 </div>
-
                 <button type="button" id="reviewModalCloseBtn"
                     class="shrink-0 rounded-full p-1.5 text-charcoal/40 transition hover:bg-ice-blue hover:text-charcoal">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -368,13 +478,9 @@
                     </svg>
                 </button>
             </div>
-
             <div class="my-5 h-px bg-light-gray"></div>
-
             <input type="hidden" id="reviewRatingInput">
-
             <p class="mb-2 text-sm font-semibold text-charcoal">Your Rating</p>
-
             <div class="flex gap-1.5">
                 @for ($i = 0; $i < 5; $i++)
                     <button type="button" class="star-btn rounded p-0.5"
@@ -387,47 +493,36 @@
                     </button>
                 @endfor
             </div>
-
             <p class="mb-2 mt-5 text-sm font-semibold text-charcoal">Your Review</p>
-
             <textarea id="reviewComment" rows="4" maxlength="1000"
                 placeholder="Share your experience with this product..."
                 class="w-full resize-none rounded-xl border border-light-gray px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"></textarea>
-
             <p class="mb-2 mt-5 text-sm font-semibold text-charcoal">
                 Add Photos/Videos
                 <span class="font-normal text-charcoal/40">(optional)</span>
             </p>
-
             <label for="reviewMediaInput"
                 class="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-light-gray bg-ice-blue/40 px-4 py-3 text-xs font-semibold text-charcoal/60 transition hover:border-primary/40">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                         d="M12 16V4m0 0L8 8m4-4l4 4M5 20h14" />
                 </svg>
-
                 Upload up to 5 photos or videos
-
-                <input type="file" id="reviewMediaInput" multiple accept="image/*,video/*" class="sr-only">
+                <input type="file" id="reviewMediaInput" multiple accept="image/\*,video/\*" class="sr-only">
             </label>
-
             <div id="reviewMediaPreview" class="mt-3 grid grid-cols-5 gap-2"></div>
-
             <p id="reviewError"
                 class="mt-4 hidden rounded-lg bg-sale-red/10 px-3 py-2 text-xs font-semibold text-sale-red"></p>
-
             <button type="button" id="reviewSubmitBtn"
                 class="mt-6 w-full rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:opacity-60">
                 Submit Review
             </button>
-
         </div>
     </div>
 
     {{-- Footer and Message Widget --}}
     <x-Buyer.message-widget />
     <x-footer />
-
 </body>
 
 </html>

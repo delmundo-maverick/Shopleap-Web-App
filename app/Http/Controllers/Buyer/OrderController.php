@@ -7,7 +7,9 @@ use App\Http\Controllers\Controller;
 use App\Models\CartItem;
 use App\Models\Order;
 use App\Models\ProductVariant;
+use App\Services\OrderCancellation;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
@@ -21,7 +23,9 @@ class OrderController extends Controller
 
         $counts = ['all' => (clone $baseQuery)->count()];
         foreach (Order::TAB_GROUPS as $key => $statuses) {
-            $counts[$key] = (clone $baseQuery)->whereIn('status', $statuses)->count();
+            $counts[$key] = $key === 'return_refund'
+                ? (clone $baseQuery)->returnOrRefund()->count()
+                : (clone $baseQuery)->whereIn('status', $statuses)->count();
         }
 
         $ordersQuery = Order::with([
@@ -29,11 +33,14 @@ class OrderController extends Controller
             'items.review',
             'seller.sellerProfile',
             'events',
+            'returns',
         ])
             ->where('buyer_id', $request->user()->id)
             ->latest();
 
-        if ($tab !== 'all' && isset(Order::TAB_GROUPS[$tab])) {
+        if ($tab === 'return_refund') {
+            $ordersQuery->returnOrRefund();
+        } elseif ($tab !== 'all' && isset(Order::TAB_GROUPS[$tab])) {
             $ordersQuery->whereIn('status', Order::TAB_GROUPS[$tab]);
         }
 
@@ -53,6 +60,70 @@ class OrderController extends Controller
             compact('orders', 'tab', 'counts'),
             $this->cartSummary($request)
         ));
+    }
+
+    /**
+     * Cancel an order that has not shipped yet.
+     * PLACED: cancelled right away. CONFIRMED / PREPARING / READY_FOR_PICKUP: a request the seller must approve.
+     */
+    public function cancel(Request $request, Order $order, OrderCancellation $cancellation)
+    {
+        abort_unless($order->buyer_id === $request->user()->id, 403);
+
+        $data = $request->validate([
+            'reason' => ['required', Rule::in(Order::BUYER_CANCEL_REASONS)],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $note = filled($data['note'] ?? null) ? trim($data['note']) : null;
+        $mode = $order->buyerCancelMode();
+
+        if ($mode === 'instant') {
+            $done = $cancellation->cancel(
+                $order,
+                'buyer',
+                $data['reason'],
+                $note,
+                $request->user()->id,
+                Order::BUYER_CANCEL_INSTANT_FROM
+            );
+
+            if ($done) {
+                return redirect()
+                    ->route('buyer.orders.index', ['tab' => 'cancelled'])
+                    ->with('status', "Order #{$order->id} was cancelled.");
+            }
+
+            return back()->withErrors(['cancel' => 'The seller just confirmed your order, so it can no longer be cancelled right away. Please send a cancellation request instead.']);
+        }
+
+        if ($mode === 'request') {
+            if ($cancellation->request($order, $data['reason'], $note, $request->user()->id)) {
+                return back()->with('status', 'Cancellation request sent. The seller has ' . Order::CANCEL_REQUEST_AUTO_APPROVE_HOURS . ' hours to respond. If they don\'t, your order is cancelled automatically.');
+            }
+
+            return back()->withErrors(['cancel' => 'This order was just updated. Please refresh and try again.']);
+        }
+
+        $message = match (true) {
+            $order->status === Order::STATUS_CANCELLED => 'This order is already cancelled.',
+            $order->cancel_request_status === 'pending' => 'You already sent a cancellation request for this order.',
+            $order->cancel_request_status === 'declined' => 'The seller declined your cancellation request. Please contact the seller.',
+            default => "This order has already shipped, so it can't be cancelled. You can ask for a return or refund once it is delivered.",
+        };
+
+        return back()->withErrors(['cancel' => $message]);
+    }
+
+    public function withdrawCancelRequest(Request $request, Order $order, OrderCancellation $cancellation)
+    {
+        abort_unless($order->buyer_id === $request->user()->id, 403);
+
+        if ($cancellation->withdraw($order, $request->user()->id)) {
+            return back()->with('status', 'Cancellation request withdrawn.');
+        }
+
+        return back()->withErrors(['cancel' => 'There is no pending cancellation request for this order.']);
     }
 
     /**
