@@ -41,6 +41,7 @@
                         <p class="text-sm text-charcoal/55">{{ $logs->total() }} event(s) recorded</p>
                     </div>
                 </div>
+                <x-notification-bell />
             </header>
 
             <main class="flex-1 space-y-5 p-6">

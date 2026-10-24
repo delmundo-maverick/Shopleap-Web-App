@@ -36,6 +36,7 @@
                             Logistics</p>
                     </div>
                 </div>
+                <x-notification-bell />
             </header>
 
             <main class="flex min-h-0 flex-1 flex-col gap-2 p-3 sm:p-4">

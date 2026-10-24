@@ -69,6 +69,7 @@
                         <p class="text-sm text-charcoal/55">Your shop profile, pickup address and security</p>
                     </div>
                 </div>
+                <x-notification-bell />
             </header>
 
             <main class="flex-1 p-6">

@@ -41,6 +41,7 @@
                         @endif
                     </div>
                 </div>
+                <x-notification-bell />
             </header>
 
             <main class="flex-1 space-y-5 p-6">

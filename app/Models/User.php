@@ -64,6 +64,11 @@ class User extends Authenticatable
         return $this->hasMany(CartItem::class);
     }
 
+    public function wishlistItems()
+    {
+        return $this->hasMany(WishlistItem::class);
+    }
+
     public function conversations()
     {
         return $this->belongsToMany(Conversation::class, 'conversation_participants')

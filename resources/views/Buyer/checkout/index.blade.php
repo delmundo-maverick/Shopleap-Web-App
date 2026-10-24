@@ -11,7 +11,7 @@
     <title>Checkout | Shopleap</title>
 </head>
 
-<body class="bg-ice-blue text-charcoal">
+<body class="flex min-h-screen flex-col bg-ice-blue text-charcoal">
 
     <header class="sticky top-0 z-40 border-b border-white/10 bg-primary">
         <div class="mx-auto flex h-16 max-w-5xl items-center justify-between px-5 sm:px-8">
@@ -44,7 +44,7 @@
         </div>
     </header>
 
-    <main class="mx-auto max-w-5xl px-5 py-6 sm:px-8">
+    <main class="mx-auto w-full max-w-5xl flex-1 px-5 py-6 sm:px-8">
 
         {{-- STEP INDICATOR --}}
         <div class="mb-6 flex items-center justify-center gap-3 text-xs font-semibold text-charcoal/40 sm:text-sm">

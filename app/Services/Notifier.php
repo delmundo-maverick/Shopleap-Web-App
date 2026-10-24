@@ -348,6 +348,269 @@ class Notifier
         }
     }
 
+    // ── Order progress (called from Order::logStatusEvent) ──
+
+    public function orderStatusChanged(Order $order, string $status, ?string $note, ?int $actorId): void
+    {
+        // Cancellations carry their reason and are handled by orderCancelled().
+        if ($status === Order::STATUS_CANCELLED) {
+            return;
+        }
+
+        $order->loadMissing(['buyer', 'seller.sellerProfile', 'logisticsProfile.user', 'deliveryRider']);
+
+        $no = "#{$order->id}";
+        $meta = ['order_id' => $order->id, 'status' => $status];
+        $buyerUrl = route('buyer.orders.index', ['tab' => $this->buyerTab($status)], false);
+        $sellerUrl = route('seller.orders.show', $order, false);
+        $cash = '₱' . number_format($order->grand_total, 2);
+
+        switch ($status) {
+            case Order::STATUS_PLACED:
+                $items = (int) $order->items()->sum('quantity');
+                $this->send(
+                    $order->seller,
+                    $actorId,
+                    'order.placed',
+                    'New order',
+                    "Order {$no} from {$order->buyer_name}: {$items} item(s), ₱" . number_format((float) $order->total_amount, 2) . '. Confirm it to start preparing.',
+                    $sellerUrl,
+                    $meta
+                );
+                break;
+
+            case Order::STATUS_CONFIRMED:
+                $this->send(
+                    $order->buyer,
+                    $actorId,
+                    'order.confirmed',
+                    'Order confirmed',
+                    "The seller confirmed order {$no}.",
+                    $buyerUrl,
+                    $meta
+                );
+                break;
+
+            case Order::STATUS_PREPARING:
+                // A note means the pickup was being re-arranged, not a new step.
+                if ($note === null) {
+                    $this->send(
+                        $order->buyer,
+                        $actorId,
+                        'order.preparing',
+                        'Seller is preparing your order',
+                        "The seller is packing order {$no}.",
+                        $buyerUrl,
+                        $meta
+                    );
+                }
+                break;
+
+            case Order::STATUS_READY_FOR_PICKUP:
+                $this->send(
+                    $order->buyer,
+                    $actorId,
+                    'order.ready',
+                    'Order packed',
+                    "Order {$no} is packed and waiting for the courier.",
+                    $buyerUrl,
+                    $meta
+                );
+
+                $shop = $order->seller?->sellerProfile?->business_name ?? $order->seller?->name;
+                $slot = Order::PICKUP_SLOTS[$order->pickup_time_slot] ?? '';
+                $this->send(
+                    $order->logisticsProfile?->user,
+                    $actorId,
+                    'pickup.requested',
+                    'New pickup request',
+                    "Order {$no} from {$shop}: pickup on {$order->pickup_date?->format('M d')} ({$slot}). Assign a rider.",
+                    route('logistics.pickups.index', [], false),
+                    $meta
+                );
+                break;
+
+            case Order::STATUS_PICKED_UP:
+                $this->send(
+                    $order->buyer,
+                    $actorId,
+                    'order.picked_up',
+                    'Parcel picked up',
+                    "Order {$no} was picked up by the courier.",
+                    $buyerUrl,
+                    $meta
+                );
+                $this->send(
+                    $order->seller,
+                    $actorId,
+                    'order.picked_up',
+                    'Parcel collected',
+                    "Order {$no} was collected by the courier.",
+                    $sellerUrl,
+                    $meta
+                );
+                break;
+
+            case Order::STATUS_AT_SORTING_CENTER:
+                $this->send(
+                    $order->buyer,
+                    $actorId,
+                    'order.at_hub',
+                    'Arrived at the sorting center',
+                    "Order {$no} arrived at the sorting center.",
+                    $buyerUrl,
+                    $meta
+                );
+                break;
+
+            case Order::STATUS_ASSIGNED_TO_RIDER:
+                // The first assignment is internal; a note with failed attempts means a reschedule.
+                if ($note !== null && $order->delivery_attempts > 0) {
+                    $this->send(
+                        $order->buyer,
+                        $actorId,
+                        'order.rescheduled',
+                        'Delivery rescheduled',
+                        "Order {$no}: we'll try delivering again (attempt " . ($order->delivery_attempts + 1) . ' of ' . Order::MAX_DELIVERY_ATTEMPTS . ').',
+                        $buyerUrl,
+                        $meta
+                    );
+                }
+                break;
+
+            case Order::STATUS_OUT_FOR_DELIVERY:
+                $rider = $order->deliveryRider?->full_name;
+                $this->send(
+                    $order->buyer,
+                    $actorId,
+                    'order.out_for_delivery',
+                    'Out for delivery',
+                    "Order {$no} is out for delivery." . ($rider ? " Your rider is {$rider}." : '') . " Please prepare {$cash} cash.",
+                    $buyerUrl,
+                    $meta
+                );
+                break;
+
+            case Order::STATUS_DELIVERED:
+                $this->send(
+                    $order->buyer,
+                    $actorId,
+                    'order.delivered',
+                    'Parcel delivered',
+                    "Order {$no} was delivered. Please confirm you received it in good condition.",
+                    $buyerUrl,
+                    $meta
+                );
+                $this->send(
+                    $order->seller,
+                    $actorId,
+                    'order.delivered',
+                    'Order delivered',
+                    "Order {$no} was delivered. It completes when the buyer confirms, or automatically after " . Order::AUTO_COMPLETE_DAYS . ' days.',
+                    $sellerUrl,
+                    $meta
+                );
+                break;
+
+            case Order::STATUS_DELIVERY_FAILED:
+                $this->send(
+                    $order->buyer,
+                    $actorId,
+                    'order.delivery_failed',
+                    'Delivery unsuccessful',
+                    "We couldn't deliver order {$no}." . ($note ? " {$note}" : ''),
+                    $buyerUrl,
+                    $meta
+                );
+                break;
+
+            case Order::STATUS_RETURNED:
+                $this->send(
+                    $order->buyer,
+                    $actorId,
+                    'order.returned',
+                    'Parcel returned to the seller',
+                    "Order {$no} couldn't be delivered and is being returned to the seller.",
+                    $buyerUrl,
+                    $meta
+                );
+                $this->send(
+                    $order->seller,
+                    $actorId,
+                    'order.returned',
+                    'Parcel returned to you',
+                    "Order {$no} couldn't be delivered after {$order->delivery_attempts} attempt(s) and is coming back to you.",
+                    $sellerUrl,
+                    $meta
+                );
+                break;
+
+            case Order::STATUS_COMPLETED:
+                $earned = '₱' . number_format((float) $order->total_amount - (float) $order->commission_amount, 2);
+                $this->send(
+                    $order->seller,
+                    $actorId,
+                    'order.completed',
+                    'Order completed',
+                    "Order {$no} is complete. Your earnings: {$earned}.",
+                    $sellerUrl,
+                    $meta
+                );
+
+                // When the buyer confirmed it themselves they are the actor and aren't notified.
+                $until = $order->returnWindowEndsAt()?->format('M d');
+                $this->send(
+                    $order->buyer,
+                    $actorId,
+                    'order.completed',
+                    'Order completed',
+                    "Order {$no} was completed automatically." . ($until ? " You can still rate it or request a return/refund until {$until}." : ''),
+                    $buyerUrl,
+                    $meta
+                );
+                break;
+        }
+    }
+
+    public function pickupAssigned(Order $order, \App\Models\CourierProfile $rider, ?int $actorId): void
+    {
+        $slot = Order::PICKUP_SLOTS[$order->pickup_time_slot] ?? '';
+
+        $this->send(
+            $order->seller,
+            $actorId,
+            'pickup.assigned',
+            'Pickup scheduled',
+            "Order #{$order->id}: {$rider->full_name} will collect it on {$order->pickup_date?->format('M d')} ({$slot}).",
+            route('seller.orders.show', $order, false),
+            ['order_id' => $order->id]
+        );
+    }
+
+    public function pickupDeclined(Order $order, string $hubName, string $reason, ?int $actorId): void
+    {
+        $this->send(
+            $order->seller,
+            $actorId,
+            'pickup.declined',
+            'Pickup request declined',
+            "Order #{$order->id}: {$hubName} can't collect it ({$reason}). Please choose another sorting center.",
+            route('seller.orders.show', $order, false),
+            ['order_id' => $order->id]
+        );
+    }
+
+    private function buyerTab(string $status): string
+    {
+        foreach (Order::TAB_GROUPS as $tab => $statuses) {
+            if (in_array($status, $statuses, true)) {
+                return $tab;
+            }
+        }
+
+        return 'all';
+    }
+
     // ── Internals ──
 
     /** @return Collection<int, User> */

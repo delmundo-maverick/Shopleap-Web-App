@@ -499,7 +499,15 @@ class Order extends Model
         );
     }
 
-        // ── Refunds in reports ──
+    public function scopeWithoutReturnRequests($query)
+    {
+        return $query->whereDoesntHave(
+            'returns',
+            fn($q) => $q->whereIn('status', OrderReturn::BLOCKING_STATUSES)
+        );
+    }
+
+    // ── Refunds in reports ──
 
     public function scopeWithRefundTotals($query)
     {
@@ -571,19 +579,32 @@ class Order extends Model
     }
 
     // ── Tracking timeline ──
-
-    /** Public event — shown to the buyer, seller and logistics. */
     public function logStatusEvent(
         ?string $note = null,
         ?int $actorId = null
     ): OrderEvent {
-        return $this->events()->create([
-            'actor_id' => $actorId ?? Auth::id(),
-            'status' => $this->status,
-            'title' => self::TIMELINE_TITLES[$this->status]
-                ?? $this->status_label,
+        $actorId = $actorId ?? Auth::id();
+        $status = $this->status;
+
+        $event = $this->events()->create([
+            'actor_id' => $actorId,
+            'status' => $status,
+            'title' => self::TIMELINE_TITLES[$status] ?? $this->status_label,
             'note' => $note,
         ]);
+
+        $order = $this;
+
+        DB::afterCommit(function () use ($order, $status, $note, $actorId) {
+            try {
+                app(\App\Services\Notifier::class)
+                    ->orderStatusChanged($order->fresh() ?? $order, $status, $note, $actorId);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        });
+
+        return $event;
     }
 
     /** Internal note — seller and logistics only, never shown to the buyer. */

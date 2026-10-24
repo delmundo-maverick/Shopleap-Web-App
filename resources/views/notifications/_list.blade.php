@@ -24,11 +24,14 @@
             $data = $notification->data;
             $isUnread = is_null($notification->read_at);
             $kind = $data['kind'] ?? '';
+
             $label = str_starts_with($kind, 'cancel')
                 ? 'Cancellation'
                 : (str_starts_with($kind, 'return')
                     ? 'Return / Refund'
-                    : 'Update');
+                    : (str_starts_with($kind, 'order') || str_starts_with($kind, 'pickup')
+                        ? 'Order'
+                        : 'Update'));
         @endphp
 
         <form method="POST" action="{{ route('notifications.read', $notification->id) }}">

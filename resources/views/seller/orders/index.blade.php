@@ -29,7 +29,6 @@
             <header
                 class="frost-panel-solid sticky top-0 z-10 flex h-16 items-center justify-between gap-3 border-b border-white/50 px-4 sm:h-20 sm:px-6">
                 <div class="flex min-w-0 items-center gap-2 sm:gap-3">
-                    {{-- Same toggle as the dashboard --}}
                     <button type="button" data-sidebar-toggle aria-label="Open menu"
                         class="frost-btn shrink-0 rounded-xl p-2 text-charcoal/60 transition hover:text-primary lg:hidden">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -43,6 +42,9 @@
                         <p class="truncate text-xs text-charcoal/55 sm:text-sm">{{ $orders->total() }} order(s) total
                         </p>
                     </div>
+                </div>
+                <div class="flex shrink-0 items-center gap-4">
+                    <x-notification-bell />
                 </div>
             </header>
 
