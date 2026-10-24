@@ -36,23 +36,7 @@
                         <p class="text-sm text-charcoal/55">Welcome back, {{ auth()->user()->name ?? 'Admin' }}</p>
                     </div>
                 </div>
-
-                <div class="flex items-center gap-4">
-
-                    <div class="flex items-center gap-2.5">
-                        <div
-                            class="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
-                            {{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 1)) }}
-                        </div>
-                        <div class="hidden sm:block">
-                            <p class="text-sm font-semibold text-charcoal leading-tight">
-                                {{ auth()->user()->name ?? 'Admin' }}</p>
-                            <p class="text-xs text-charcoal/50 leading-tight">Super Admin</p>
-                        </div>
-                    </div>
-
-                </div>
-
+                <x-notification-bell />
             </header>
 
 

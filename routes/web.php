@@ -61,6 +61,7 @@ use App\Http\Controllers\Buyer\{
     ProductController as BuyerProductController,
     ReviewController as BuyerReviewController,
     ShopController,
+    WishlistController,
     AccountController as BuyerAccountController,
     ReturnController as BuyerReturnController,
 };
@@ -230,6 +231,7 @@ Route::middleware('auth')
     ->group(function () {
         Route::get('/', 'index')->name('index');
         Route::post('/read-all', 'readAll')->name('read-all');
+        Route::get('/feed', 'feed')->middleware('throttle:120,1')->name('feed');
         Route::post('/{id}/read', 'read')->name('read');
     });
 
@@ -672,6 +674,22 @@ Route::middleware(['auth', 'buyer'])
 
                 Route::delete('/cart', 'destroyMany')
                     ->name('destroyMany');
+            });
+
+        // Wishlist
+        Route::prefix('wishlist')
+            ->name('wishlist.')
+            ->controller(WishlistController::class)
+            ->group(function () {
+                Route::get('/', 'index')->name('index');
+
+                Route::post('/{product}', 'store')
+                    ->middleware('throttle:60,1')
+                    ->name('store');
+
+                Route::delete('/{product}', 'destroy')
+                    ->middleware('throttle:60,1')
+                    ->name('destroy');
             });
 
         // Checkout

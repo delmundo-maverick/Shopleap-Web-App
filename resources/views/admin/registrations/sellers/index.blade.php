@@ -68,12 +68,7 @@
                         </p>
                     </div>
                 </div>
-
-                <div
-                    class="hidden items-center gap-2 rounded-full border border-white/60 bg-white/70 px-4 py-2 text-xs font-medium text-charcoal/60 sm:flex">
-                    <span class="h-2 w-2 rounded-full bg-seller"></span>
-                    Sellers workspace
-                </div>
+                <x-notification-bell />
             </header>
 
             <main class="flex-1 space-y-5 p-6">

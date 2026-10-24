@@ -21,11 +21,18 @@ class OrderController extends Controller
 
         $baseQuery = Order::where('buyer_id', $request->user()->id);
 
+        // Tab badges. The Completed count uses the same condition as the list below,
+        // so the number always matches the orders shown.
         $counts = ['all' => (clone $baseQuery)->count()];
         foreach (Order::TAB_GROUPS as $key => $statuses) {
-            $counts[$key] = $key === 'return_refund'
-                ? (clone $baseQuery)->returnOrRefund()->count()
-                : (clone $baseQuery)->whereIn('status', $statuses)->count();
+            $counts[$key] = match ($key) {
+                'return_refund' => (clone $baseQuery)->returnOrRefund()->count(),
+                'completed' => (clone $baseQuery)
+                    ->whereIn('status', $statuses)
+                    ->withoutReturnRequests()
+                    ->count(),
+                default => (clone $baseQuery)->whereIn('status', $statuses)->count(),
+            };
         }
 
         $ordersQuery = Order::with([
@@ -40,6 +47,11 @@ class OrderController extends Controller
 
         if ($tab === 'return_refund') {
             $ordersQuery->returnOrRefund();
+        } elseif ($tab === 'completed') {
+            // Orders with an active or settled return/refund live under Return/Refund instead.
+            $ordersQuery
+                ->whereIn('status', Order::TAB_GROUPS['completed'])
+                ->withoutReturnRequests();
         } elseif ($tab !== 'all' && isset(Order::TAB_GROUPS[$tab])) {
             $ordersQuery->whereIn('status', Order::TAB_GROUPS[$tab]);
         }

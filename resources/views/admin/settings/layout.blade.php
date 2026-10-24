@@ -37,6 +37,7 @@
                         <p class="text-sm text-charcoal/55">@yield('subtitle')</p>
                     </div>
                 </div>
+                <x-notification-bell />
             </header>
 
             <main class="flex-1 p-6">
