@@ -140,6 +140,7 @@ class MessagingController extends Controller
             ->where('id', '!=', $user->id)
             ->with(['sellerProfile', 'logisticsProfile', 'courierProfile'])
             ->get()
+            ->filter(fn($u) => MessagingPolicy::canMessage($user, $u))
             ->map(fn($u) => [
                 'id' => $u->id,
                 'name' => $u->messaging_name,
