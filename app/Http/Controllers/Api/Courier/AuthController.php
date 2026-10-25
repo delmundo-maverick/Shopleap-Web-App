@@ -24,6 +24,10 @@ class AuthController extends Controller
     /** Step 1: validate, upload documents, keep the data in the cache and email the OTP. */
     public function register(Request $request, OtpService $otp): JsonResponse
     {
+        $request->merge([
+            'email' => strtolower(trim((string) $request->input('email'))),
+        ]);
+
         $v = $request->validate([
             'hub_id' => ['required', 'integer'],
             'last_name' => ['required', 'string', 'max:100'],
@@ -37,6 +41,7 @@ class AuthController extends Controller
             'municipality' => ['required', 'string', 'not_regex:/^\d+$/'],
             'barangay' => ['required', 'string', 'not_regex:/^\d+$/'],
             'street_address' => ['required', 'string', 'max:255'],
+            'house_number' => ['nullable', 'string', 'max:50'],
             'vehicle_type' => ['required', 'string', 'max:50'],
             'plate_number' => ['required', 'string', 'max:20'],
             'license_upload' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
@@ -73,6 +78,7 @@ class AuthController extends Controller
                 'municipality' => $v['municipality'],
                 'barangay' => $v['barangay'],
                 'street_address' => $v['street_address'],
+                'house_number' => $v['house_number'] ?? null,
                 'vehicle_type' => $v['vehicle_type'],
                 'plate_number' => $v['plate_number'],
                 'license_upload_path' => $request->file('license_upload')->store('courier_uploads/licenses', 'r2'),
@@ -114,6 +120,7 @@ class AuthController extends Controller
         });
 
         Cache::forget($this->cacheKey($email));
+        $otp->consume($email, 'courier');
 
         return response()->json(
             ['message' => 'Email verified. Your application was sent to the sorting center for approval.'],
@@ -225,6 +232,77 @@ class AuthController extends Controller
         return response()->json(['message' => 'Application resubmitted.', 'courier' => $this->payload($courier->fresh('logisticsProfile'))]);
     }
 
+    /**
+     * Always return the same response to avoid revealing whether a rider
+     * account exists for the supplied email address.
+     */
+    public function forgotPassword(Request $request, OtpService $otp): JsonResponse
+    {
+        $email = strtolower(trim(
+            $request->validate(['email' => ['required', 'email']])['email']
+        ));
+
+        $isRider = User::whereRaw('LOWER(email) = ?', [$email])
+            ->where('role', 'courier')
+            ->whereNotNull('email_verified_at')
+            ->exists();
+
+        if ($isRider) {
+            try {
+                $otp->generateAndSend($email, 'courier_reset', 'reset');
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        return response()->json([
+            'message' => 'If that email belongs to a rider account, a code was sent.',
+        ]);
+    }
+
+    public function resetPassword(Request $request, OtpService $otp): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'otp' => ['required', 'digits:6'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $email = strtolower(trim($data['email']));
+
+        $user = User::whereRaw('LOWER(email) = ?', [$email])
+            ->where('role', 'courier')
+            ->first();
+
+        if (! $user) {
+            return response()->json([
+                'message' => 'Invalid or expired code.',
+            ], 422);
+        }
+
+        [$ok, $message] = $otp->verify(
+            $email,
+            'courier_reset',
+            $data['otp']
+        );
+
+        if (! $ok) {
+            return response()->json(['message' => $message], 422);
+        }
+
+        // The User model's hashed cast should hash this password.
+        $user->update(['password' => $data['password']]);
+
+        // Revoke all Sanctum tokens so every device must sign in again.
+        $user->tokens()->delete();
+
+        $otp->consume($email, 'courier_reset');
+
+        return response()->json([
+            'message' => 'Password changed. Please sign in.',
+        ]);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
@@ -247,6 +325,13 @@ class AuthController extends Controller
             'rejection_reason' => $p->rejection_reason,
             'vehicle_type' => $p->vehicle_type,
             'plate_number' => $p->plate_number,
+            'contact_no' => $p->contact_no,
+            'house_number' => $p->house_number,
+            'street_address' => $p->street_address,
+            'province' => $p->province,
+            'municipality' => $p->municipality,
+            'barangay' => $p->barangay,
+            'avatar_url' => $p->user?->avatar_url,
             'hub' => $p->logisticsProfile ? [
                 'id' => $p->logisticsProfile->id,
                 'name' => $p->logisticsProfile->business_name,

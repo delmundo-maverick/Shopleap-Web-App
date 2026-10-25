@@ -74,6 +74,16 @@ class Notifier
                 route('logistics.pickups.index', [], false),
                 $meta
             );
+
+            $this->send(
+                $order->pickupRider?->user,
+                $actorId,
+                'cancel.pickup_rider',
+                'Pickup cancelled',
+                "Order {$no} was cancelled. Do not collect the parcel.",
+                null,
+                $meta
+            );
         }
     }
 
@@ -357,7 +367,7 @@ class Notifier
             return;
         }
 
-        $order->loadMissing(['buyer', 'seller.sellerProfile', 'logisticsProfile.user', 'deliveryRider']);
+        $order->loadMissing(['buyer', 'seller.sellerProfile', 'logisticsProfile.user', 'deliveryRider.user']);
 
         $no = "#{$order->id}";
         $meta = ['order_id' => $order->id, 'status' => $status];
@@ -464,6 +474,17 @@ class Notifier
                 break;
 
             case Order::STATUS_ASSIGNED_TO_RIDER:
+                $ship = $order->ship_to;
+                $this->send(
+                    $order->deliveryRider?->user,
+                    $actorId,
+                    'delivery.assigned',
+                    'New delivery assigned',
+                    "Order {$no} to Brgy. {$ship['barangay']}, {$ship['municipality']}. Cash to collect: {$cash}.",
+                    null,
+                    $meta
+                );
+
                 // The first assignment is internal; a note with failed attempts means a reschedule.
                 if ($note !== null && $order->delivery_attempts > 0) {
                     $this->send(
@@ -583,6 +604,19 @@ class Notifier
             'Pickup scheduled',
             "Order #{$order->id}: {$rider->full_name} will collect it on {$order->pickup_date?->format('M d')} ({$slot}).",
             route('seller.orders.show', $order, false),
+            ['order_id' => $order->id]
+        );
+
+        $rider->loadMissing('user');
+
+        $this->send(
+            $rider->user,
+            $actorId,
+            'pickup.assigned_rider',
+            'New pickup assigned',
+            "Order #{$order->id}: collect from " . ($order->seller?->sellerProfile?->business_name ?? $order->seller?->name)
+                . " on {$order->pickup_date?->format('M d')} ({$slot}). Please accept it.",
+            null,
             ['order_id' => $order->id]
         );
     }
