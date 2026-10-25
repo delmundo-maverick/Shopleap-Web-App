@@ -2,10 +2,12 @@
 
 use App\Http\Controllers\Api\Courier\AccountController;
 use App\Http\Controllers\Api\Courier\AuthController;
+use App\Http\Controllers\Api\Courier\ChatController;
 use App\Http\Controllers\Api\Courier\DashboardController;
 use App\Http\Controllers\Api\Courier\DeliveryController;
 use App\Http\Controllers\Api\Courier\EarningsController;
 use App\Http\Controllers\Api\Courier\HistoryController;
+use App\Http\Controllers\Api\Courier\NotificationController;
 use App\Http\Controllers\Api\Courier\PickupController;
 use App\Http\Controllers\Api\HubController;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +41,7 @@ Route::prefix('courier')->group(function () {
     // Signed-in couriers, regardless of approval state.
     // Pending, rejected, and approved couriers can access these routes.
     Route::middleware(['auth:sanctum', 'courier'])->group(function () {
+
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/reapply', [AuthController::class, 'reapply']);
@@ -72,5 +75,25 @@ Route::prefix('courier')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'summary']);
         Route::get('/history', [HistoryController::class, 'index']);
         Route::get('/earnings', [EarningsController::class, 'index']);
+
+        // Notifications.
+        Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::post('/notifications/read-all', [NotificationController::class, 'readAll']);
+        Route::post('/notifications/{id}/read', [NotificationController::class, 'read']);
+
+        // Chat and messaging.
+        Route::prefix('chat')->group(function () {
+            Route::get('/contacts', [ChatController::class, 'contacts']);
+            Route::get('/conversations', [ChatController::class, 'conversations']);
+            Route::get('/unread-count', [ChatController::class, 'unreadCount']);
+            Route::post('/open', [ChatController::class, 'open']);
+
+            Route::get('/{conversation}/messages', [ChatController::class, 'messages']);
+
+            Route::post('/{conversation}/messages', [ChatController::class, 'store'])
+                ->middleware('throttle:60,1');
+
+            Route::post('/{conversation}/hide', [ChatController::class, 'destroy']);
+        });
     });
 });
