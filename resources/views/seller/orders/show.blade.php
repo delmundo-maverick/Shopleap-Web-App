@@ -145,6 +145,9 @@
                                                 <p class="text-xs text-charcoal/50">
                                                     ₱{{ number_format($item->price_at_purchase, 2) }}
                                                     × {{ $item->quantity }}
+                                                    @if ($item->weight_kg !== null)
+                                                        · {{ number_format((float) $item->weight_kg, 2) }} kg
+                                                    @endif
                                                 </p>
                                             </div>
 
@@ -162,6 +165,15 @@
                                             ₱{{ number_format($order->total_amount, 2) }}
                                         </span>
                                     </div>
+
+                                    @if (($order->total_weight_kg ?? 0) > 0)
+                                        <div class="seller-order-summary-row flex justify-between text-charcoal/50">
+                                            <span>Estimated Parcel Weight</span>
+                                            <span class="shrink-0">
+                                                {{ number_format($order->total_weight_kg, 2) }} kg
+                                            </span>
+                                        </div>
+                                    @endif
 
                                     <div class="seller-order-summary-row flex justify-between text-charcoal/50">
                                         <span>Platform Commission ({{ $order->commission_rate_label }})</span>

@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const productData = JSON.parse(document.getElementById('productData').textContent);
-    const { productId, basePrice, baseStock, variants, hasOptions } = productData;
+    const { productId, basePrice, baseStock, variants, hasOptions, primaryImage, selectedVariantId } = productData;
 
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
     const checkoutRoute = document.getElementById('productPageData')?.dataset.checkoutRoute;
@@ -8,18 +8,39 @@ document.addEventListener('DOMContentLoaded', () => {
     let modalIntent = 'cart';
 
     // ---------------------------------------------------
-    // THUMBNAIL SWITCHING
+    // THUMBNAIL / MAIN IMAGE SWITCHING
     // ---------------------------------------------------
-    document.querySelectorAll('.thumb-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            document.getElementById('mainImage').src = this.dataset.thumb;
-            document.querySelectorAll('.thumb-btn').forEach(b => {
-                b.classList.remove('border-primary');
-                b.classList.add('border-transparent');
-            });
-            this.classList.remove('border-transparent');
-            this.classList.add('border-primary');
+    const mainImage = document.getElementById('mainImage');
+    const modalImage = document.getElementById('modalVariantImage');
+
+    function setMainImage(url) {
+        if (!url || !mainImage) return;
+
+        mainImage.src = url;
+
+        if (modalImage) {
+            modalImage.src = url;
+        }
+
+        // Keep the active thumbnail in step. When a variant image is not part
+        // of the general gallery, no general thumbnail is marked active.
+        document.querySelectorAll('.thumb-btn').forEach(btn => {
+            const active = btn.dataset.thumb === url;
+
+            btn.classList.toggle('border-primary', active);
+            btn.classList.toggle('border-transparent', !active);
+            btn.classList.toggle('hover:border-primary/50', !active);
+            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
         });
+    }
+
+    function applyVariantImage(variant) {
+        // Variant image first, then the primary general image.
+        setMainImage(variant?.image_url || primaryImage);
+    }
+
+    document.querySelectorAll('.thumb-btn').forEach(btn => {
+        btn.addEventListener('click', () => setMainImage(btn.dataset.thumb));
     });
 
     // ---------------------------------------------------
@@ -35,31 +56,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalQtyInput = document.getElementById('modalQtyInput');
     const modalConfirmBtn = document.getElementById('modalConfirmBtn');
 
-    function resetVariantSelection() {
-        Object.keys(selectedOptions).forEach(k => delete selectedOptions[k]);
-        selectedVariant = null;
-
-        document.querySelectorAll('.variant-value-btn').forEach(b => {
-            b.classList.remove('border-primary', 'bg-primary/5', 'text-primary');
-            b.classList.add('border-light-gray', 'text-charcoal');
-        });
-
-        if (modalQtyInput) {
-            modalQtyInput.value = 1;
-            modalQtyInput.max = baseStock;
-        }
-        if (modalWarning) modalWarning.classList.add('hidden');
-        if (modalConfirmBtn) modalConfirmBtn.disabled = true;
-
-        updateModalPriceStock();
-    }
-
     function openVariantModal(intent = 'cart') {
         modalIntent = intent;
-        resetVariantSelection();
+
+        // The inline variation chips share this selection state, so keep it
+        // instead of clearing what the buyer already picked.
+        if (modalQtyInput) {
+            modalQtyInput.value = 1;
+        }
+
         if (modalConfirmBtn) {
             modalConfirmBtn.textContent = intent === 'buyNow' ? 'Buy Now' : 'Add to Cart';
         }
+
+        resolveSelectedVariant();
+
         variantModalOverlay.classList.remove('hidden');
         variantModalOverlay.classList.add('flex');
     }
@@ -76,12 +87,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             document.querySelectorAll(`.variant-value-btn[data-option-name="${groupName}"]`)
                 .forEach(sibling => {
-                    sibling.classList.remove('border-primary', 'bg-primary/5', 'text-primary');
-                    sibling.classList.add('border-light-gray', 'text-charcoal');
-                });
+                    const active = sibling.dataset.optionValue === value;
 
-            this.classList.remove('border-light-gray', 'text-charcoal');
-            this.classList.add('border-primary', 'bg-primary/5', 'text-primary');
+                    sibling.classList.toggle('border-primary', active);
+                    sibling.classList.toggle('bg-primary/5', active);
+                    sibling.classList.toggle('bg-white', !active);
+                    sibling.classList.toggle('text-primary', active);
+                    sibling.classList.toggle('border-light-gray', !active);
+                    sibling.classList.toggle('text-charcoal', !active);
+                    sibling.setAttribute('aria-pressed', active ? 'true' : 'false');
+                });
 
             selectedOptions[groupName] = value;
             resolveSelectedVariant();
@@ -97,6 +112,8 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedVariant = null;
             if (modalConfirmBtn) modalConfirmBtn.disabled = true;
             if (modalWarning) modalWarning.classList.add('hidden');
+            setMainImage(primaryImage);
+            updateModalPriceStock();
             return;
         }
 
@@ -106,6 +123,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (modalWarning) modalWarning.classList.toggle('hidden', !!selectedVariant);
         if (modalConfirmBtn) modalConfirmBtn.disabled = !selectedVariant || selectedVariant.stock_quantity < 1;
+
+        if (selectedVariant) {
+            applyVariantImage(selectedVariant);
+        } else {
+            setMainImage(primaryImage);
+        }
 
         updateModalPriceStock();
     }
@@ -121,6 +144,41 @@ document.addEventListener('DOMContentLoaded', () => {
             if (parseInt(modalQtyInput.value) > stock) modalQtyInput.value = stock > 0 ? 1 : 0;
         }
     }
+
+    /**
+     * If the page was opened with a preselected variant (e.g. ?variant=123),
+     * highlight its options and show its image straight away.
+     */
+    function preselectInitialVariant() {
+        if (!selectedVariantId) return;
+
+        const variant = variants.find(v => Number(v.id) === Number(selectedVariantId));
+        if (!variant) return;
+
+        selectedVariant = variant;
+
+        document.querySelectorAll('.variant-value-btn').forEach(btn => {
+            const active = variant.options?.[btn.dataset.optionName] === btn.dataset.optionValue;
+
+            btn.classList.toggle('border-primary', active);
+            btn.classList.toggle('bg-primary/5', active);
+            btn.classList.toggle('bg-white', !active);
+            btn.classList.toggle('text-primary', active);
+            btn.classList.toggle('border-light-gray', !active);
+            btn.classList.toggle('text-charcoal', !active);
+            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+
+            if (active) {
+                selectedOptions[btn.dataset.optionName] = btn.dataset.optionValue;
+            }
+        });
+
+        if (modalConfirmBtn) modalConfirmBtn.disabled = variant.stock_quantity < 1;
+        updateModalPriceStock();
+        applyVariantImage(variant);
+    }
+
+    preselectInitialVariant();
 
     document.getElementById('modalQtyMinus')?.addEventListener('click', () => {
         modalQtyInput.value = Math.max(1, parseInt(modalQtyInput.value || 1) - 1);
@@ -222,18 +280,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('addToCartBtn')?.addEventListener('click', function () {
         if (hasOptions) {
-            openVariantModal('cart');
+            // Chips in the product page select the variant directly. Only fall
+            // back to the modal when a complete combination is still missing.
+            if (!selectedVariant || selectedVariant.stock_quantity < 1) {
+                openVariantModal('cart');
+                return;
+            }
+
+            addToCart(1, selectedVariant.id, selectedOptions, false);
             return;
         }
+
         const quantity = Math.max(1, Math.min(parseInt(qtyInput.max), parseInt(qtyInput.value || 1)));
         addToCart(quantity, null, null, false);
     });
 
     document.getElementById('buyNowBtn')?.addEventListener('click', function () {
         if (hasOptions) {
-            openVariantModal('buyNow');
+            if (!selectedVariant) {
+                openVariantModal('buyNow');
+                return;
+            }
+
+            // Buy Now goes straight to checkout with the selected variant.
+            addToCart(1, selectedVariant.id, selectedOptions, true);
             return;
         }
+
         const quantity = Math.max(1, Math.min(parseInt(qtyInput.max), parseInt(qtyInput.value || 1)));
         addToCart(quantity, null, null, true);
     });
@@ -250,6 +323,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const cartModalOverlay = document.getElementById('cartModalOverlay');
 
     function openCartModal() {
+        const image = document.getElementById('cartModalImage');
+
+        if (image) {
+            image.src = selectedVariant?.image_url || primaryImage || image.src;
+        }
+
         cartModalOverlay.classList.remove('hidden');
         cartModalOverlay.classList.add('flex');
     }

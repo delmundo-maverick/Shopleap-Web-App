@@ -1,70 +1,53 @@
-
 <?php
 
+use App\Http\Controllers\Admin\ActivityLogController;
+use App\Http\Controllers\Admin\BuyerManagementController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\LogisticsManagementController;
+use App\Http\Controllers\Admin\PlatformSettingController;
+use App\Http\Controllers\Admin\ReturnController as AdminReturnController;
+use App\Http\Controllers\Admin\SellerManagementController;
+use App\Http\Controllers\Admin\TransactionController;
+use App\Http\Controllers\Auth\BuyerRegistrationController;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\LogisticsRegistrationController;
+use App\Http\Controllers\Auth\SellerRegistrationController;
+use App\Http\Controllers\Buyer\AccountController as BuyerAccountController;
+use App\Http\Controllers\Buyer\CartController;
+use App\Http\Controllers\Buyer\CheckoutController;
+use App\Http\Controllers\Buyer\HomeController as BuyerHomeController;
+use App\Http\Controllers\Buyer\OrderController as BuyerOrderController;
+use App\Http\Controllers\Buyer\ProductController as BuyerProductController;
+use App\Http\Controllers\Buyer\ReturnController as BuyerReturnController;
+use App\Http\Controllers\Buyer\ReviewController as BuyerReviewController;
+use App\Http\Controllers\Buyer\ShopController;
+use App\Http\Controllers\Buyer\WishlistController;
+use App\Http\Controllers\Buyer\VoucherController as BuyerVoucherController;
+use App\Http\Controllers\Seller\ShopVoucherController;
+use App\Http\Controllers\LandingController;
+use App\Http\Controllers\Logistics\DashboardController as LogisticsDashboardController;
+use App\Http\Controllers\Logistics\DeliveryController;
+use App\Http\Controllers\Logistics\IncomingParcelController;
+use App\Http\Controllers\Logistics\PickupController;
+use App\Http\Controllers\Logistics\RiderController;
+use App\Http\Controllers\Logistics\ServiceAreaController;
+use App\Http\Controllers\Logistics\SortingController;
+use App\Http\Controllers\MessagingController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PolicyController;
+use App\Http\Controllers\ReturnMediaController;
+use App\Http\Controllers\Seller\AccountController as SellerAccountController;
+use App\Http\Controllers\Seller\DashboardController as SellerDashboardController;
+use App\Http\Controllers\Seller\OrderController as SellerOrderController;
+use App\Http\Controllers\Seller\ProductController as SellerProductController;
+use App\Http\Controllers\Seller\ProductDiscountController as SellerProductDiscountController;
+use App\Http\Controllers\Seller\ReportController as SellerReportController;
+use App\Http\Controllers\Seller\ReturnController as SellerReturnController;
+use App\Http\Controllers\Seller\ReviewController as SellerReviewController;
+use App\Http\Controllers\Seller\WaybillController;
+use App\Http\Controllers\SupportController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schedule;
-
-use App\Http\Controllers\{
-    LandingController,
-    MessagingController,
-    PolicyController,
-    SupportController,
-    ReturnMediaController,
-    NotificationController
-};
-
-use App\Http\Controllers\Auth\{
-    BuyerRegistrationController,
-    LoginController,
-    LogisticsRegistrationController,
-    SellerRegistrationController,
-};
-
-use App\Http\Controllers\Admin\{
-    ActivityLogController,
-    BuyerManagementController,
-    DashboardController as AdminDashboardController,
-    LogisticsManagementController,
-    PlatformSettingController,
-    SellerManagementController,
-    TransactionController,
-    ReturnController as AdminReturnController,
-};
-
-use App\Http\Controllers\Logistics\{
-    DashboardController as LogisticsDashboardController,
-    DeliveryController,
-    IncomingParcelController,
-    PickupController,
-    RiderController,
-    ServiceAreaController,
-    SortingController,
-};
-
-use App\Http\Controllers\Seller\{
-    AccountController as SellerAccountController,
-    DashboardController as SellerDashboardController,
-    OrderController as SellerOrderController,
-    ProductController as SellerProductController,
-    ReportController as SellerReportController,
-    ReviewController as SellerReviewController,
-    WaybillController,
-    ProductDiscountController as SellerProductDiscountController,
-    ReturnController as SellerReturnController,
-};
-
-use App\Http\Controllers\Buyer\{
-    CartController,
-    CheckoutController,
-    HomeController as BuyerHomeController,
-    OrderController as BuyerOrderController,
-    ProductController as BuyerProductController,
-    ReviewController as BuyerReviewController,
-    ShopController,
-    WishlistController,
-    AccountController as BuyerAccountController,
-    ReturnController as BuyerReturnController,
-};
 
 /*
 |--------------------------------------------------------------------------
@@ -217,7 +200,6 @@ Route::middleware('auth')
         });
     });
 
-
 /*
 |--------------------------------------------------------------------------
 | Notifications (any authenticated user)
@@ -234,7 +216,6 @@ Route::middleware('auth')
         Route::get('/feed', 'feed')->middleware('throttle:120,1')->name('feed');
         Route::post('/{id}/read', 'read')->name('read');
     });
-
 
 /*
 |--------------------------------------------------------------------------
@@ -512,6 +493,22 @@ Route::middleware(['auth', 'seller'])
                 Route::post('/{product}/status', 'updateStatus')
                     ->name('status');
 
+                // General product images (max 5) and the optional image per variant.
+                Route::post('/{product}/images', 'storeImage')
+                    ->name('images.store');
+
+                Route::post('/{product}/images/{image}', 'updateImage')
+                    ->name('images.update');
+
+                Route::delete('/{product}/images/{image}', 'destroyImage')
+                    ->name('images.destroy');
+
+                Route::post('/{product}/variants/{variant}/image', 'storeVariantImage')
+                    ->name('variants.image');
+
+                Route::delete('/{product}/variants/{variant}/image', 'destroyVariantImage')
+                    ->name('variants.image.destroy');
+
                 Route::get('/{product}/discount', [
                     SellerProductDiscountController::class,
                     'edit',
@@ -618,6 +615,22 @@ Route::middleware(['auth', 'seller'])
                     ->name('problem');
             });
 
+        // Shop Vouchers
+        Route::prefix('vouchers')
+            ->name('vouchers.')
+            ->controller(ShopVoucherController::class)
+            ->group(function () {
+                Route::get('/', 'index')->name('index');
+                Route::get('/create', 'create')->name('create');
+                Route::post('/', 'store')->name('store');
+                Route::get('/{shopVoucher}', 'show')->name('show');
+                Route::get('/{shopVoucher}/edit', 'edit')->name('edit');
+                Route::put('/{shopVoucher}', 'update')->name('update');
+                Route::patch('/{shopVoucher}', 'update');
+                Route::post('/{shopVoucher}/toggle', 'toggle')->name('toggle');
+                Route::post('/generate-code', 'generateCode')->name('generate-code');
+            });
+
         // Account
         Route::prefix('account')
             ->name('account.')
@@ -690,6 +703,16 @@ Route::middleware(['auth', 'buyer'])
                 Route::delete('/{product}', 'destroy')
                     ->middleware('throttle:60,1')
                     ->name('destroy');
+            });
+
+        // Vouchers
+        Route::prefix('vouchers')
+            ->name('vouchers.')
+            ->controller(BuyerVoucherController::class)
+            ->group(function () {
+                Route::get('/', 'index')->name('index');
+                Route::get('/dropdown', 'dropdown')->name('dropdown');
+                Route::post('/apply', 'apply')->name('apply');
             });
 
         // Checkout

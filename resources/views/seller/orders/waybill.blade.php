@@ -202,6 +202,12 @@
         @endif
     </table>
 
+    @if (($order->total_weight_kg ?? 0) > 0)
+        <p class="muted" style="font-size: 7px; margin-top: 4px;">
+            Parcel weight: {{ number_format($order->total_weight_kg, 2) }} kg
+        </p>
+    @endif
+
     <div class="cod">
         <table>
             <tr>

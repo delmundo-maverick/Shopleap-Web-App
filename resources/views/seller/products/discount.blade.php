@@ -76,8 +76,8 @@
                     <section
                         class="flex items-center gap-4 rounded-2xl border border-light-gray bg-white p-5 shadow-sm shadow-charcoal/5">
                         <div class="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-ice-blue/60">
-                            @if ($product->images->first())
-                                <img src="{{ $product->images->first()->url }}" alt=""
+                            @if ($product->main_image_url)
+                                <img src="{{ $product->main_image_url }}" alt=""
                                     class="h-full w-full object-cover">
                             @endif
                         </div>

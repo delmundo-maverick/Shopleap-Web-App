@@ -15,7 +15,7 @@ class SellerReportService
         // Amounts are net of approved/paid refunds (Order::scopeWithRefundTotals).
         $orders = Order::where('seller_id', $sellerId)
             ->whereBetween('created_at', [$from, $to])
-            ->select(['id', 'buyer_id', 'status', 'total_amount', 'commission_amount', 'created_at'])
+            ->select(['id', 'buyer_id', 'status', 'total_amount', 'commission_amount', 'voucher_discount', 'created_at'])
             ->withRefundTotals()
             ->get();
 
@@ -32,6 +32,7 @@ class SellerReportService
             'commission' => round($commission($c), 2),
             'net' => round($gross($c) - $commission($c), 2),
             'refunded' => round((float) $c->sum(fn($o) => $o->refunded_items ?? 0), 2),
+            'voucher_discount' => round((float) $c->sum(fn($o) => $o->voucher_discount ?? 0), 2),
             'count' => $c->count(),
         ];
 

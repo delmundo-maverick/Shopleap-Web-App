@@ -6,6 +6,35 @@ use Symfony\Component\Console\Input\ArgvInput;
 
 define('LARAVEL_START', microtime(true));
 
+// `php artisan serve` launches a child PHP process, so hand it our local
+// upload limits (php.d/99-upload-limits.ini) without changing the global
+// php.ini. Both putenv() and $_SERVER are needed: Symfony Process on Windows
+// builds the child environment from the intersection of the two.
+$uploadIniDir = __DIR__.'/php.d';
+
+if (is_dir($uploadIniDir)) {
+    $configuredScanDirs = getenv('PHP_INI_SCAN_DIR');
+
+    // If no scan dir is configured, start from PHP's compile-time default
+    // (e.g. /usr/local/etc/php/conf.d) so child processes keep loading the
+    // extensions and settings we are not overriding. An explicitly empty
+    // value means scanning was disabled, so leave it that way.
+    if ($configuredScanDirs === false && defined('PHP_CONFIG_FILE_SCAN_DIR')) {
+        $configuredScanDirs = (string) PHP_CONFIG_FILE_SCAN_DIR;
+    }
+
+    $scanDirs = array_filter(explode(PATH_SEPARATOR, (string) $configuredScanDirs));
+
+    if (! in_array($uploadIniDir, $scanDirs, true)) {
+        $scanDirs[] = $uploadIniDir;
+    }
+
+    $scanDirValue = implode(PATH_SEPARATOR, $scanDirs);
+
+    putenv('PHP_INI_SCAN_DIR='.$scanDirValue);
+    $_SERVER['PHP_INI_SCAN_DIR'] = $scanDirValue;
+}
+
 // Register the Composer autoloader...
 require __DIR__.'/vendor/autoload.php';
 

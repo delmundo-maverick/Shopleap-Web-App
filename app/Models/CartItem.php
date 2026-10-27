@@ -44,4 +44,31 @@ class CartItem extends Model
     {
         return $this->quantity * $this->unit_price;
     }
+
+    /**
+     * Weight of one unit, in kilograms: the variant's effective weight when a
+     * variant is selected, otherwise the product's default weight.
+     */
+    public function getUnitWeightKgAttribute(): ?float
+    {
+        // Avoid loading the variant's product relation: the cart item already
+        // holds the product, so use it as the fallback.
+        $weight = $this->variant
+            ? ($this->variant->weight_kg ?? $this->product?->weight_kg)
+            : $this->product?->weight_kg;
+
+        return $weight !== null ? (float) $weight : null;
+    }
+
+    /**
+     * Total weight for this cart line (unit weight x quantity), or null when unknown.
+     */
+    public function getLineWeightKgAttribute(): ?float
+    {
+        $unitWeight = $this->unit_weight_kg;
+
+        return $unitWeight === null
+            ? null
+            : round($unitWeight * $this->quantity, 3);
+    }
 }

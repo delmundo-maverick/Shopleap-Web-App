@@ -17,6 +17,7 @@ const emptyForm = () => ({
     price: '',
     discount_price: '',
     stock_quantity: '',
+    weight_kg: '',
 });
 
 const csrfToken = () => document.querySelector('meta[name="csrf-token"]').content;
@@ -43,6 +44,27 @@ async function api(url, { method = 'GET', body } = {}) {
     };
 }
 
+/** Same wrapper for multipart uploads. Never set Content-Type: the browser adds the boundary. */
+async function upload(url, formData, method = 'POST') {
+    const res = await fetch(url, {
+        method,
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrfToken(),
+        },
+        body: formData,
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    return {
+        ok: res.ok && data.success !== false,
+        status: res.status,
+        data,
+    };
+}
+
 export default function productsPage(config) {
     let toastTimer = null;
 
@@ -52,7 +74,9 @@ export default function productsPage(config) {
         modalOpen: false,
         loading: true,
         saving: false,
+        imageBusy: false,
         productId: null,
+        status: 'active',
         subcategories: [],
         images: [],
         form: emptyForm(),
@@ -78,6 +102,17 @@ export default function productsPage(config) {
         // --- helpers ---
         url(name, id) {
             return config.routes[name].replace('__ID__', id);
+        },
+
+        /** For nested routes with more than one placeholder. */
+        urlFor(name, params) {
+            let url = config.routes[name];
+
+            Object.entries(params).forEach(([key, value]) => {
+                url = url.replace(`__${key.toUpperCase()}__`, value);
+            });
+
+            return url;
         },
 
         row(id) {
@@ -151,11 +186,17 @@ export default function productsPage(config) {
                     price: data.price,
                     discount_price: data.discount_price ?? '',
                     stock_quantity: data.stock_quantity,
+                    weight_kg: data.weight_kg ?? '',
                 };
                 this.populateSubcategories(data.category, data.subcategory);
                 this.images = data.images;
+                this.status = data.status ?? 'active';
                 this.hasVariants = !!data.has_variants;
-                this.variants = (data.variants || []).map((v) => ({ ...v, sku: v.sku ?? '' }));
+                this.variants = (data.variants || []).map((v) => ({
+                    ...v,
+                    sku: v.sku ?? '',
+                    weight_kg: v.weight_kg ?? '',
+                }));
                 this.loading = false;
                 this.updateRow(id, data);
             } catch {
@@ -169,6 +210,7 @@ export default function productsPage(config) {
             this.loading = true;
             this.productId = null;
             this.images = [];
+            this.status = 'active';
             this.hasVariants = false;
             this.variants = [];
             this.errors = {};
@@ -181,6 +223,7 @@ export default function productsPage(config) {
                 description: this.form.description,
                 category: this.form.category,
                 subcategory: this.form.subcategory || null,
+                weight_kg: this.form.weight_kg === '' ? null : this.form.weight_kg,
             };
 
             // Variant products: price/stock live on the variants; the server recalculates the product.
@@ -191,6 +234,7 @@ export default function productsPage(config) {
                         id: v.id,
                         price: v.price,
                         stock_quantity: v.stock_quantity,
+                        weight_kg: v.weight_kg === '' || v.weight_kg === null ? null : v.weight_kg,
                         sku: v.sku || null,
                         is_active: !!v.is_active,
                     })),
@@ -222,7 +266,15 @@ export default function productsPage(config) {
 
                 // Take the server's canonical values back (trimmed SKUs, recalculated totals).
                 if (this.hasVariants && result.data.variants) {
-                    this.variants = result.data.variants.map((v) => ({ ...v, sku: v.sku ?? '' }));
+                    this.variants = result.data.variants.map((v) => ({
+                        ...v,
+                        sku: v.sku ?? '',
+                        weight_kg: v.weight_kg ?? '',
+                    }));
+                }
+
+                if (result.data.product) {
+                    this.form.weight_kg = result.data.product.weight_kg ?? '';
                 }
 
                 this.updateRow(this.productId, result.data.product);
@@ -243,14 +295,153 @@ export default function productsPage(config) {
                     body: { status },
                 });
 
-                if (!result.ok) return this.handleFailure(result);
+                if (!result.ok) {
+                    const statusError = result.data?.errors?.status?.[0];
+
+                    if (statusError) {
+                        this.showToast(statusError, true);
+                        return;
+                    }
+
+                    return this.handleFailure(result);
+                }
 
                 this.showToast(result.data.message);
+                this.status = result.data.status;
                 this.updateRowStatus(this.productId, result.data.status);
             } catch {
                 this.showToast('Network error. Please try again.', true);
             } finally {
                 this.saving = false;
+            }
+        },
+
+        // --- product images ---
+        async uploadImage(event) {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+
+            if (!file || this.imageBusy) return;
+
+            this.imageBusy = true;
+            this.errors = {};
+
+            try {
+                const body = new FormData();
+                body.append('image', file);
+
+                const result = await upload(this.url('images', this.productId), body);
+
+                if (!result.ok) return this.handleFailure(result);
+
+                this.images = result.data.images || this.images;
+                this.showToast(result.data.message);
+            } catch {
+                this.showToast('Network error. Please try again.', true);
+            } finally {
+                this.imageBusy = false;
+            }
+        },
+
+        async replaceImage(image, event) {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+
+            if (!file || this.imageBusy) return;
+
+            this.imageBusy = true;
+            this.errors = {};
+
+            try {
+                const body = new FormData();
+                body.append('image', file);
+
+                const result = await upload(
+                    this.urlFor('imageUpdate', { id: this.productId, image: image.id }),
+                    body
+                );
+
+                if (!result.ok) return this.handleFailure(result);
+
+                this.images = result.data.images || this.images;
+                this.showToast(result.data.message);
+            } catch {
+                this.showToast('Network error. Please try again.', true);
+            } finally {
+                this.imageBusy = false;
+            }
+        },
+
+        async removeImage(image) {
+            if (this.imageBusy || !window.confirm('Remove this product image?')) return;
+
+            this.imageBusy = true;
+
+            try {
+                const result = await api(
+                    this.urlFor('imageDestroy', { id: this.productId, image: image.id }),
+                    { method: 'DELETE' }
+                );
+
+                if (!result.ok) return this.handleFailure(result);
+
+                this.images = result.data.images || this.images;
+                this.showToast(result.data.message);
+            } catch {
+                this.showToast('Network error. Please try again.', true);
+            } finally {
+                this.imageBusy = false;
+            }
+        },
+
+        // --- variant images ---
+        async uploadVariantImage(variant, event) {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+
+            if (!file || this.imageBusy) return;
+
+            this.imageBusy = true;
+
+            try {
+                const body = new FormData();
+                body.append('image', file);
+
+                const result = await upload(
+                    this.urlFor('variantImage', { id: this.productId, variant: variant.id }),
+                    body
+                );
+
+                if (!result.ok) return this.handleFailure(result);
+
+                variant.image_url = result.data.image_url;
+                this.showToast(result.data.message);
+            } catch {
+                this.showToast('Network error. Please try again.', true);
+            } finally {
+                this.imageBusy = false;
+            }
+        },
+
+        async removeVariantImage(variant) {
+            if (this.imageBusy || !window.confirm('Remove this variant image?')) return;
+
+            this.imageBusy = true;
+
+            try {
+                const result = await api(
+                    this.urlFor('variantImageDestroy', { id: this.productId, variant: variant.id }),
+                    { method: 'DELETE' }
+                );
+
+                if (!result.ok) return this.handleFailure(result);
+
+                variant.image_url = null;
+                this.showToast(result.data.message);
+            } catch {
+                this.showToast('Network error. Please try again.', true);
+            } finally {
+                this.imageBusy = false;
             }
         },
 

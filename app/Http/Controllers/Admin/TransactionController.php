@@ -72,13 +72,14 @@ class TransactionController extends Controller
                 'Seller',
                 'Status',
                 'GMV after refunds (PHP)',
+                'Voucher Discount (PHP)',
                 'Commission (PHP)',
                 'Seller Payout (PHP)',
                 'Shipping Fee (PHP, paid to logistics)',
                 'Refunded (PHP)',
             ]);
 
-            $totals = ['gmv' => 0.0, 'commission' => 0.0, 'shipping' => 0.0, 'refunded' => 0.0];
+            $totals = ['gmv' => 0.0, 'commission' => 0.0, 'shipping' => 0.0, 'refunded' => 0.0, 'voucher' => 0.0];
 
             foreach ($service->ledger($from, $to)->cursor() as $order) {
                 // Amounts after approved/paid refunds; orders without a refund are unchanged.
@@ -86,11 +87,13 @@ class TransactionController extends Controller
                 $commission = $order->net_commission_amount;
                 $shippingFee = $order->net_shipping_fee;
                 $refunded = $order->refunded_total;
+                $voucherDiscount = (float) ($order->voucher_discount ?? 0);
 
                 if (in_array($order->status, Order::GROUP_REALIZED, true)) {
                     $totals['gmv'] += $gross;
                     $totals['commission'] += $commission;
                     $totals['refunded'] += $refunded;
+                    $totals['voucher'] += $voucherDiscount;
                 }
 
                 if (in_array($order->status, Order::GROUP_SHIPPING_EARNED, true)) {
@@ -104,6 +107,7 @@ class TransactionController extends Controller
                     $this->csvSafe($order->seller->sellerProfile->business_name ?? $order->seller->name ?? ''),
                     $order->status_label,
                     number_format($gross, 2, '.', ''),
+                    number_format($voucherDiscount, 2, '.', ''),
                     number_format($commission, 2, '.', ''),
                     number_format($gross - $commission, 2, '.', ''),
                     number_format($shippingFee, 2, '.', ''),
@@ -119,6 +123,7 @@ class TransactionController extends Controller
                 '',
                 '',
                 number_format($totals['gmv'], 2, '.', ''),
+                number_format($totals['voucher'] ?? 0, 2, '.', ''),
                 number_format($totals['commission'], 2, '.', ''),
                 number_format($totals['gmv'] - $totals['commission'], 2, '.', ''),
                 number_format($totals['shipping'], 2, '.', ''),

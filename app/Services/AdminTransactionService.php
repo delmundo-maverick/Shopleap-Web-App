@@ -14,7 +14,7 @@ class AdminTransactionService
     {
         // Amounts are net of approved/paid refunds (Order::scopeWithRefundTotals).
         $orders = Order::whereBetween('created_at', [$from, $to])
-            ->select(['id', 'seller_id', 'buyer_id', 'status', 'total_amount', 'commission_amount', 'created_at'])
+            ->select(['id', 'seller_id', 'buyer_id', 'status', 'total_amount', 'commission_amount', 'voucher_discount', 'created_at'])
             ->withRefundTotals()
             ->get();
 
@@ -30,6 +30,7 @@ class AdminTransactionService
             'commission' => round($commission($c), 2),
             'payout' => round($gmv($c) - $commission($c), 2),
             'refunded' => round((float) $c->sum(fn($o) => $o->refunded_items ?? 0), 2),
+            'voucher_discount' => round((float) $c->sum(fn($o) => $o->voucher_discount ?? 0), 2),
             'count' => $c->count(),
         ];
 

@@ -25,7 +25,7 @@ class DeliveryController extends Controller
             ->get();
 
         return response()->json([
-            'data' => $orders->map(fn($o) => $this->payload($o)),
+            'data' => $orders->map(fn ($o) => $this->payload($o)),
             'failure_reasons' => HubDeliveryController::FAILURE_REASONS,
         ]);
     }
@@ -70,7 +70,7 @@ class DeliveryController extends Controller
         }
 
         return response()->json([
-            'message' => "Failed delivery recorded (attempt {$attempt} of " . Order::MAX_DELIVERY_ATTEMPTS . '). The sorting center will decide the next step.',
+            'message' => "Failed delivery recorded (attempt {$attempt} of ".Order::MAX_DELIVERY_ATTEMPTS.'). The sorting center will decide the next step.',
         ]);
     }
 
@@ -113,6 +113,7 @@ class DeliveryController extends Controller
             'attempts' => (int) $o->delivery_attempts,
             'max_attempts' => Order::MAX_DELIVERY_ATTEMPTS,
             'items_count' => $o->items->sum('quantity'),
+            'weight_kg' => $o->total_weight_kg,
             'seller' => $o->seller->sellerProfile->business_name ?? $o->seller->name,
         ];
     }

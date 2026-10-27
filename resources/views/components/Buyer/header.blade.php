@@ -111,6 +111,8 @@ $wishlistPayload = [
                     </div>
                 </div>
 
+                {{-- Vouchers removed from header; available in profile dropdown --}}
+
                 {{-- Help --}}
                 <a href="{{ route('messages.support') }}" title="Help"
                     class="flex items-center gap-1.5 rounded-full py-1.5 pl-2 pr-3 transition hover:bg-white/10">
@@ -148,6 +150,8 @@ $wishlistPayload = [
                             class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My Purchases</a>
                         <a href="{{ route('buyer.wishlist.index') }}"
                             class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My Wishlist</a>
+                        <a href="{{ route('buyer.vouchers.index') }}"
+                            class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My Vouchers</a>
                         <a href="{{ route('messages.index') }}"
                             class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">Chat / Messages</a>
 

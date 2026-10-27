@@ -112,6 +112,16 @@
                                     class="w-full rounded-xl border border-light-gray bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
                             </div>
                         </div>
+
+                        <div class="mt-5">
+                            <label class="mb-2 block text-sm font-semibold text-charcoal">Product Weight (kg)</label>
+                            <input type="number" name="weight_kg" value="{{ old('weight_kg') }}" min="0"
+                                step="0.001" placeholder="e.g. 0.500"
+                                class="w-full rounded-xl border border-light-gray bg-white px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 sm:max-w-xs">
+                            <p class="mt-1 text-xs text-charcoal/45">
+                                Weight per unit. Used for delivery and logistics. Variants can override it below.
+                            </p>
+                        </div>
                     </section>
 
                     <!-- OPTIONS & VARIANTS -->
@@ -149,6 +159,8 @@
                                             <th class="px-4 py-3">Price (₱) *</th>
                                             <th class="px-4 py-3">Stock *</th>
                                             <th class="px-4 py-3">SKU</th>
+                                            <th class="px-4 py-3">Weight (kg)</th>
+                                            <th class="px-4 py-3">Image</th>
                                         </tr>
                                     </thead>
                                     <tbody id="variantsBody" class="divide-y divide-light-gray"></tbody>
@@ -160,9 +172,10 @@
                     <!-- IMAGES -->
                     <section class="rounded-2xl border border-light-gray bg-white p-6 shadow-sm shadow-charcoal/5">
                         <p class="mb-1 text-xs font-bold uppercase tracking-wide text-primary">Product Photos</p>
-                        <p class="mb-4 text-xs text-charcoal/50">Upload 1–6 images. First image will be used as the
-                            main
-                            thumbnail.</p>
+                        <p class="mb-4 text-xs text-charcoal/50">Upload up to 5 images for the whole product. The first
+                            image is the main thumbnail. If you give each variant its own photo, general photos are
+                            optional.
+                        </p>
 
                         <label for="images"
                             class="group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-light-gray bg-ice-blue px-6 py-8 text-center transition hover:border-primary/40 hover:bg-ice-blue/60">
@@ -174,22 +187,38 @@
                                 </svg>
                             </div>
                             <p class="mt-3 text-sm font-bold text-charcoal">Click to upload photos</p>
-                            <p class="mt-1 text-xs text-charcoal/50">JPG, PNG or WEBP — max 3MB each</p>
-                            <input type="file" id="images" name="images[]" multiple required
+                            <p class="mt-1 text-xs text-charcoal/50">JPG, PNG or WEBP — max 10MB each</p>
+                            <input type="file" id="images" name="images[]" multiple
                                 accept=".jpg,.jpeg,.png,.webp" class="sr-only">
                         </label>
 
                         <div id="imagePreviewGrid" class="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-6"></div>
+
+                        <p id="imageLimitNote" class="mt-2 hidden text-xs font-semibold text-sale-red">
+                            You can upload up to 5 product images. Extra files were ignored.
+                        </p>
+
+                        <p id="imageRequirementNote" class="mt-2 hidden text-xs font-semibold text-sale-red">
+                            Add at least one product photo, or upload a photo for at least one variant, before
+                            publishing.
+                        </p>
                     </section>
 
-                    <button type="submit"
-                        class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-seller/20 transition hover:bg-sky-blue hover:shadow-xl">
-                        Add Product
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 4v16m8-8H4" />
-                        </svg>
-                    </button>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <button type="submit" name="status" value="draft" formnovalidate
+                            class="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-white px-6 py-3.5 text-sm font-bold text-primary shadow-sm transition hover:bg-primary/5">
+                            Save as Draft
+                        </button>
+
+                        <button type="submit" name="status" value="active"
+                            class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-seller/20 transition hover:bg-sky-blue hover:shadow-xl">
+                            Publish Product
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 4v16m8-8H4" />
+                            </svg>
+                        </button>
+                    </div>
 
                 </form>
 
@@ -371,6 +400,20 @@
                         <input type="text" name="variants[${i}][sku]" value="${esc(saved.sku ?? '')}" maxlength="100" placeholder="Optional"
                             class="variant-sku-input w-28 rounded-lg border border-light-gray px-2 py-1.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
                     </td>
+                    <td class="px-4 py-2">
+                        <input type="number" name="variants[${i}][weight_kg]" value="${esc(saved.weight ?? '')}" min="0" step="0.001" placeholder="Default"
+                            class="variant-weight-input w-24 rounded-lg border border-light-gray px-2 py-1.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
+                    </td>
+                    <td class="px-4 py-2">
+                        <div class="flex items-center gap-2">
+                            <img alt="" class="variant-image-preview hidden h-9 w-9 shrink-0 rounded-lg border border-light-gray object-cover">
+                            <div class="min-w-0">
+                                <input type="file" name="variants[${i}][image]" accept=".jpg,.jpeg,.png,.webp"
+                                    class="variant-image-input block w-36 text-[11px] text-charcoal/60 file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:text-[10px] file:font-semibold file:text-primary">
+                                <button type="button" class="variant-image-clear mt-1 hidden text-[10px] font-semibold text-sale-red hover:underline">Remove image</button>
+                            </div>
+                        </div>
+                    </td>
                 `;
 
                 row.querySelector('.variant-price-input').addEventListener('input', e =>
@@ -379,6 +422,37 @@
                     saveVariantField(comboKey, 'stock', e.target.value));
                 row.querySelector('.variant-sku-input').addEventListener('input', e =>
                     saveVariantField(comboKey, 'sku', e.target.value));
+                row.querySelector('.variant-weight-input').addEventListener('input', e =>
+                    saveVariantField(comboKey, 'weight', e.target.value));
+
+                const imageInput = row.querySelector('.variant-image-input');
+                const imagePreview = row.querySelector('.variant-image-preview');
+                const imageClear = row.querySelector('.variant-image-clear');
+                let previewUrl = null;
+
+                const clearPreview = () => {
+                    if (previewUrl) URL.revokeObjectURL(previewUrl);
+                    previewUrl = null;
+                    imagePreview.src = '';
+                    imagePreview.classList.add('hidden');
+                    imageClear.classList.add('hidden');
+                };
+
+                imageInput.addEventListener('change', () => {
+                    clearPreview();
+                    const file = imageInput.files?.[0];
+                    if (!file) return;
+
+                    previewUrl = URL.createObjectURL(file);
+                    imagePreview.src = previewUrl;
+                    imagePreview.classList.remove('hidden');
+                    imageClear.classList.remove('hidden');
+                });
+
+                imageClear.addEventListener('click', () => {
+                    imageInput.value = '';
+                    clearPreview();
+                });
 
                 variantsBody.appendChild(row);
             });
@@ -397,7 +471,26 @@
 
         // Before submit, if using variants, fill the (hidden) base price/stock
         // so nothing blocks submission — the backend recalculates them anyway.
-        document.getElementById('productForm').addEventListener('submit', function() {
+        document.getElementById('productForm').addEventListener('submit', function(event) {
+            // Publishing may use general photos or per-variant photos, but
+            // it needs at least one of the two. Drafts are always allowed.
+            if (event.submitter?.value === 'active') {
+                const hasVariantImage = Array.from(document.querySelectorAll('.variant-image-input'))
+                    .some(input => input.files?.length > 0);
+
+                if (!selectedImages.length && !hasVariantImage) {
+                    event.preventDefault();
+                    imageRequirementNote.classList.remove('hidden');
+                    imagesInput.closest('section')?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                    return;
+                }
+            }
+
+            imageRequirementNote.classList.add('hidden');
+
             if (!variantsWrapper.classList.contains('hidden')) {
                 const prices = Array.from(document.querySelectorAll('.variant-price-input'))
                     .map(el => parseFloat(el.value)).filter(v => !isNaN(v));
@@ -426,6 +519,7 @@
                     price: v.price ?? '',
                     stock: v.stock_quantity ?? '',
                     sku: v.sku ?? '',
+                    weight: v.weight_kg ?? '',
                 });
             });
 
@@ -437,23 +531,89 @@
         // ---------------------------------------------------
         const imagesInput = document.getElementById('images');
         const previewGrid = document.getElementById('imagePreviewGrid');
+        const imageLimitNote = document.getElementById('imageLimitNote');
+        const imageRequirementNote = document.getElementById('imageRequirementNote');
+        const maxImages = 5;
+        let selectedImages = [];
+
+        /** The file input is read-only, so rebuild its FileList from our own list. */
+        function syncImagesInput() {
+            const transfer = new DataTransfer();
+
+            selectedImages.forEach(file => transfer.items.add(file));
+
+            imagesInput.files = transfer.files;
+        }
+
+        function renderImagePreviews() {
+            previewGrid.innerHTML = '';
+
+            selectedImages.forEach((file, index) => {
+                const previewUrl = URL.createObjectURL(file);
+                const wrapper = document.createElement('div');
+                wrapper.className =
+                    'relative aspect-square overflow-hidden rounded-lg border border-light-gray';
+                wrapper.innerHTML = `
+                    <img alt="" class="h-full w-full object-cover">
+                    ${index === 0 ? '<span class="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[9px] font-bold text-white">Main</span>' : ''}
+                    <div class="absolute inset-x-1 bottom-1 flex gap-1">
+                        <label
+                            class="flex-1 cursor-pointer rounded bg-white/90 px-1 py-1 text-center text-[10px] font-semibold text-charcoal transition hover:bg-white">
+                            Replace
+                            <input type="file" data-replace accept=".jpg,.jpeg,.png,.webp" class="sr-only">
+                        </label>
+                        <button type="button" data-remove
+                            class="flex-1 rounded bg-charcoal/80 px-1 py-1 text-[10px] font-semibold text-white transition hover:bg-sale-red">
+                            Remove
+                        </button>
+                    </div>
+                `;
+
+                const preview = wrapper.querySelector('img');
+                preview.src = previewUrl;
+                preview.addEventListener('load', () => URL.revokeObjectURL(previewUrl), { once: true });
+
+                wrapper.querySelector('[data-replace]').addEventListener('change', function() {
+                    const replacement = this.files?.[0];
+                    if (!replacement) return;
+
+                    selectedImages[index] = replacement;
+                    imageLimitNote.classList.add('hidden');
+                    syncImagesInput();
+                    renderImagePreviews();
+                });
+
+                wrapper.querySelector('[data-remove]').addEventListener('click', () => {
+                    selectedImages.splice(index, 1);
+                    imageLimitNote.classList.add('hidden');
+                    syncImagesInput();
+                    renderImagePreviews();
+                });
+
+                previewGrid.appendChild(wrapper);
+            });
+        }
 
         imagesInput.addEventListener('change', function() {
-            previewGrid.innerHTML = '';
-            Array.from(this.files).slice(0, 6).forEach((file, index) => {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    const wrapper = document.createElement('div');
-                    wrapper.className =
-                        'relative aspect-square overflow-hidden rounded-lg border border-light-gray';
-                    wrapper.innerHTML = `
-                        <img src="${e.target.result}" class="h-full w-full object-cover">
-                        ${index === 0 ? '<span class="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[9px] font-bold text-white">Main</span>' : ''}
-                    `;
-                    previewGrid.appendChild(wrapper);
-                };
-                reader.readAsDataURL(file);
+            const incoming = Array.from(this.files);
+            const room = maxImages - selectedImages.length;
+
+            incoming.slice(0, Math.max(room, 0)).forEach(file => {
+                const alreadySelected = selectedImages.some(existing =>
+                    existing.name === file.name &&
+                    existing.size === file.size &&
+                    existing.lastModified === file.lastModified
+                );
+
+                if (!alreadySelected) {
+                    selectedImages.push(file);
+                }
             });
+
+            imageLimitNote.classList.toggle('hidden', incoming.length <= room);
+
+            syncImagesInput();
+            renderImagePreviews();
         });
     </script>
 

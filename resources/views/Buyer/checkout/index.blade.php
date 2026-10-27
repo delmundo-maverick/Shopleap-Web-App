@@ -14,7 +14,7 @@
 <body class="flex min-h-screen flex-col bg-ice-blue text-charcoal">
 
     <header class="sticky top-0 z-40 border-b border-white/10 bg-primary">
-        <div class="mx-auto flex h-16 max-w-5xl items-center justify-between px-5 sm:px-8">
+        <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-3 md:px-8">
 
             <!-- LOGO -->
             <a href="{{ route('buyer.home') }}" class="flex shrink-0 items-center gap-2">
@@ -44,13 +44,13 @@
         </div>
     </header>
 
-    <main class="mx-auto w-full max-w-5xl flex-1 px-5 py-6 sm:px-8">
+    <main class="mx-auto w-full max-w-7xl flex-1 px-3 py-5 pb-32 md:px-8 md:py-6 md:pb-32">
 
         {{-- STEP INDICATOR --}}
         <div class="mb-6 flex items-center justify-center gap-3 text-xs font-semibold text-charcoal/40 sm:text-sm">
             <span class="flex items-center gap-1.5 text-charcoal/40">
                 <span class="flex h-5 w-5 items-center justify-center rounded-full bg-charcoal/10 text-[10px]">
-                    ✓
+                    ₱�
                 </span>
                 Cart
             </span>
@@ -208,7 +208,7 @@
                                             @endif
 
                                             <p class="text-xs text-charcoal/50">
-                                                Qty: {{ $item->quantity }} ×
+                                                Qty: {{ $item->quantity }} +�
                                                 ₱{{ number_format($item->unit_price, 2) }}
                                             </p>
                                         </div>
@@ -305,6 +305,17 @@
                     <div class="sticky top-24 rounded-lg bg-white p-5 shadow-sm shadow-charcoal/5">
                         <h3 class="mb-4 text-sm font-bold text-charcoal">Order Total</h3>
 
+                        <!-- Voucher Section -->
+                        <div class="mb-4" x-data="voucherCheckout()" x-init="init()">
+                            <label class="mb-1.5 block text-xs font-semibold text-charcoal">Shop Voucher</label>
+                            <div class="flex gap-2">
+                                <input type="text" x-model="code" placeholder="Enter voucher code" class="w-full rounded-lg border border-light-gray px-3 py-2 text-sm uppercase outline-none focus:border-primary">
+                                <button type="button" @click="applyVoucher()" class="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-sky-blue">Apply</button>
+                            </div>
+                            <p x-show="message" x-text="message" :class="success ? 'text-leaf-green' : 'text-sale-red'" class="mt-1.5 text-xs"></p>
+                            <input type="hidden" name="voucher_code" :value="appliedCode">
+                        </div>
+
                         <div class="flex items-center justify-between gap-3 text-sm text-charcoal/70">
                             <span>
                                 Merchandise Subtotal
@@ -328,13 +339,18 @@
                             </span>
                         </div>
 
+                        <div class="mt-2 flex items-center justify-between gap-3 text-sm text-charcoal/70" x-data="{ disc: 0 }" @voucher-applied.window="disc = $event.detail.discount">
+                            <span>Voucher Discount</span>
+                            <span class="shrink-0 font-semibold text-leaf-green">- ₱<span x-text="disc.toFixed(2)"></span></span>
+                        </div>
+
                         <div class="my-4 h-px bg-light-gray"></div>
 
                         <div class="mb-1 flex items-center justify-between">
                             <span class="text-sm font-bold text-charcoal">Total Payment</span>
 
                             <span class="text-xl font-bold text-primary">
-                                ₱{{ number_format($grandTotal, 2) }}
+                                ₱<span x-data="{ total: {{ $grandTotal }}, disc: 0 }" @voucher-applied.window="disc = $event.detail.discount" x-text="(total - disc).toFixed(2)"></span>
                             </span>
                         </div>
 
@@ -374,6 +390,53 @@
 
     <x-Buyer.message-widget />
     <x-footer />
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('voucherCheckout', () => ({
+                code: '',
+                appliedCode: '',
+                message: '',
+                success: false,
+                init() {},
+                async applyVoucher() {
+                    this.message = '';
+                    this.success = false;
+                    if (!this.code) {
+                        this.message = 'Please enter a voucher code.';
+                        this.success = false;
+                        return;
+                    }
+                    try {
+                        const formData = new FormData();
+                        formData.append('code', this.code);
+                        formData.append('_token', document.querySelector('input[name="_token"]').value);
+                        const response = await fetch('{{ route("buyer.vouchers.apply") }}', {
+                            method: 'POST',
+                            body: formData,
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            this.appliedCode = data.voucher_code;
+                            this.success = true;
+                            this.message = data.message || 'Voucher applied successfully.';
+                            window.dispatchEvent(new CustomEvent('voucher-applied', { detail: { discount: parseFloat(data.discount) || 0, code: data.voucher_code } }));
+                        } else {
+                            this.success = false;
+                            this.message = data.message || 'Failed to apply voucher.';
+                            window.dispatchEvent(new CustomEvent('voucher-applied', { detail: { discount: 0 } }));
+                        }
+                    } catch (e) {
+                        this.success = false;
+                        this.message = 'An error occurred while applying voucher.';
+                        window.dispatchEvent(new CustomEvent('voucher-applied', { detail: { discount: 0 } }));
+                    }
+                }
+            }));
+        });
+    </script>
 </body>
 
 </html>
