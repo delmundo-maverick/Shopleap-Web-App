@@ -27,14 +27,14 @@ class PickupController extends Controller
             ->where('status', Order::STATUS_READY_FOR_PICKUP)
             ->when(
                 $request->query('filter') === 'awaiting_accept',
-                fn($q) => $q->where('pickup_status', 'assigned')
+                fn ($q) => $q->where('pickup_status', 'assigned')
             )
             ->orderBy('pickup_date')
             ->orderBy('id')
             ->get();
 
         return response()->json([
-            'data' => $orders->map(fn($o) => $this->payload($o)),
+            'data' => $orders->map(fn ($o) => $this->payload($o)),
         ]);
     }
 
@@ -136,7 +136,7 @@ class PickupController extends Controller
         ]);
 
         $valid = [
-            'SHOPLEAP:ORDER:' . $order->id,
+            'SHOPLEAP:ORDER:'.$order->id,
             str_pad((string) $order->id, 10, '0', STR_PAD_LEFT),
         ];
 
@@ -221,6 +221,7 @@ class PickupController extends Controller
 
             'deliver_to_hub' => $o->logisticsProfile?->business_name,
             'items_count' => $o->items->sum('quantity'),
+            'weight_kg' => $o->total_weight_kg,
             'waybill_printed' => (bool) $o->waybill_printed_at,
         ];
     }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class ProductVariant extends Model
 {
@@ -11,7 +12,9 @@ class ProductVariant extends Model
         'options',
         'price',
         'stock_quantity',
+        'weight_kg',
         'sku',
+        'image_path',
         'is_active',
     ];
 
@@ -21,6 +24,7 @@ class ProductVariant extends Model
             'options' => 'array',
             'price' => 'decimal:2',
             'stock_quantity' => 'integer',
+            'weight_kg' => 'decimal:3',
             'is_active' => 'boolean',
         ];
     }
@@ -46,7 +50,28 @@ class ProductVariant extends Model
     public function getLabelAttribute(): string
     {
         return collect($this->options)
-            ->map(fn($value, $name) => "{$name}: {$value}")
+            ->map(fn ($value, $name) => "{$name}: {$value}")
             ->implode(', ');
+    }
+
+    public function getImageUrlAttribute(): ?string
+    {
+        return $this->image_path
+            ? Storage::disk('r2_public')->url($this->image_path)
+            : null;
+    }
+
+    /**
+     * Variant weight when set, otherwise the parent product's default weight.
+     */
+    public function getEffectiveWeightKgAttribute(): ?float
+    {
+        if ($this->weight_kg !== null) {
+            return (float) $this->weight_kg;
+        }
+
+        return $this->product?->weight_kg !== null
+            ? (float) $this->product->weight_kg
+            : null;
     }
 }

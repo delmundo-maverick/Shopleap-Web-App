@@ -6,6 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
+    public const STATUS_DRAFT = 'draft';
+
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_ARCHIVED = 'archived';
+
     protected $fillable = [
         'seller_id',
         'name',
@@ -15,6 +21,7 @@ class Product extends Model
         'price',
         'discount_price',
         'stock_quantity',
+        'weight_kg',
         'status',
     ];
 
@@ -24,6 +31,7 @@ class Product extends Model
             'price' => 'decimal:2',
             'discount_price' => 'decimal:2',
             'stock_quantity' => 'integer',
+            'weight_kg' => 'decimal:3',
         ];
     }
 
@@ -60,16 +68,25 @@ class Product extends Model
         $price = (float) $this->price;
 
         return $this->display_price < $price ? $price : null;
-    }   
+    }
 
     /**
-     * First product image's public R2 URL, or null if none uploaded.
+     * The main thumbnail: the first general image, otherwise the first
+     * variant image (so variant-only galleries still render everywhere).
      */
     public function getMainImageUrlAttribute(): ?string
     {
         $first = $this->images->first();
 
-        return $first ? $first->url : null;
+        if ($first) {
+            return $first->url;
+        }
+
+        $variant = $this->relationLoaded('variants')
+            ? $this->variants->first(fn (ProductVariant $variant) => $variant->image_path !== null)
+            : $this->variants()->whereNotNull('image_path')->first();
+
+        return $variant?->image_url;
     }
 
     /**
@@ -106,7 +123,6 @@ class Product extends Model
             ? $this->variants->isNotEmpty()
             : $this->variants()->exists();
     }
-
 
     /** Active variants at or below the threshold (includes sold-out ones). */
     public function lowStockVariantCount(?int $threshold = null): int
@@ -155,7 +171,17 @@ class Product extends Model
 
     public function scopeActive($query)
     {
-        return $query->where('status', 'active');
+        return $query->where('status', self::STATUS_ACTIVE);
+    }
+
+    public function isDraft(): bool
+    {
+        return $this->status === self::STATUS_DRAFT;
+    }
+
+    public function isPubliclyVisible(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE;
     }
 
     /**
@@ -178,7 +204,7 @@ class Product extends Model
             'out' => $query->where('stock_quantity', '<=', 0),
             'low' => $query->where('stock_quantity', '>', 0)->where(function ($q) use ($threshold) {
                 $q->where('stock_quantity', '<=', $threshold)
-                    ->orWhereHas('variants', fn($v) => $v
+                    ->orWhereHas('variants', fn ($v) => $v
                         ->where('is_active', true)
                         ->where('stock_quantity', '<=', $threshold));
             }),

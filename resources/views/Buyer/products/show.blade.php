@@ -47,8 +47,8 @@
                     <div id="mainImageWrapper"
                         class="relative aspect-square w-full overflow-hidden bg-ice-blue/50 sm:max-h-[520px] lg:max-h-none">
 
-                        @if ($product->images->isNotEmpty())
-                            <img id="mainImage" src="{{ $product->images->first()->url }}" alt="{{ $product->name }}"
+                        @if ($product->main_image_url)
+                            <img id="mainImage" src="{{ $product->main_image_url }}" alt="{{ $product->name }}"
                                 fetchpriority="high" class="h-full w-full object-contain">
                         @else
                             <div class="flex h-full w-full items-center justify-center text-charcoal/25">
@@ -186,21 +186,24 @@
                                 <div
                                     class="grid grid-cols-[90px_minmax(0,1fr)] items-start gap-3 sm:grid-cols-[110px_minmax(0,1fr)]">
                                     <span class="pt-2 text-charcoal/55">{{ $option->name }}</span>
-                                    <div class="flex flex-wrap gap-2">
+                                    <div class="flex flex-wrap gap-2 variant-option-group"
+                                        data-option-name="{{ $option->name }}">
                                         @foreach ($option->values as $value)
-                                            <button type="button" data-open-options
-                                                class="min-h-9 rounded-sm border border-light-gray bg-white px-3 py-1.5 text-sm text-charcoal transition hover:border-primary hover:text-primary">
+                                            <button type="button" aria-pressed="false"
+                                                class="variant-value-btn min-h-9 rounded-sm border border-light-gray bg-white px-3 py-1.5 text-sm text-charcoal transition hover:border-primary hover:text-primary active:bg-primary/5"
+                                                data-option-name="{{ $option->name }}"
+                                                data-option-value="{{ $value }}">
                                                 {{ $value }}
                                             </button>
                                         @endforeach
                                     </div>
                                 </div>
                             @endforeach
-
-                            {{-- EXISTING JAVASCRIPT TRIGGER --}}
-                            <button type="button" id="addToCartBtn" class="hidden" aria-hidden="true" tabindex="-1"
-                                @disabled($product->stock_quantity < 1)></button>
                         @endif
+
+                        {{-- HIDDEN JAVASCRIPT TRIGGER (desktop/mobile buttons proxy to it) --}}
+                        <button type="button" id="addToCartBtn" class="hidden" aria-hidden="true" tabindex="-1"
+                            @disabled($product->stock_quantity < 1)></button>
 
                         {{-- QUANTITY AND STOCK --}}
                         <div
@@ -721,9 +724,9 @@
 
                 <div class="flex items-start gap-3">
                     <div class="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-ice-blue/60 sm:h-24 sm:w-24">
-                        @if ($product->images->isNotEmpty())
-                            <img src="{{ $product->images->first()->url }}" alt="{{ $product->name }}"
-                                class="h-full w-full object-cover">
+                        @if ($product->main_image_url)
+                            <img id="modalVariantImage" src="{{ $product->main_image_url }}"
+                                alt="{{ $product->name }}" class="h-full w-full object-cover">
                         @endif
                     </div>
 
@@ -828,9 +831,9 @@
 
             <div class="mt-4 flex items-center gap-3 rounded-xl border border-light-gray p-3">
                 <div class="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-ice-blue/60">
-                    @if ($product->images->isNotEmpty())
-                        <img src="{{ $product->images->first()->url }}" alt="{{ $product->name }}"
-                            class="h-full w-full object-cover">
+                    @if ($product->main_image_url)
+                        <img id="cartModalImage" src="{{ $product->main_image_url }}"
+                            alt="{{ $product->name }}" class="h-full w-full object-cover">
                     @endif
                 </div>
 
@@ -862,6 +865,8 @@
             'productId' => $product->id,
             'basePrice' => (float) $product->display_price,
             'baseStock' => (int) $product->stock_quantity,
+            'primaryImage' => $product->main_image_url,
+            'selectedVariantId' => (int) request('variant') ?: null,
             'hasOptions' => $hasOptions,
             'variants' => $product->variants->map(
                 fn($v) => [
@@ -870,6 +875,10 @@
                     'price' => (float) $product->priceAfterDiscount($v->price),
                     'original_price' => (float) $v->price,
                     'stock_quantity' => $v->stock_quantity,
+                    'weight_kg' => $v->weight_kg !== null
+                        ? (float) $v->weight_kg
+                        : ($product->weight_kg !== null ? (float) $product->weight_kg : null),
+                    'image_url' => $v->image_url,
                 ],
             ),
         ];
@@ -913,17 +922,6 @@
 
                 if (addButton && !addButton.disabled) {
                     addButton.click();
-                }
-            });
-        });
-
-        // Tapping a variation chip opens the option selector.
-        document.querySelectorAll('[data-open-options]').forEach((chip) => {
-            chip.addEventListener('click', () => {
-                const trigger = document.getElementById('addToCartBtn');
-
-                if (trigger && !trigger.disabled) {
-                    trigger.click();
                 }
             });
         });

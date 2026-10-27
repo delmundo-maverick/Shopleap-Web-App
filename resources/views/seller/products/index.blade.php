@@ -1,5 +1,5 @@
 @php
-    $statusVariants = ['active' => 'success', 'archived' => 'neutral'];
+    $statusVariants = ['draft' => 'warning', 'active' => 'success', 'archived' => 'neutral'];
     $lowStock = (int) config('shop.low_stock_threshold', 5);
 
     // Mobile: each table row becomes a card, each cell shows its own label (from data-label).
@@ -35,6 +35,11 @@
         'details' => route('seller.products.details', '__ID__'),
         'update' => route('seller.products.update', '__ID__'),
         'status' => route('seller.products.status', '__ID__'),
+        'images' => route('seller.products.images.store', '__ID__'),
+        'imageUpdate' => route('seller.products.images.update', ['product' => '__ID__', 'image' => '__IMAGE__']),
+        'imageDestroy' => route('seller.products.images.destroy', ['product' => '__ID__', 'image' => '__IMAGE__']),
+        'variantImage' => route('seller.products.variants.image', ['product' => '__ID__', 'variant' => '__VARIANT__']),
+        'variantImageDestroy' => route('seller.products.variants.image.destroy', ['product' => '__ID__', 'variant' => '__VARIANT__']),
     ],
 ]))">
 
@@ -114,6 +119,7 @@
                     <select name="status" aria-label="Filter by status" @change="$el.form.submit()"
                         class="frost-input field-control min-w-0 lg:w-auto">
                         <option value="all" @selected(request('status', 'all') === 'all')>All Status</option>
+                        <option value="draft" @selected(request('status') === 'draft')>Draft</option>
                         <option value="active" @selected(request('status') === 'active')>Active</option>
                         <option value="archived" @selected(request('status') === 'archived')>Archived</option>
                     </select>
@@ -149,7 +155,7 @@
                         @endif
 
                         @php
-                            $thumb = $product->images->first();
+                            $thumb = $product->main_image_url;
                             $variant = $statusVariants[$product->status] ?? 'neutral';
                             $hasVariants = $product->hasVariants();
                             $lowVariants = $product->lowStockVariantCount($lowStock);
@@ -161,7 +167,7 @@
                                 <div class="flex items-center gap-3">
                                     <div class="product-thumb shrink-0">
                                         @if ($thumb)
-                                            <img src="{{ $thumb->url }}" alt="" loading="lazy"
+                                            <img src="{{ $thumb }}" alt="" loading="lazy"
                                                 class="h-full w-full object-cover">
                                         @endif
                                     </div>
@@ -271,11 +277,54 @@
 
             <div x-show="!loading" x-cloak class="space-y-5 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-6">
 
-                <div x-show="images.length" class="flex gap-2 overflow-x-auto">
-                    <template x-for="img in images" :key="img.url">
-                        <img :src="img.url" alt=""
-                            class="h-20 w-20 shrink-0 rounded-lg border border-white/50 object-cover">
-                    </template>
+                <div class="frost-panel rounded-xl p-3 sm:p-4">
+                    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <p class="text-section-label">Product Images</p>
+                            <p class="text-xs text-charcoal/50">
+                                <span x-text="images.length"></span> of 5 &middot; the first image is the main
+                                thumbnail.
+                            </p>
+                        </div>
+
+                        <label class="btn-soft cursor-pointer"
+                            :class="{ 'pointer-events-none opacity-50': images.length >= 5 || imageBusy }">
+                            <span x-text="imageBusy ? 'Uploading...' : 'Add Image'"></span>
+                            <input type="file" accept=".jpg,.jpeg,.png,.webp" class="sr-only"
+                                :disabled="images.length >= 5 || imageBusy" @change="uploadImage($event)">
+                        </label>
+                    </div>
+
+                    <p x-show="errors.image" x-text="errors.image?.[0]" class="field-error"></p>
+
+                    <div x-show="images.length" class="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                        <template x-for="(img, index) in images" :key="img.id">
+                            <div class="relative overflow-hidden rounded-lg border border-white/60 bg-ice-blue/50">
+                                <img :src="img.url" alt=""
+                                    class="aspect-square w-full object-cover">
+
+                                <span x-show="index === 0"
+                                    class="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[9px] font-bold text-white">Main</span>
+
+                                <div class="absolute inset-x-0 bottom-0 flex gap-1 bg-charcoal/70 p-1">
+                                    <label
+                                        class="flex-1 cursor-pointer rounded bg-white/90 px-1 py-1 text-center text-[10px] font-semibold text-charcoal transition hover:bg-white">
+                                        Replace
+                                        <input type="file" accept=".jpg,.jpeg,.png,.webp" class="sr-only"
+                                            :disabled="imageBusy" @change="replaceImage(img, $event)">
+                                    </label>
+                                    <button type="button"
+                                        class="flex-1 rounded bg-sale-red/90 px-1 py-1 text-[10px] font-semibold text-white transition hover:bg-sale-red"
+                                        :disabled="imageBusy" @click="removeImage(img)">Remove</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <p x-show="!images.length"
+                        class="rounded-lg border border-dashed border-white/70 bg-white/40 px-3 py-4 text-center text-xs text-charcoal/45">
+                        No general product images yet. Variant photos still count for publishing.
+                    </p>
                 </div>
 
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -315,6 +364,17 @@
                             </template>
                         </select>
                         <p x-show="errors.subcategory" x-text="errors.subcategory?.[0]" class="field-error"></p>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="f-weight" class="field-label">Product Weight (kg)</label>
+                        <input id="f-weight" type="number" inputmode="decimal" x-model="form.weight_kg"
+                            min="0" step="0.001" placeholder="e.g. 0.500" class="frost-input field-control"
+                            :aria-invalid="errors.weight_kg ? 'true' : 'false'">
+                        <p class="mt-1 text-xs text-charcoal/45">
+                            Default weight per unit. Each variant can override it below.
+                        </p>
+                        <p x-show="errors.weight_kg" x-text="errors.weight_kg?.[0]" class="field-error"></p>
                     </div>
 
                     <!-- Simple products: price / stock live on the product -->
@@ -360,6 +420,8 @@
                                         <th scope="col">Price (₱)</th>
                                         <th scope="col">Stock</th>
                                         <th scope="col">SKU</th>
+                                        <th scope="col">Weight (kg)</th>
+                                        <th scope="col">Image</th>
                                         <th scope="col">Active</th>
                                     </tr>
                                 </thead>
@@ -405,6 +467,38 @@
                                                         class="field-error"></p>
                                                 </div>
                                             </td>
+                                            <td data-label="Weight" class="{{ $variantCell }}">
+                                                <div class="min-w-0">
+                                                    <input type="number" inputmode="decimal" min="0" step="0.001"
+                                                        x-model="v.weight_kg" placeholder="Default"
+                                                        class="frost-input field-control w-full md:w-24"
+                                                        :aria-label="'Weight in kg for ' + variantLabel(v)"
+                                                        :aria-invalid="variantError(i, 'weight_kg') ? 'true' : 'false'">
+                                                    <p x-show="variantError(i, 'weight_kg')"
+                                                        x-text="variantError(i, 'weight_kg')" class="field-error"></p>
+                                                </div>
+                                            </td>
+                                            <td data-label="Image" class="{{ $variantCell }}">
+                                                <div class="min-w-0 space-y-1.5">
+                                                    <img x-show="v.image_url" :src="v.image_url" alt=""
+                                                        class="h-10 w-10 rounded-lg border border-white/60 object-cover">
+
+                                                    <div class="flex flex-wrap items-center gap-1">
+                                                        <label
+                                                            class="cursor-pointer rounded-md bg-white/80 px-2 py-1 text-[10px] font-semibold text-charcoal transition hover:bg-white">
+                                                            <span x-text="v.image_url ? 'Replace' : 'Upload'"></span>
+                                                            <input type="file" accept=".jpg,.jpeg,.png,.webp"
+                                                                class="sr-only" :disabled="imageBusy"
+                                                                @change="uploadVariantImage(v, $event)">
+                                                        </label>
+
+                                                        <button type="button" x-show="v.image_url"
+                                                            class="rounded-md bg-sale-red/10 px-2 py-1 text-[10px] font-semibold text-sale-red transition hover:bg-sale-red/20"
+                                                            :disabled="imageBusy"
+                                                            @click="removeVariantImage(v)">Remove</button>
+                                                    </div>
+                                                </div>
+                                            </td>
                                             <td data-label="Active" class="{{ $variantCell }} md:text-center">
                                                 <input type="checkbox" x-model="v.is_active"
                                                     class="mt-2 h-5 w-5 accent-primary md:h-4 md:w-4"
@@ -428,14 +522,24 @@
 
                 <div class="frost-panel rounded-xl p-3 sm:p-4">
                     <p class="text-section-label mb-3">Listing Status</p>
-                    <div class="flex gap-2">
-                        <button type="button" @click="setStatus('active')" :disabled="saving"
-                            class="btn-soft btn-soft--success flex-1">Activate</button>
-                        <button type="button" @click="setStatus('archived')" :disabled="saving"
-                            class="btn-soft btn-soft--danger flex-1">Archive</button>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" @click="setStatus('active')"
+                            :disabled="saving || status === 'active'" class="btn-soft btn-soft--success flex-1">
+                            Publish
+                        </button>
+                        <button type="button" @click="setStatus('draft')"
+                            :disabled="saving || status === 'draft'" class="btn-soft btn-soft--warning flex-1">
+                            Save as Draft
+                        </button>
+                        <button type="button" @click="setStatus('archived')"
+                            :disabled="saving || status === 'archived'" class="btn-soft btn-soft--danger flex-1">
+                            Archive
+                        </button>
                     </div>
-                    <p class="mt-2 text-xs text-charcoal/45">Archived products are hidden from buyers but not
-                        deleted.</p>
+                    <p class="mt-2 text-xs text-charcoal/45">
+                        Drafts and archived products are hidden from buyers but never deleted. Drafts can be edited and
+                        published later.
+                    </p>
                 </div>
 
             </div>

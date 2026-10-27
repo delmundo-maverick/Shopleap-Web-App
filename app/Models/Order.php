@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Services\Notifier;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class Order extends Model
 {
@@ -18,6 +20,9 @@ class Order extends Model
         'shipping_zone',
         'buyer_note',
         'commission_amount',
+        'shop_voucher_id',
+        'voucher_code',
+        'voucher_discount',
         'ship_province',
         'ship_municipality',
         'ship_barangay',
@@ -55,6 +60,7 @@ class Order extends Model
     {
         return [
             'shipping_fee' => 'decimal:2',
+            'voucher_discount' => 'decimal:2',
             'pickup_date' => 'date',
             'waybill_printed_at' => 'datetime',
             'stock_restored_at' => 'datetime',
@@ -72,18 +78,31 @@ class Order extends Model
     // ── Status chain (Buyer → Seller → Rider → Sorting Center → Rider → Buyer) ──
 
     const STATUS_PLACED = 'PLACED';
+
     const STATUS_CONFIRMED = 'CONFIRMED';
+
     const STATUS_PREPARING = 'PREPARING';
+
     const STATUS_READY_FOR_PICKUP = 'READY_FOR_PICKUP';
+
     const STATUS_PICKED_UP = 'PICKED_UP';
+
     const STATUS_AT_SORTING_CENTER = 'AT_SORTING_CENTER';
+
     const STATUS_SORTED = 'SORTED';
+
     const STATUS_ASSIGNED_TO_RIDER = 'ASSIGNED_TO_RIDER';
+
     const STATUS_OUT_FOR_DELIVERY = 'OUT_FOR_DELIVERY';
+
     const STATUS_DELIVERED = 'DELIVERED';
+
     const STATUS_COMPLETED = 'COMPLETED';
+
     const STATUS_CANCELLED = 'CANCELLED';
+
     const STATUS_DELIVERY_FAILED = 'DELIVERY_FAILED';
+
     const STATUS_RETURNED = 'RETURNED';
 
     // Seller: statuses they may set by hand.
@@ -342,6 +361,27 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function shopVoucher()
+    {
+        return $this->belongsTo(ShopVoucher::class);
+    }
+
+    public function voucherRedemption()
+    {
+        return $this->hasOne(ShopVoucherRedemption::class);
+    }
+
+    /**
+     * Total parcel weight for this order, in kilograms.
+     * Old order items predate the weight snapshot and are treated as 0.
+     */
+    public function getTotalWeightKgAttribute(): float
+    {
+        return round((float) $this->items->sum(
+            fn (OrderItem $item) => (float) ($item->weight_kg ?? 0)
+        ), 3);
+    }
+
     public function logisticsProfile()
     {
         return $this->belongsTo(LogisticsProfile::class);
@@ -402,7 +442,7 @@ class Order extends Model
             2
         );
 
-        return rtrim(rtrim(number_format($rate, 2), '0'), '.') . '%';
+        return rtrim(rtrim(number_format($rate, 2), '0'), '.').'%';
     }
 
     /**
@@ -423,8 +463,8 @@ class Order extends Model
                 ?? ($p
                     ? trim(
                         ($p->house_number ?? '')
-                            . ' '
-                            . ($p->street ?? '')
+                            .' '
+                            .($p->street ?? '')
                     )
                     : null),
         ];
@@ -448,7 +488,7 @@ class Order extends Model
         );
     }
 
-    public function returnWindowEndsAt(): ?\Illuminate\Support\Carbon
+    public function returnWindowEndsAt(): ?Carbon
     {
         return $this->delivered_at?->copy()->addDays(
             self::returnWindowDays()
@@ -493,7 +533,7 @@ class Order extends Model
     public function scopeReturnOrRefund($query)
     {
         return $query->where(
-            fn($q) => $q
+            fn ($q) => $q
                 ->whereIn('status', self::GROUP_RETURN_REFUND)
                 ->orWhereHas('returns')
         );
@@ -503,7 +543,7 @@ class Order extends Model
     {
         return $query->whereDoesntHave(
             'returns',
-            fn($q) => $q->whereIn('status', OrderReturn::BLOCKING_STATUSES)
+            fn ($q) => $q->whereIn('status', OrderReturn::BLOCKING_STATUSES)
         );
     }
 
@@ -511,7 +551,7 @@ class Order extends Model
 
     public function scopeWithRefundTotals($query)
     {
-        $counted = fn($q) => $q->whereIn('status', OrderReturn::REFUND_COUNTED);
+        $counted = fn ($q) => $q->whereIn('status', OrderReturn::REFUND_COUNTED);
 
         return $query
             ->withSum(['returns as refunded_items' => $counted], 'items_amount')
@@ -597,7 +637,7 @@ class Order extends Model
 
         DB::afterCommit(function () use ($order, $status, $note, $actorId) {
             try {
-                app(\App\Services\Notifier::class)
+                app(Notifier::class)
                     ->orderStatusChanged($order->fresh() ?? $order, $status, $note, $actorId);
             } catch (\Throwable $e) {
                 report($e);

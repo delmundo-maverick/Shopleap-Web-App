@@ -34,6 +34,10 @@
         --btn-color: var(--color-success);
     }
 
+    .btn-soft--warning {
+        --btn-color: var(--color-warning);
+    }
+
     .btn-soft--danger {
         --btn-color: var(--color-danger);
     }

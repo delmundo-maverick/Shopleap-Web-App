@@ -20,6 +20,7 @@ class WishlistController extends Controller
             ->select('products.*')
             ->join('wishlist_items', 'wishlist_items.product_id', '=', 'products.id')
             ->where('wishlist_items.user_id', $user->id)
+            ->active()
             ->with(['images', 'liveDiscount', 'variants:id,product_id'])
             ->withReviewStats() // after select(), same ordering rule as your product index
             ->orderByDesc('wishlist_items.created_at')

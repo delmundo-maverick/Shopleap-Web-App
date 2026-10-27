@@ -9,8 +9,11 @@ use App\Models\OrderItem;
 use App\Models\PlatformSetting;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\ShopVoucher;
+use App\Models\ShopVoucherRedemption;
 use App\Services\HubCoverage;
 use App\Services\ShippingFeeCalculator;
+use App\Services\ShopVoucherService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -33,6 +36,13 @@ class CheckoutController extends Controller
         $subtotal = $cartItems->sum('line_total');
         $itemIds = $cartItems->pluck('id')->implode(',');
 
+        // Parcel weight per seller, used for display only. Shipping fees stay zone-based.
+        $weightBySeller = $groupedBySeller
+            ->map(fn ($items) => round((float) $items->sum('line_weight_kg'), 3))
+            ->all();
+
+        $totalWeight = round(array_sum($weightBySeller), 3);
+
         $shippingBySeller = $this->quoteShipping(
             $request,
             $groupedBySeller,
@@ -46,7 +56,7 @@ class CheckoutController extends Controller
 
         $blockedSellerIds = $groupedBySeller
             ->filter(
-                fn($items) => ! $coverage->isCovered(
+                fn ($items) => ! $coverage->isCovered(
                     $items->first()->product->seller,
                     $profile?->province,
                     $profile?->municipality
@@ -58,6 +68,8 @@ class CheckoutController extends Controller
         return view('Buyer.checkout.index', [
             'groupedBySeller' => $groupedBySeller,
             'total' => $subtotal,
+            'weightBySeller' => $weightBySeller,
+            'totalWeight' => $totalWeight,
             'shippingBySeller' => $shippingBySeller,
             'shippingTotal' => $shippingTotal,
             'grandTotal' => $subtotal + $shippingTotal,
@@ -69,7 +81,8 @@ class CheckoutController extends Controller
     public function store(
         Request $request,
         ShippingFeeCalculator $shipping,
-        HubCoverage $coverage
+        HubCoverage $coverage,
+        ShopVoucherService $voucherService
     ) {
         $buyer = $request->user();
 
@@ -93,7 +106,8 @@ class CheckoutController extends Controller
             $request,
             $buyer,
             $shipping,
-            $coverage
+            $coverage,
+            $voucherService
         ) {
             // 1. Lock the cart rows so a double-click cannot place the order twice.
             $cartItems = $this->selectedCartItems(
@@ -200,10 +214,35 @@ class CheckoutController extends Controller
             // 4. Create one order per seller and deduct stock.
             $touchedVariantProducts = [];
 
+            // Handle voucher if applied
+            $appliedVoucher = null;
+            $voucherDiscountTotal = 0;
+            if ($request->filled('voucher_code')) {
+                try {
+                    $appliedVoucher = $voucherService->validateAndApplyForCart($buyer, $request->voucher_code, $cartItems);
+                } catch (\Throwable $e) {
+                    $this->fail($e->getMessage());
+                }
+            }
+
             foreach (
                 $cartItems->groupBy('product.seller_id') as $sellerId => $items
             ) {
                 $orderTotal = $items->sum('line_total');
+                $sellerVoucherDiscount = 0;
+                $voucherModel = null;
+                if ($appliedVoucher && $appliedVoucher['voucher']->seller_id == $sellerId) {
+                    $voucherModel = $appliedVoucher['voucher'];
+                    // Re-validate under lock
+                    $voucherModel = ShopVoucher::where('id', $voucherModel->id)->lockForUpdate()->first();
+                    if (! $voucherModel || ! $voucherModel->isValidNow() || ! $voucherModel->canBeUsedByBuyer($buyer->id)) {
+                        $this->fail('Voucher is no longer valid.');
+                    }
+                    $eligibleSubtotal = $appliedVoucher['eligible_items']->sum('line_total');
+                    $eligibleQuantity = $appliedVoucher['eligible_items']->sum('quantity');
+                    $sellerVoucherDiscount = $voucherModel->calculateDiscount($eligibleSubtotal, $eligibleQuantity);
+                    $voucherDiscountTotal += $sellerVoucherDiscount;
+                }
 
                 // Recalculate shipping on the server using the current address.
                 $quote = $shipping->calculate(
@@ -212,6 +251,7 @@ class CheckoutController extends Controller
                     $buyer->buyerProfile?->municipality
                 );
 
+                // Commission calculated on order total (items subtotal) as per existing policy
                 $order = Order::create([
                     'seller_id' => $sellerId,
                     'buyer_id' => $buyer->id,
@@ -224,14 +264,17 @@ class CheckoutController extends Controller
                         $orderTotal * PlatformSetting::commissionRate(),
                         2
                     ),
+                    'shop_voucher_id' => $voucherModel?->id,
+                    'voucher_code' => $voucherModel?->code,
+                    'voucher_discount' => $sellerVoucherDiscount,
                     'ship_province' => $buyer->buyerProfile?->province,
                     'ship_municipality' => $buyer->buyerProfile?->municipality,
                     'ship_barangay' => $buyer->buyerProfile?->barangay,
                     'ship_street' => $buyer->buyerProfile
                         ? trim(
                             ($buyer->buyerProfile->house_number ?? '')
-                                . ' '
-                                . ($buyer->buyerProfile->street ?? '')
+                                .' '
+                                .($buyer->buyerProfile->street ?? '')
                         )
                         : null,
                     'ship_contact_no' => $buyer->buyerProfile?->contact_no,
@@ -244,7 +287,22 @@ class CheckoutController extends Controller
 
                 $order->logStatusEvent(null, $buyer->id);
 
+                // Allocate voucher discount proportionally to eligible items
+                $eligibleItemsForVoucher = collect();
+                if ($voucherModel && isset($appliedVoucher)) {
+                    $eligibleItemsForVoucher = $appliedVoucher['eligible_items']->pluck('id')->flip();
+                }
+                $eligibleSubtotalForAlloc = 0;
+                if ($voucherModel && $eligibleItemsForVoucher->isNotEmpty()) {
+                    $eligibleSubtotalForAlloc = $items->filter(fn ($it) => $eligibleItemsForVoucher->has($it->id))->sum('line_total');
+                }
+
                 foreach ($items as $item) {
+                    $itemVoucherDiscount = 0;
+                    if ($voucherModel && $sellerVoucherDiscount > 0 && $eligibleSubtotalForAlloc > 0 && $eligibleItemsForVoucher->has($item->id)) {
+                        $itemVoucherDiscount = round($sellerVoucherDiscount * ($item->line_total / $eligibleSubtotalForAlloc), 2);
+                    }
+
                     OrderItem::create([
                         'order_id' => $order->id,
                         'product_id' => $item->product_id,
@@ -252,10 +310,12 @@ class CheckoutController extends Controller
                         'product_name' => $item->product->name,
                         'selected_options' => $item->selected_options,
                         'quantity' => $item->quantity,
+                        'weight_kg' => $item->line_weight_kg,
                         'price_at_purchase' => $item->unit_price,
                         'original_price' => $item->variant?->price
                             ?? $item->product->price,
                         'subtotal' => $item->line_total,
+                        'voucher_discount_allocated' => $itemVoucherDiscount,
                     ]);
 
                     // Conditional decrement prevents stock from going below zero.
@@ -282,6 +342,33 @@ class CheckoutController extends Controller
                 }
             }
 
+            // Record voucher redemption if used
+            if (isset($appliedVoucher) && $appliedVoucher['voucher'] && $voucherDiscountTotal > 0) {
+                $voucherModelFinal = ShopVoucher::where('id', $appliedVoucher['voucher']->id)->lockForUpdate()->first();
+                if ($voucherModelFinal && $voucherModelFinal->canBeUsedByBuyer($buyer->id)) {
+                    $orderForRedemption = Order::where('buyer_id', $buyer->id)
+                        ->where('shop_voucher_id', $voucherModelFinal->id)
+                        ->latest()
+                        ->first();
+                    ShopVoucherRedemption::create([
+                        'shop_voucher_id' => $voucherModelFinal->id,
+                        'buyer_id' => $buyer->id,
+                        'seller_id' => $voucherModelFinal->seller_id,
+                        'order_id' => $orderForRedemption?->id,
+                        'discount_amount' => $voucherDiscountTotal,
+                        'order_subtotal' => $cartItems->sum('line_total'),
+                        'status' => 'used',
+                        'used_at' => now(),
+                    ]);
+                    $voucherModelFinal->increment('used_quantity');
+                    if (! is_null($voucherModelFinal->total_quantity) && $voucherModelFinal->used_quantity >= $voucherModelFinal->total_quantity) {
+                        $voucherModelFinal->status = 'exhausted';
+                        $voucherModelFinal->is_active = false;
+                        $voucherModelFinal->save();
+                    }
+                }
+            }
+
             // 5. Synchronize each variant product's total stock.
             foreach ($touchedVariantProducts as $product) {
                 $product->syncFromVariants();
@@ -289,7 +376,7 @@ class CheckoutController extends Controller
 
             // 6. Remove only the cart items that were checked out.
             $cartItems->pluck('id')->chunk(500)->each(
-                fn($chunk) => CartItem::whereIn('id', $chunk)->delete()
+                fn ($chunk) => CartItem::whereIn('id', $chunk)->delete()
             );
 
             return true;
@@ -322,7 +409,7 @@ class CheckoutController extends Controller
     /**
      * Calculate shipping for each seller.
      *
-     * @param Collection<int|string, Collection<int, \App\Models\CartItem>> $groupedBySeller
+     * @param  Collection<int|string, Collection<int, CartItem>>  $groupedBySeller
      * @return array<int|string, array{fee: float, zone: string}>
      */
     private function quoteShipping(

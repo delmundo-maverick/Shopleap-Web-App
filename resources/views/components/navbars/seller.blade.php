@@ -148,6 +148,20 @@
                 @endif
             </a>
 
+            <a href="{{ route('seller.vouchers.index') }}" title="Shop Vouchers"
+                class="nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
+                {{ $active === 'vouchers'
+                    ? 'frost-chip text-primary font-semibold'
+                    : 'text-charcoal/70 hover:bg-ice-blue hover:text-primary' }}">
+
+                <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                        d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                </svg>
+
+                <span class="nav-label">Shop Vouchers</span>
+            </a>
+
             <p class="nav-section-title px-3 pb-2 pt-4 text-xs font-semibold uppercase tracking-wide text-charcoal/40">
                 Insights
             </p>

@@ -12,15 +12,21 @@ class OrderItem extends Model
         'product_variant_id',
         'product_name',
         'quantity',
+        'weight_kg',
         'price_at_purchase',
         'subtotal',
         'selected_options',
         'original_price',
+        'voucher_discount_allocated',
     ];
 
     protected function casts(): array
     {
-        return ['selected_options' => 'array'];
+        return [
+            'selected_options' => 'array',
+            'weight_kg' => 'decimal:3',
+            'voucher_discount_allocated' => 'decimal:2',
+        ];
     }
 
     public function order()

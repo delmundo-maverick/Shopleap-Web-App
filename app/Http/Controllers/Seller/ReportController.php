@@ -47,18 +47,20 @@ class ReportController extends Controller
                     ]);
                 }
             } else {
-                fputcsv($out, ['Order #', 'Order Date', 'Buyer', 'Order Status', 'Units', 'Gross (PHP)', 'Commission (PHP)', 'Net (PHP)', 'Classification']);
+                fputcsv($out, ['Order #', 'Order Date', 'Buyer', 'Order Status', 'Units', 'Gross (PHP)', 'Voucher Discount (PHP)', 'Commission (PHP)', 'Net (PHP)', 'Classification']);
 
-                $totals = ['gross' => 0.0, 'commission' => 0.0];
+                $totals = ['gross' => 0.0, 'commission' => 0.0, 'voucher' => 0.0];
 
                 foreach ($service->ledger($sellerId, $from, $to) as $order) {
                     $gross = (float) $order->net_items_amount;
                     $commission = (float) $order->net_commission_amount;
+                    $voucherDiscount = (float) ($order->voucher_discount ?? 0);
 
                     if (in_array($order->status, Order::GROUP_REALIZED, true)) {
                         $classification = 'Realized';
                         $totals['gross'] += $gross;
                         $totals['commission'] += $commission;
+                        $totals['voucher'] += $voucherDiscount;
                     } elseif (in_array($order->status, Order::GROUP_IN_PROGRESS, true)) {
                         $classification = 'Pending';
                     } else {
@@ -72,6 +74,7 @@ class ReportController extends Controller
                         $order->status_label,
                         (int) $order->items_sum_quantity,
                         number_format($gross, 2, '.', ''),
+                        number_format($voucherDiscount, 2, '.', ''),
                         number_format($commission, 2, '.', ''),
                         number_format($gross - $commission, 2, '.', ''),
                         $classification,
@@ -86,6 +89,7 @@ class ReportController extends Controller
                     '',
                     '',
                     number_format($totals['gross'], 2, '.', ''),
+                    number_format($totals['voucher'] ?? 0, 2, '.', ''),
                     number_format($totals['commission'], 2, '.', ''),
                     number_format($totals['gross'] - $totals['commission'], 2, '.', ''),
                     '',
