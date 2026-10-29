@@ -206,8 +206,6 @@
                 <span class="nav-label">System Activity Logs</span>
             </a>
 
-
-
             {{-- Platform Settings --}}
             <p class="nav-section-title px-3 pb-2 pt-4 text-xs font-semibold uppercase tracking-wide text-charcoal/40">
                 Platform Settings
