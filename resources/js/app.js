@@ -1,6 +1,8 @@
 import Alpine from 'alpinejs';
+import sortingScanner from './sorting-scanner.js';
 
 window.Alpine = Alpine;
+window.sortingScanner = sortingScanner;
 
 Alpine.store('sidebar', {
     open: false,

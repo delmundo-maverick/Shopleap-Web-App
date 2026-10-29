@@ -50,7 +50,7 @@
         <div class="mb-6 flex items-center justify-center gap-3 text-xs font-semibold text-charcoal/40 sm:text-sm">
             <span class="flex items-center gap-1.5 text-charcoal/40">
                 <span class="flex h-5 w-5 items-center justify-center rounded-full bg-charcoal/10 text-[10px]">
-                    ₱�
+                    1
                 </span>
                 Cart
             </span>
@@ -309,10 +309,13 @@
                         <div class="mb-4" x-data="voucherCheckout()" x-init="init()">
                             <label class="mb-1.5 block text-xs font-semibold text-charcoal">Shop Voucher</label>
                             <div class="flex gap-2">
-                                <input type="text" x-model="code" placeholder="Enter voucher code" class="w-full rounded-lg border border-light-gray px-3 py-2 text-sm uppercase outline-none focus:border-primary">
-                                <button type="button" @click="applyVoucher()" class="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-sky-blue">Apply</button>
+                                <input type="text" x-model="code" placeholder="Enter voucher code"
+                                    class="w-full rounded-lg border border-light-gray px-3 py-2 text-sm uppercase outline-none focus:border-primary">
+                                <button type="button" @click="applyVoucher()"
+                                    class="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-sky-blue">Apply</button>
                             </div>
-                            <p x-show="message" x-text="message" :class="success ? 'text-leaf-green' : 'text-sale-red'" class="mt-1.5 text-xs"></p>
+                            <p x-show="message" x-text="message"
+                                :class="success ? 'text-leaf-green' : 'text-sale-red'" class="mt-1.5 text-xs"></p>
                             <input type="hidden" name="voucher_code" :value="appliedCode">
                         </div>
 
@@ -339,9 +342,11 @@
                             </span>
                         </div>
 
-                        <div class="mt-2 flex items-center justify-between gap-3 text-sm text-charcoal/70" x-data="{ disc: 0 }" @voucher-applied.window="disc = $event.detail.discount">
+                        <div class="mt-2 flex items-center justify-between gap-3 text-sm text-charcoal/70"
+                            x-data="{ disc: 0 }" @voucher-applied.window="disc = $event.detail.discount">
                             <span>Voucher Discount</span>
-                            <span class="shrink-0 font-semibold text-leaf-green">- ₱<span x-text="disc.toFixed(2)"></span></span>
+                            <span class="shrink-0 font-semibold text-leaf-green">- ₱<span
+                                    x-text="disc.toFixed(2)"></span></span>
                         </div>
 
                         <div class="my-4 h-px bg-light-gray"></div>
@@ -350,7 +355,8 @@
                             <span class="text-sm font-bold text-charcoal">Total Payment</span>
 
                             <span class="text-xl font-bold text-primary">
-                                ₱<span x-data="{ total: {{ $grandTotal }}, disc: 0 }" @voucher-applied.window="disc = $event.detail.discount" x-text="(total - disc).toFixed(2)"></span>
+                                ₱<span x-data="{ total: {{ $grandTotal }}, disc: 0 }" @voucher-applied.window="disc = $event.detail.discount"
+                                    x-text="(total - disc).toFixed(2)"></span>
                             </span>
                         </div>
 
@@ -409,8 +415,9 @@
                     try {
                         const formData = new FormData();
                         formData.append('code', this.code);
-                        formData.append('_token', document.querySelector('input[name="_token"]').value);
-                        const response = await fetch('{{ route("buyer.vouchers.apply") }}', {
+                        formData.append('_token', document.querySelector('input[name="_token"]')
+                            .value);
+                        const response = await fetch('{{ route('buyer.vouchers.apply') }}', {
                             method: 'POST',
                             body: formData,
                             headers: {
@@ -422,16 +429,29 @@
                             this.appliedCode = data.voucher_code;
                             this.success = true;
                             this.message = data.message || 'Voucher applied successfully.';
-                            window.dispatchEvent(new CustomEvent('voucher-applied', { detail: { discount: parseFloat(data.discount) || 0, code: data.voucher_code } }));
+                            window.dispatchEvent(new CustomEvent('voucher-applied', {
+                                detail: {
+                                    discount: parseFloat(data.discount) || 0,
+                                    code: data.voucher_code
+                                }
+                            }));
                         } else {
                             this.success = false;
                             this.message = data.message || 'Failed to apply voucher.';
-                            window.dispatchEvent(new CustomEvent('voucher-applied', { detail: { discount: 0 } }));
+                            window.dispatchEvent(new CustomEvent('voucher-applied', {
+                                detail: {
+                                    discount: 0
+                                }
+                            }));
                         }
                     } catch (e) {
                         this.success = false;
                         this.message = 'An error occurred while applying voucher.';
-                        window.dispatchEvent(new CustomEvent('voucher-applied', { detail: { discount: 0 } }));
+                        window.dispatchEvent(new CustomEvent('voucher-applied', {
+                            detail: {
+                                discount: 0
+                            }
+                        }));
                     }
                 }
             }));
