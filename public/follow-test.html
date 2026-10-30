@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="csrf-token" content="test-token">
+    <title>Follow Test</title>
+</head>
+<body>
+    <script id="sellerFollowData" type="application/json">{"ids":[],"counts":{"5":10},"followUrl":"/buyer/sellers/__ID__/follow","unfollowUrl":"/buyer/sellers/__ID__/unfollow","loginUrl":"/login"}</script>
+
+    <button type="button" x-data
+        x-init="$store.follow.prime(5, 10, false)"
+        @click="$store.follow.toggle(5)"
+        :aria-pressed="$store.follow.has(5)"
+        :aria-label="$store.follow.has(5) ? 'Unfollow this shop' : 'Follow this shop'"
+        :disabled="!! $store.follow.pending[5]"
+        :class="$store.follow.has(5) ? 'following' : 'follow'"
+        class="follow-button">
+        <span x-text="$store.follow.has(5) ? 'Following' : 'Follow'">Follow</span>
+    </button>
+
+    <button id="undefined-disabled" x-data="{ foo: undefined }" :disabled="foo">undefined</button>
+    <button id="false-disabled" x-data="{ foo: false }" :disabled="foo">false</button>
+    <button id="null-disabled" x-data="{ foo: null }" :disabled="foo">null</button>
+    <button id="missing-disabled" x-data="{}" :disabled="foo">missing</button>
+
+    <pre id="debug"></pre>
+
+    <script type="module" src="/build/assets/app-CaVCG91S.js"></script>
+    <script>
+        setTimeout(function () {
+            var store = window.Alpine && window.Alpine.store('follow');
+            document.getElementById('debug').textContent = JSON.stringify({
+                pending: store ? store.pending : 'NO_STORE',
+                pendingValue: store ? store.pending[5] : 'NO_STORE',
+                has: store ? store.has(5) : 'NO_STORE',
+                counts: store ? store.counts : 'NO_STORE',
+                disabled: document.querySelector('button').disabled,
+                attr: document.querySelector('button').getAttribute('disabled'),
+            });
+        }, 1000);
+    </script>
+</body>
+</html>

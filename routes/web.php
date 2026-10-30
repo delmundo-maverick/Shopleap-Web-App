@@ -1,17 +1,17 @@
 <?php
 
-use App\Http\Controllers\LandingController;
-use App\Http\Controllers\MessagingController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\PolicyController;
-use App\Http\Controllers\ReturnMediaController;
-use App\Http\Controllers\SupportController;
-
+use App\Http\Controllers\Admin\ActivityLogController;
+use App\Http\Controllers\Admin\BuyerManagementController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\LogisticsManagementController;
+use App\Http\Controllers\Admin\PlatformSettingController;
+use App\Http\Controllers\Admin\ReturnController as AdminReturnController;
+use App\Http\Controllers\Admin\SellerManagementController;
+use App\Http\Controllers\Admin\TransactionController;
 use App\Http\Controllers\Auth\BuyerRegistrationController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogisticsRegistrationController;
 use App\Http\Controllers\Auth\SellerRegistrationController;
-
 use App\Http\Controllers\Buyer\AccountController as BuyerAccountController;
 use App\Http\Controllers\Buyer\CartController;
 use App\Http\Controllers\Buyer\CheckoutController;
@@ -20,10 +20,23 @@ use App\Http\Controllers\Buyer\OrderController as BuyerOrderController;
 use App\Http\Controllers\Buyer\ProductController as BuyerProductController;
 use App\Http\Controllers\Buyer\ReturnController as BuyerReturnController;
 use App\Http\Controllers\Buyer\ReviewController as BuyerReviewController;
+use App\Http\Controllers\Buyer\SellerFollowController;
 use App\Http\Controllers\Buyer\ShopController;
 use App\Http\Controllers\Buyer\VoucherController as BuyerVoucherController;
 use App\Http\Controllers\Buyer\WishlistController;
-
+use App\Http\Controllers\LandingController;
+use App\Http\Controllers\Logistics\DashboardController as LogisticsDashboardController;
+use App\Http\Controllers\Logistics\DeliveryController;
+use App\Http\Controllers\Logistics\IncomingParcelController;
+use App\Http\Controllers\Logistics\PickupController;
+use App\Http\Controllers\Logistics\RiderController;
+use App\Http\Controllers\Logistics\ServiceAreaController;
+use App\Http\Controllers\Logistics\SortingController;
+use App\Http\Controllers\Logistics\SortingSessionController as LogisticsSortingSessionController;
+use App\Http\Controllers\MessagingController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PolicyController;
+use App\Http\Controllers\ReturnMediaController;
 use App\Http\Controllers\Seller\AccountController as SellerAccountController;
 use App\Http\Controllers\Seller\DashboardController as SellerDashboardController;
 use App\Http\Controllers\Seller\OrderController as SellerOrderController;
@@ -34,25 +47,7 @@ use App\Http\Controllers\Seller\ReturnController as SellerReturnController;
 use App\Http\Controllers\Seller\ReviewController as SellerReviewController;
 use App\Http\Controllers\Seller\ShopVoucherController;
 use App\Http\Controllers\Seller\WaybillController;
-
-use App\Http\Controllers\Logistics\DashboardController as LogisticsDashboardController;
-use App\Http\Controllers\Logistics\DeliveryController;
-use App\Http\Controllers\Logistics\IncomingParcelController;
-use App\Http\Controllers\Logistics\PickupController;
-use App\Http\Controllers\Logistics\RiderController;
-use App\Http\Controllers\Logistics\ServiceAreaController;
-use App\Http\Controllers\Logistics\SortingController;
-use App\Http\Controllers\Logistics\SortingSessionController as LogisticsSortingSessionController;
-
-use App\Http\Controllers\Admin\ActivityLogController;
-use App\Http\Controllers\Admin\BuyerManagementController;
-use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
-use App\Http\Controllers\Admin\LogisticsManagementController;
-use App\Http\Controllers\Admin\PlatformSettingController;
-use App\Http\Controllers\Admin\ReturnController as AdminReturnController;
-use App\Http\Controllers\Admin\SellerManagementController;
-use App\Http\Controllers\Admin\TransactionController;
-
+use App\Http\Controllers\SupportController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schedule;
 
@@ -224,6 +219,15 @@ Route::middleware(['auth', 'buyer'])
 
         Route::get('/shop/{seller}', [ShopController::class, 'show'])
             ->name('shop.show');
+
+        // Follow / unfollow a seller.
+        Route::post('/sellers/{seller}/follow', [SellerFollowController::class, 'store'])
+            ->middleware('throttle:60,1')
+            ->name('sellers.follow');
+
+        Route::delete('/sellers/{seller}/follow', [SellerFollowController::class, 'destroy'])
+            ->middleware('throttle:60,1')
+            ->name('sellers.unfollow');
 
         // Cart
         Route::prefix('cart')

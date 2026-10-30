@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Storage;
 
 class ReviewMedia extends Model
 {
-    public const DISK = 'r2'; // match the disk your ProductImage uses
+    public const DISK = 'r2'; //
 
     protected $fillable = ['review_id', 'path', 'type', 'sort_order'];
 
@@ -18,7 +18,10 @@ class ReviewMedia extends Model
 
     public function getUrlAttribute(): string
     {
-        return Storage::disk(self::DISK)->url($this->path);
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+        $disk = Storage::disk(self::DISK);
+
+        return $disk->url($this->path);
     }
 
     public function getIsVideoAttribute(): bool

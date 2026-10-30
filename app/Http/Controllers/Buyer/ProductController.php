@@ -40,7 +40,7 @@ class ProductController extends Controller
                         ->groupBy('order_items.product_id')
                         ->selectRaw('order_items.product_id, SUM(order_items.quantity) as units_sold'),
                     'sales',
-                    fn($join) => $join->on('sales.product_id', '=', 'products.id')
+                    fn ($join) => $join->on('sales.product_id', '=', 'products.id')
                 )
                 ->orderByDesc('sales.units_sold');
         } elseif ($sort === 'price_low') {
@@ -103,8 +103,8 @@ class ProductController extends Controller
         $reviewCount = (int) ($summary->total ?? 0);
 
         $reviewStats = [
-            'count'      => $reviewCount,
-            'average'    => $reviewCount > 0 ? round((float) $summary->average, 1) : null,
+            'count' => $reviewCount,
+            'average' => $reviewCount > 0 ? round((float) $summary->average, 1) : null,
             'with_media' => $reviewCount > 0 ? (clone $reviewBase)->whereHas('media')->count() : 0,
         ];
 
@@ -122,43 +122,55 @@ class ProductController extends Controller
 
         $reviews = (clone $reviewBase)
             ->with(['media', 'buyer', 'orderItem'])
-            ->when($ratingFilter, fn($q) => $q->where('rating', $ratingFilter))
-            ->when($mediaFilter, fn($q) => $q->whereHas('media'))
+            ->when($ratingFilter, fn ($q) => $q->where('rating', $ratingFilter))
+            ->when($mediaFilter, fn ($q) => $q->whereHas('media'))
             ->latest()
             ->paginate(5)
             ->withQueryString()
             ->fragment('reviews')
-            ->through(fn(Review $review) => [
-                'id'         => $review->id,
-                'rating'     => $review->rating,
-                'comment'    => $review->comment,
-                'buyer'      => $review->buyer_masked_name,
-                'variation'  => collect($review->orderItem?->selected_options ?? [])
-                    ->map(fn($v, $k) => (is_int($k) ? '' : "{$k}: ") . (is_array($v) ? implode('/', $v) : $v))
+            ->through(fn (Review $review) => [
+                'id' => $review->id,
+                'rating' => $review->rating,
+                'comment' => $review->comment,
+                'buyer' => $review->buyer_masked_name,
+                'variation' => collect($review->orderItem?->selected_options ?? [])
+                    ->map(fn ($v, $k) => (is_int($k) ? '' : "{$k}: ").(is_array($v) ? implode('/', $v) : $v))
                     ->filter()
                     ->implode(', '),
                 'created_at' => $review->created_at,
-                'reply'      => $review->seller_reply,
+                'reply' => $review->seller_reply,
                 'replied_at' => $review->seller_replied_at,
-                'media'      => $review->media->map(fn($m) => [
-                    'url'      => $m->url,
+                'media' => $review->media->map(fn ($m) => [
+                    'url' => $m->url,
                     'is_video' => $m->is_video,
                 ])->values(),
             ]);
 
         // Seller stats for the seller card (same queries the shop page uses)
-        $sellerSummary = Review::where('seller_id', $product->seller_id)
-            ->toBase()
-            ->selectRaw('COUNT(*) AS total, AVG(rating) AS average')
-            ->first();
+        $seller = $product->seller;
+        $sellerEligible = $seller?->isEligibleSeller() ?? false;
+        $sellerStats = null;
+        $isFollowing = false;
 
-        $sellerRatingCount = (int) ($sellerSummary->total ?? 0);
+        if ($sellerEligible) {
+            $sellerSummary = Review::where('seller_id', $product->seller_id)
+                ->toBase()
+                ->selectRaw('COUNT(*) AS total, AVG(rating) AS average')
+                ->first();
 
-        $sellerStats = [
-            'products'       => Product::where('seller_id', $product->seller_id)->active()->count(),
-            'rating_count'   => $sellerRatingCount,
-            'rating_average' => $sellerRatingCount > 0 ? round((float) $sellerSummary->average, 1) : null,
-        ];
+            $sellerRatingCount = (int) ($sellerSummary->total ?? 0);
+
+            $sellerStats = [
+                'products' => Product::where('seller_id', $product->seller_id)->active()->count(),
+                'rating_count' => $sellerRatingCount,
+                'rating_average' => $sellerRatingCount > 0 ? round((float) $sellerSummary->average, 1) : null,
+                'followers' => $seller->followers()->count(),
+            ];
+
+            $isFollowing = $request->user()->isFollowing($seller);
+        }
+
+        $followingCount = $request->user()->followedSellers()->count();
 
         return view('Buyer.products.show', array_merge(
             compact(
@@ -170,7 +182,9 @@ class ProductController extends Controller
                 'ratingDistribution',
                 'ratingFilter',
                 'mediaFilter',
-                'sellerStats'
+                'sellerStats',
+                'isFollowing',
+                'followingCount',
             ),
             $this->cartSummary($request)
         ));

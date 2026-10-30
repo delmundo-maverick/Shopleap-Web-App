@@ -147,11 +147,11 @@ $wishlistPayload = [
                         <a href="{{ route('buyer.account.index') }}"
                             class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My Account</a>
                         <a href="{{ route('buyer.orders.index') }}"
-                            class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My Purchases</a>
+                            class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">Purchases</a>
                         <a href="{{ route('buyer.wishlist.index') }}"
-                            class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My Wishlist</a>
+                            class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">Wishlist</a>
                         <a href="{{ route('buyer.vouchers.index') }}"
-                            class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">My Vouchers</a>
+                            class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">Vouchers</a>
                         <a href="{{ route('messages.index') }}"
                             class="block px-4 py-2.5 text-sm transition hover:bg-ice-blue">Chat / Messages</a>
 
@@ -291,11 +291,22 @@ $wishlistPayload = [
     @json($wishlistPayload)
 </script>
 
-{{-- WISHLIST: toast shown for wishlist and add-to-cart feedback --}}
-<div x-data="{ show: false, message: '', error: false, timer: null }"
-    @wishlist-toast.window="
-        message = $event.detail.message; error = $event.detail.error; show = true;
-        clearTimeout(timer); timer = setTimeout(() => show = false, 3000)"
+{{-- WISHLIST / FOLLOW: shared toast for page-level action feedback --}}
+<div x-data="{
+    show: false,
+    message: '',
+    error: false,
+    timer: null,
+    notify(detail) {
+        this.message = detail.message;
+        this.error = detail.error;
+        this.show = true;
+        clearTimeout(this.timer);
+        this.timer = setTimeout(() => (this.show = false), 3000);
+    },
+}"
+    @wishlist-toast.window="notify($event.detail)"
+    @seller-follow-toast.window="notify($event.detail)"
     x-show="show" x-cloak x-transition role="status" aria-live="polite"
     :class="error ? 'bg-sale-red' : 'bg-leaf-green'"
     class="fixed bottom-20 right-3 z-[80] max-w-[calc(100vw-1.5rem)] rounded-xl px-4 py-3 text-sm font-medium text-white shadow-xl sm:bottom-6 sm:right-6 sm:max-w-sm">
