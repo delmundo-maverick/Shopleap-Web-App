@@ -44,26 +44,25 @@ class ProductVariant extends Model
         return $this->stock_quantity <= ($threshold ?? (int) config('shop.low_stock_threshold', 5));
     }
 
-    /**
-     * Human-readable combo label, e.g. "Pack Size: Pack of 4, Color: Red"
-     */
     public function getLabelAttribute(): string
     {
         return collect($this->options)
-            ->map(fn ($value, $name) => "{$name}: {$value}")
+            ->map(fn($value, $name) => "{$name}: {$value}")
             ->implode(', ');
     }
 
     public function getImageUrlAttribute(): ?string
     {
-        return $this->image_path
-            ? Storage::disk('r2_public')->url($this->image_path)
-            : null;
+        if (!$this->image_path) {
+            return null;
+        }
+
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+        $disk = Storage::disk('r2_public');
+
+        return $disk->url($this->image_path);
     }
 
-    /**
-     * Variant weight when set, otherwise the parent product's default weight.
-     */
     public function getEffectiveWeightKgAttribute(): ?float
     {
         if ($this->weight_kg !== null) {

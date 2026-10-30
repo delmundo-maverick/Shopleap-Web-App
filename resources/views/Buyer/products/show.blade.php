@@ -372,10 +372,10 @@
                             </dd>
                         </div>
 
-                        {{-- PLACEHOLDER UNTIL FOLLOW FEATURE EXISTS --}}
                         <div class="flex items-center justify-between gap-3">
                             <dt class="text-charcoal/55">Followers</dt>
-                            <dd class="font-semibold text-primary">--</dd>
+                            <dd x-data x-text="$store.follow.followerCount({{ $seller->id }})"
+                                class="font-semibold text-primary">{{ number_format($sellerStats['followers']) }}</dd>
                         </div>
                     </dl>
                 </div>
@@ -832,8 +832,8 @@
             <div class="mt-4 flex items-center gap-3 rounded-xl border border-light-gray p-3">
                 <div class="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-ice-blue/60">
                     @if ($product->main_image_url)
-                        <img id="cartModalImage" src="{{ $product->main_image_url }}"
-                            alt="{{ $product->name }}" class="h-full w-full object-cover">
+                        <img id="cartModalImage" src="{{ $product->main_image_url }}" alt="{{ $product->name }}"
+                            class="h-full w-full object-cover">
                     @endif
                 </div>
 
@@ -875,9 +875,12 @@
                     'price' => (float) $product->priceAfterDiscount($v->price),
                     'original_price' => (float) $v->price,
                     'stock_quantity' => $v->stock_quantity,
-                    'weight_kg' => $v->weight_kg !== null
-                        ? (float) $v->weight_kg
-                        : ($product->weight_kg !== null ? (float) $product->weight_kg : null),
+                    'weight_kg' =>
+                        $v->weight_kg !== null
+                            ? (float) $v->weight_kg
+                            : ($product->weight_kg !== null
+                                ? (float) $product->weight_kg
+                                : null),
                     'image_url' => $v->image_url,
                 ],
             ),
@@ -887,6 +890,10 @@
     <script id="productData" type="application/json">
         @json($productDataForJs)
     </script>
+
+    @if ($sellerStats)
+        <x-Buyer.seller-follow-data :ids="$isFollowing ? [$seller->id] : []" :counts="[$seller->id => $sellerStats['followers']]" :total="$followingCount" />
+    @endif
 
     {{-- SHARED FOOTER --}}
     <x-footer />

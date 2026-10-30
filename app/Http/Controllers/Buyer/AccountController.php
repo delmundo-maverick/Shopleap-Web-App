@@ -14,7 +14,31 @@ class AccountController extends Controller
         $user = $request->user();
         $profile = $user->buyerProfile;
 
-        return view('Buyer.account.index', compact('user', 'profile'));
+        $following = $user->followedSellers()
+            ->eligibleSellers()
+            ->select('users.*')
+            ->with('sellerProfile')
+            ->withCount([
+                'followers',
+                'products as active_products_count' => fn ($query) => $query->active(),
+            ])
+            ->orderByDesc('seller_followers.created_at')
+            ->paginate(8)
+            ->withQueryString()
+            ->fragment('following');
+
+        $followingIds = $following->getCollection()->pluck('id')->all();
+        $followingCounts = $following->getCollection()
+            ->mapWithKeys(fn ($seller) => [$seller->id => $seller->followers_count])
+            ->all();
+
+        return view('Buyer.account.index', compact(
+            'user',
+            'profile',
+            'following',
+            'followingIds',
+            'followingCounts',
+        ));
     }
 
     public function updateProfile(Request $request)

@@ -48,16 +48,9 @@
                     </div>
 
                     <div class="mt-3 grid grid-cols-2 gap-2">
-                        <!-- Follow button (placeholder: no follow feature yet) -->
-                        <button type="button"
-                            class="flex items-center justify-center gap-2 border border-white/80 bg-transparent px-3 py-2 text-xs font-bold text-white transition hover:bg-white/10">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M12 4v16m8-8H4" />
-                            </svg>
-                            Follow
-                        </button>
+                        <!-- Follow / unfollow -->
+                        <x-Buyer.follow-button :seller="$seller" :followers-count="$followersCount"
+                            :is-following="$isFollowing" variant="inverse" class="w-full" />
 
                         <!-- Chat link -->
                         <a href="{{ route('messages.index') }}?contact={{ $seller->id }}"
@@ -100,14 +93,15 @@
                         </p>
                     </a>
 
-                    {{-- Followers: placeholder until the follow feature exists --}}
                     <div class="flex items-center gap-3">
                         <svg class="h-4 w-4 shrink-0 text-charcoal" fill="none" stroke="currentColor"
                             viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"
                                 d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-4.13a4 4 0 11-8 0 4 4 0 018 0zm6 0a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        <p class="text-sm text-charcoal">Followers: <span class="font-medium text-primary">--</span>
+                        <p class="text-sm text-charcoal">Followers: <span x-data
+                                x-text="$store.follow.followerCount({{ $seller->id }})"
+                                class="font-medium text-primary">{{ number_format($followersCount) }}</span>
                         </p>
                     </div>
 
@@ -292,6 +286,9 @@
     </main>
 
     <x-Buyer.message-widget />
+
+    <x-Buyer.seller-follow-data :ids="$isFollowing ? [$seller->id] : []" :counts="[$seller->id => $followersCount]"
+        :total="$followingCount" />
 </body>
 
 </html>

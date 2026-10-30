@@ -305,4 +305,108 @@ Alpine.store('wishlist', {
     },
 });
 
+Alpine.store('follow', {
+    ids: {},          // { [sellerId]: true }
+    counts: {},       // { [sellerId]: follower count }
+    total: 0,         // sellers this buyer follows
+    pending: {},      // { [sellerId]: true } while a request is in flight
+    followUrl: '',
+    unfollowUrl: '',
+    loginUrl: '/login',
+
+    init() {
+        const el = document.getElementById('sellerFollowData');
+        if (!el) return;
+
+        const data = JSON.parse(el.textContent || '{}');
+        (data.ids || []).forEach((id) => (this.ids[id] = true));
+        Object.entries(data.counts || {}).forEach(([id, count]) => {
+            this.counts[id] = Number(count);
+        });
+
+        this.total = data.total ?? 0;
+        this.followUrl = data.followUrl;
+        this.unfollowUrl = data.unfollowUrl;
+        this.loginUrl = data.loginUrl || '/login';
+    },
+
+    has(id) {
+        return !!this.ids[id];
+    },
+
+    followerCount(id) {
+        return this.counts[id] ?? 0;
+    },
+
+    /** Seed a seller's state on pages that show a single shop. */
+    prime(id, count, following) {
+        if (this.pending[id]) return;
+
+        if (following) this.ids[id] = true;
+        else delete this.ids[id];
+
+        if (count !== null && count !== undefined) this.counts[id] = Number(count);
+    },
+
+    set(id, following) {
+        if (following) this.ids[id] = true;
+        else delete this.ids[id];
+    },
+
+    headers() {
+        return {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+        };
+    },
+
+    toast(message, error = false) {
+        window.dispatchEvent(new CustomEvent('seller-follow-toast', { detail: { message, error } }));
+    },
+
+    /** Optimistic toggle: update the UI now, roll back if the server says no. */
+    async toggle(id) {
+        if (this.pending[id]) return;
+
+        const wasFollowing = this.has(id);
+        const previousCount = this.followerCount(id);
+        const previousTotal = this.total;
+
+        this.pending[id] = true;
+        this.set(id, !wasFollowing);
+        this.counts[id] = Math.max(0, previousCount + (wasFollowing ? -1 : 1));
+        this.total = Math.max(0, previousTotal + (wasFollowing ? -1 : 1));
+
+        try {
+            const res = await fetch((wasFollowing ? this.unfollowUrl : this.followUrl).replace('__ID__', id), {
+                method: wasFollowing ? 'DELETE' : 'POST',
+                headers: this.headers(),
+            });
+
+            if (res.status === 401 || res.status === 419) {
+                window.location.href = this.loginUrl;
+                return;
+            }
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.success === false) {
+                throw new Error(data.message || 'Could not update your following list.');
+            }
+
+            this.set(id, data.following);
+            this.counts[id] = data.followers_count;
+            this.total = data.following_count;
+            this.toast(data.message);
+        } catch (e) {
+            this.set(id, wasFollowing);
+            this.counts[id] = previousCount;
+            this.total = previousTotal;
+            this.toast(e instanceof TypeError ? 'Network error. Please try again.' : e.message, true);
+        } finally {
+            delete this.pending[id];
+        }
+    },
+});
+
 Alpine.start();
