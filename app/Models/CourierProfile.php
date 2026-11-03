@@ -74,7 +74,7 @@ class CourierProfile extends Model
 
         $area = HubServiceArea::where('logistics_profile_id', $this->logistics_profile_id)
             ->get()
-            ->first(fn($a) => $a->area_key === $key);
+            ->first(fn ($a) => $a->area_key === $key);
 
         if (! $area) {
             return [
@@ -85,10 +85,20 @@ class CourierProfile extends Model
 
         $barangayKey = HubServiceArea::barangayKey($barangay);
 
-        $existing = $area->barangays()->with('rider')->get()
-            ->first(fn($b) => HubServiceArea::barangayKey($b->barangay) === $barangayKey);
+        $existing = HubServiceAreaBarangay::where('province_key', HubServiceArea::nameKey($this->province))
+            ->where('municipality_key', HubServiceArea::nameKey($this->municipality))
+            ->where('barangay_key', $barangayKey)
+            ->with('rider')
+            ->first();
 
-        if ($existing && $existing->rider_id && $existing->rider_id !== $this->id) {
+        if ($existing && (int) $existing->hub_service_area_id !== (int) $area->id) {
+            return [
+                'mapped' => false,
+                'message' => "Brgy. {$barangay}, {$this->municipality} already belongs to another hub, so it was not mapped.",
+            ];
+        }
+
+        if ($existing && $existing->rider_id !== null && (int) $existing->rider_id !== (int) $this->id) {
             $other = $existing->rider;
 
             if ($other && $other->status === 'approved' && $other->is_active) {

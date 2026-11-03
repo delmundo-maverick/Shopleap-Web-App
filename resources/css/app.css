@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600&display=swap');
 @import 'tailwindcss';
 
@@ -14,17 +15,43 @@
     /* Brand palette */
     --color-primary: #1A5FB4;
     --color-sky-blue: #4A90D9;
-    --color-ice-blue: #FAFAFA;
-    /* NOTE: neutral off-white. Try #EAF3FB for a visible blue tint. */
     --color-charcoal: #2E3A46;
     --color-leaf-green: #4CAF7D;
     --color-sale-red: #E4572E;
     --color-warning: #F97316;
     --color-light-gray: #F5F7FA;
 
+    /* Page canvas: an almost-white neutral. Just enough off-white that white
+       cards and their borders still read, without any blue tint. */
+    --color-ice-blue: #F8FAFC;
+
+    /* Surfaces and lines */
+    --color-surface: #FFFFFF;
+    --color-line: #DDE3EA;
+
     /* Semantic aliases: use these for UI states, not the brand names above */
     --color-success: var(--color-leaf-green);
     --color-danger: var(--color-sale-red);
+
+    /*
+    | Radius scale
+    | Overriding Tailwind's defaults means every existing rounded-* class in
+    | every Blade file gets squarer automatically, with no markup changes.
+    |
+    |   rounded-sm        4px   badges, tags
+    |   rounded-md/lg   5-6px   buttons, inputs, dropdowns
+    |   rounded-xl/2xl    8px   cards, panels
+    |   rounded-3xl      12px   modals, large containers
+    |   rounded-full            avatars, dots, switches (unchanged)
+    */
+    --radius-xs: 0.125rem;
+    --radius-sm: 0.25rem;
+    --radius-md: 0.3125rem;
+    --radius-lg: 0.375rem;
+    --radius-xl: 0.5rem;
+    --radius-2xl: 0.5rem;
+    --radius-3xl: 0.75rem;
+    --radius-4xl: 1rem;
 }
 
 /*
@@ -35,6 +62,10 @@
 @layer base {
     [x-cloak] {
         display: none !important;
+    }
+
+    body {
+        background-color: var(--color-ice-blue);
     }
 }
 
@@ -52,93 +83,72 @@
         @apply text-xs font-bold uppercase tracking-wide text-primary;
     }
 
+    /* Raised from /45 to /60 so small labels stay readable on white. */
     .text-card-label {
-        @apply text-xs font-semibold uppercase tracking-wide text-charcoal/45;
+        @apply text-xs font-semibold uppercase tracking-wide text-charcoal/60;
+    }
+
+    .text-card-title {
+        @apply text-sm font-semibold text-charcoal;
+    }
+
+    .text-card-hint {
+        @apply text-xs text-charcoal/60;
     }
 }
 
 /*
 |--------------------------------------------------------------------------
-| Frosted UI system
+| Surface system (formerly "frosted")
 |--------------------------------------------------------------------------
+| Class names are kept so existing pages keep working. Everything is now a
+| flat, solid surface: no gradients, no blur, no translucency.
 */
 @layer components {
 
-    /* Fixed page background. Put one <div class="frost-surface"></div> in the layout. */
+    /* Fixed page background. Plain solid color. Safe to leave the
+       <div class="frost-surface"></div> in layouts until they are cleaned up. */
     .frost-surface {
         position: fixed;
         inset: 0;
         z-index: -1;
-        overflow: hidden;
-        background: linear-gradient(180deg,
-                color-mix(in srgb, var(--color-ice-blue) 55%, white) 0%,
-                var(--color-ice-blue) 45%,
-                color-mix(in srgb, var(--color-ice-blue) 70%, white) 100%);
+        background: var(--color-ice-blue);
     }
 
-    .frost-surface::before,
-    .frost-surface::after {
-        content: "";
-        position: absolute;
-        border-radius: 9999px;
-        filter: blur(90px);
-        opacity: 0.55;
-    }
-
-    .frost-surface::before {
-        top: -12%;
-        left: -8%;
-        width: 42rem;
-        height: 42rem;
-        background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--color-sky-blue) 65%, white), transparent 70%);
-    }
-
-    .frost-surface::after {
-        bottom: -18%;
-        right: -10%;
-        width: 46rem;
-        height: 46rem;
-        background: radial-gradient(circle at 70% 70%, color-mix(in srgb, var(--color-primary) 35%, white), transparent 70%);
-    }
-
-    /* Lighter glass: dashboard cards, content panels. */
+    /* Standard card: dashboard cards, content panels. */
     .frost-panel {
-        background: color-mix(in srgb, white 60%, transparent);
-        backdrop-filter: blur(20px) saturate(160%);
-        border: 1px solid color-mix(in srgb, white 70%, transparent);
-        box-shadow: 0 1px 2px color-mix(in srgb, var(--color-charcoal) 6%, transparent),
-            0 12px 32px -16px color-mix(in srgb, var(--color-charcoal) 22%, transparent);
+        background: var(--color-surface);
+        border: 1px solid var(--color-line);
+        box-shadow: 0 1px 2px color-mix(in srgb, var(--color-charcoal) 5%, transparent);
     }
 
-    /* Denser glass: chrome that must stay legible (topbar, sidebar, modals). */
+    /* Chrome that floats above content: topbar, sidebar, modals, dropdowns. */
     .frost-panel-solid {
-        background: color-mix(in srgb, white 80%, transparent);
-        backdrop-filter: blur(24px) saturate(160%);
-        border: 1px solid color-mix(in srgb, white 85%, transparent);
-        box-shadow: 0 8px 30px -12px color-mix(in srgb, var(--color-charcoal) 15%, transparent);
+        background: var(--color-surface);
+        border: 1px solid var(--color-line);
+        box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--color-charcoal) 12%, transparent);
     }
 
-    /* Small glass buttons: icon toggles, collapse controls. */
+    /* Small buttons: icon toggles, collapse controls. */
     .frost-btn {
-        background: color-mix(in srgb, white 85%, transparent);
-        backdrop-filter: blur(12px) saturate(160%);
-        border: 1px solid color-mix(in srgb, white 90%, transparent);
+        background: var(--color-surface);
+        border: 1px solid var(--color-line);
+        transition: background-color 0.15s ease, color 0.15s ease;
     }
 
     /* Tinted pill: badges, active chips, avatar wells. */
     .frost-chip {
-        background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-        border: 1px solid color-mix(in srgb, var(--color-primary) 14%, transparent);
+        background: color-mix(in srgb, var(--color-primary) 8%, white);
+        border: 1px solid color-mix(in srgb, var(--color-primary) 18%, white);
     }
 
     /* Form fields: inputs, textareas, selects. */
     .frost-input {
-        background: color-mix(in srgb, white 85%, transparent);
-        backdrop-filter: blur(12px);
-        border: 1px solid color-mix(in srgb, var(--color-charcoal) 18%, white);
+        background: var(--color-surface);
+        border: 1px solid color-mix(in srgb, var(--color-charcoal) 22%, white);
         color: var(--color-charcoal);
-        box-shadow: 0 1px 3px 0 color-mix(in srgb, var(--color-charcoal) 6%, transparent);
-        transition: all 0.2s ease-in-out;
+        box-shadow: 0 1px 2px color-mix(in srgb, var(--color-charcoal) 4%, transparent);
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
 
     .frost-input::placeholder {
@@ -146,7 +156,6 @@
     }
 
     .frost-input:focus-visible {
-        background: #FFFFFF;
         border-color: var(--color-primary);
         box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
         outline: none;
@@ -159,13 +168,14 @@
     }
 
     .frost-input:disabled {
-        opacity: 0.6;
+        background: var(--color-light-gray);
+        opacity: 0.7;
         cursor: not-allowed;
     }
 
-    /* Inner card used for grouped details inside modals. */
+    /* Inner block used for grouped details inside modals and cards. */
     .modal-section {
-        @apply rounded-2xl border border-white/60 bg-white/60 p-4;
+        @apply rounded-xl border border-line bg-ice-blue p-4;
     }
 
     .modal-section__title {
@@ -174,49 +184,10 @@
     }
 }
 
-/*
-|--------------------------------------------------------------------------
-| Fallbacks and accessibility for the frosted look
-|--------------------------------------------------------------------------
-| Unsupported browsers, users who ask for less transparency, and small
-| screens (cheaper blur on low-end phones) get a solid or lighter version.
-*/
-@supports not (backdrop-filter: blur(1px)) {
-
-    .frost-panel,
-    .frost-panel-solid,
-    .frost-btn,
-    .frost-input {
-        background: rgb(255 255 255 / 0.95);
-    }
-}
-
-@media (prefers-reduced-transparency: reduce) {
-
-    .frost-panel,
-    .frost-panel-solid,
-    .frost-btn,
-    .frost-input {
-        background: rgb(255 255 255 / 0.97);
-        backdrop-filter: none;
-    }
-
-    .frost-surface::before,
-    .frost-surface::after {
-        display: none;
-    }
-}
-
-@media (max-width: 640px) {
-
-    .frost-surface::before,
-    .frost-surface::after {
-        filter: blur(60px);
-    }
-}
-
 @media (prefers-reduced-motion: reduce) {
-    .frost-input {
+
+    .frost-input,
+    .frost-btn {
         transition: none;
     }
 }
@@ -240,15 +211,14 @@
         align-items: center;
         gap: 0.375rem;
         padding: 0.25rem 0.625rem;
-        border: 1px solid color-mix(in srgb, var(--badge-color) 30%, transparent);
-        border-radius: 9999px;
-        background: color-mix(in srgb, var(--badge-color) 12%, transparent);
+        border: 1px solid color-mix(in srgb, var(--badge-color) 28%, white);
+        border-radius: var(--radius-sm);
+        background: color-mix(in srgb, var(--badge-color) 10%, white);
         color: color-mix(in srgb, var(--badge-color) 80%, black);
         font-size: 0.75rem;
         line-height: 1rem;
         font-weight: 500;
         text-transform: capitalize;
-        backdrop-filter: blur(8px);
     }
 
     .status-badge::before {
@@ -299,6 +269,11 @@
     }
 }
 
+/*
+|--------------------------------------------------------------------------
+| Pagination
+|--------------------------------------------------------------------------
+*/
 .pagination-frost nav {
     display: flex;
     align-items: center;
@@ -308,14 +283,14 @@
 .pagination-frost a,
 .pagination-frost span[aria-disabled="true"]>span,
 .pagination-frost span[aria-current="page"]>span {
-    border-radius: 0.65rem;
-    border-color: color-mix(in srgb, white 70%, transparent);
-    background: color-mix(in srgb, white 70%, transparent);
+    border-radius: var(--radius-lg);
+    border-color: var(--color-line);
+    background: var(--color-surface);
     color: var(--color-charcoal);
 }
 
 .pagination-frost a:hover {
-    background: color-mix(in srgb, var(--color-primary) 10%, white);
+    background: color-mix(in srgb, var(--color-primary) 8%, white);
     color: var(--color-primary);
 }
 
@@ -328,4 +303,9 @@
     background: var(--color-primary);
     border-color: var(--color-primary);
     color: #fff;
+}
+
+
+.variant-value-btn[aria-pressed="true"] {
+    @apply border-primary bg-primary/10 font-bold text-primary;
 }

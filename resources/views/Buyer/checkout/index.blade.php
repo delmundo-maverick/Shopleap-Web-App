@@ -15,8 +15,7 @@
 
     <header class="sticky top-0 z-40 border-b border-white/10 bg-primary">
         <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-3 md:px-8">
-
-            <!-- LOGO -->
+            
             <a href="{{ route('buyer.home') }}" class="flex shrink-0 items-center gap-2">
                 <span class="flex h-9 w-9 items-center justify-center overflow-hidden">
                     <img src="{{ asset('images/Shopleap-Logo-White.png') }}" alt="Shopleap"

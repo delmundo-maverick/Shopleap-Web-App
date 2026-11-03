@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Http\Controllers\Controller;
 use App\Http\Controllers\Auth\Concerns\HandlesOtpRegistration;
+use App\Http\Controllers\Controller;
+use App\Models\HubServiceArea;
+use App\Models\LogisticsProfile;
 use App\Services\OtpService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -52,6 +54,12 @@ class LogisticsRegistrationController extends Controller
             'account_status' => 'active',
         ];
 
+        $companyName = preg_replace('/\\s+/', ' ', trim($validated['company_name']));
+
+        $joiningExisting = LogisticsProfile::query()
+            ->get()
+            ->contains(fn ($hub) => $hub->companyKey() === HubServiceArea::nameKey($companyName));
+
         $profileAttributes = [
             'last_name' => $validated['last_name'],
             'first_name' => $validated['first_name'],
@@ -65,7 +73,8 @@ class LogisticsRegistrationController extends Controller
             'barangay' => $validated['barangay'],
             'street_address' => $validated['street_address'],
             'business_name' => $validated['business_name'],
-            'company_name' => preg_replace('/\s+/', ' ', trim($validated['company_name'])),
+            'company_name' => $companyName,
+            'joining_existing_company' => $joiningExisting,
             'id_upload_path' => $idPath,
             'business_permit_path' => $permitPath,
             'status' => 'pending',

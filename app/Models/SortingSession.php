@@ -22,7 +22,7 @@ class SortingSession extends Model
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
             'auto_closed' => 'boolean',
-            'duration_seconds' => 'integer'
+            'duration_seconds' => 'integer',
         ];
     }
 
@@ -96,7 +96,7 @@ class SortingSession extends Model
             return 0;
         }
 
-        $query = Order::where('logistics_profile_id', $this->logistics_profile_id)
+        $query = Order::heldBy($this->logistics_profile_id)
             ->where('status', Order::STATUS_ASSIGNED_TO_RIDER)
             ->where('updated_at', '>=', $this->started_at);
 

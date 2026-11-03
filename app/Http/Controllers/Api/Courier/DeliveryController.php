@@ -7,6 +7,7 @@ use App\Http\Controllers\Logistics\DeliveryController as HubDeliveryController;
 use App\Models\CourierProfile;
 use App\Models\Order;
 use App\Services\OrderTransitions;
+use App\Services\RiderCoverage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -21,6 +22,7 @@ class DeliveryController extends Controller
         $orders = Order::with(['items', 'seller.sellerProfile', 'buyer.buyerProfile'])
             ->where('delivery_rider_id', $courier->id)
             ->whereIn('status', [Order::STATUS_ASSIGNED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY])
+            ->whereRaw('COALESCE(current_hub_id, logistics_profile_id) = ?', [$courier->logistics_profile_id])
             ->orderBy('delivery_area')->orderBy('ship_municipality')->orderBy('ship_barangay')->orderBy('id')
             ->get();
 
@@ -80,6 +82,26 @@ class DeliveryController extends Controller
 
         abort_unless($order->delivery_rider_id === $courier->id, 403, 'This delivery is not assigned to you.');
 
+        abort_unless(
+            (int) ($order->current_hub_id ?? $order->logistics_profile_id) === (int) $courier->logistics_profile_id,
+            403,
+            'This delivery belongs to another hub.'
+        );
+
+        $dest = $order->ship_to;
+
+        abort_unless(
+            RiderCoverage::coversAddress(
+                $courier,
+                $dest['province'],
+                $dest['municipality'],
+                $dest['barangay'],
+                $order->logistics_profile_id
+            ),
+            422,
+            'You do not cover this delivery address. Ask the sorting center to reassign it.'
+        );
+
         return $courier;
     }
 
@@ -95,6 +117,7 @@ class DeliveryController extends Controller
         return [
             'order_id' => $o->id,
             'status' => $o->status,
+            'hub_id' => $o->current_hub_id ?? $o->logistics_profile_id,
             'delivery_area' => $o->delivery_area,
             'buyer' => [
                 'name' => $ship['name'],

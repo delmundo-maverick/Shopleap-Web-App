@@ -12,6 +12,7 @@ use App\Models\ProductVariant;
 use App\Models\ShopVoucher;
 use App\Models\ShopVoucherRedemption;
 use App\Services\HubCoverage;
+use App\Services\ParcelLifecycle;
 use App\Services\ShippingFeeCalculator;
 use App\Services\ShopVoucherService;
 use Illuminate\Http\Request;
@@ -51,7 +52,8 @@ class CheckoutController extends Controller
 
         $shippingTotal = collect($shippingBySeller)->sum('fee');
 
-        // Sellers for whom no single hub covers both pickup and delivery.
+        // Sellers whose pickup hub and delivery hub can't be paired under one
+        // logistics company.
         $profile = $request->user()->buyerProfile;
 
         $blockedSellerIds = $groupedBySeller
@@ -59,7 +61,8 @@ class CheckoutController extends Controller
                 fn ($items) => ! $coverage->isCovered(
                     $items->first()->product->seller,
                     $profile?->province,
-                    $profile?->municipality
+                    $profile?->municipality,
+                    $profile?->barangay
                 )
             )
             ->keys()
@@ -82,7 +85,8 @@ class CheckoutController extends Controller
         Request $request,
         ShippingFeeCalculator $shipping,
         HubCoverage $coverage,
-        ShopVoucherService $voucherService
+        ShopVoucherService $voucherService,
+        ParcelLifecycle $lifecycle
     ) {
         $buyer = $request->user();
 
@@ -107,7 +111,8 @@ class CheckoutController extends Controller
             $buyer,
             $shipping,
             $coverage,
-            $voucherService
+            $voucherService,
+            $lifecycle
         ) {
             // 1. Lock the cart rows so a double-click cannot place the order twice.
             $cartItems = $this->selectedCartItems(
@@ -192,23 +197,30 @@ class CheckoutController extends Controller
                 }
             }
 
-            // 3b. A single hub must cover both the seller's pickup area
-            // and the buyer's delivery area.
-            foreach ($cartItems->groupBy('product.seller_id') as $items) {
+            // 3b. Resolve the pickup hub and delivery hub for each seller.
+            // Both ends must belong to the same logistics company.
+            $routes = [];
+
+            foreach ($cartItems->groupBy('product.seller_id') as $sellerId => $items) {
                 $seller = $items->first()->product->seller;
 
-                if (! $coverage->isCovered(
+                $route = $coverage->routeFor(
                     $seller,
                     $buyer->buyerProfile->province,
-                    $buyer->buyerProfile->municipality
-                )) {
+                    $buyer->buyerProfile->municipality,
+                    $buyer->buyerProfile->barangay
+                );
+
+                if (! $route) {
                     $name = $seller->sellerProfile->business_name
                         ?? $seller->name;
 
                     $this->fail(
-                        "\"{$name}\" can't deliver to your address yet. Please remove their items from your cart."
+                        "\"{$name}\" can't deliver to your address yet. No logistics company serves both the seller's pickup area and your barangay. Please remove their items from your cart."
                     );
                 }
+
+                $routes[$sellerId] = $route;
             }
 
             // 4. Create one order per seller and deduct stock.
@@ -252,6 +264,8 @@ class CheckoutController extends Controller
                 );
 
                 // Commission calculated on order total (items subtotal) as per existing policy
+                $route = $routes[$sellerId];
+
                 $order = Order::create([
                     'seller_id' => $sellerId,
                     'buyer_id' => $buyer->id,
@@ -267,6 +281,8 @@ class CheckoutController extends Controller
                     'shop_voucher_id' => $voucherModel?->id,
                     'voucher_code' => $voucherModel?->code,
                     'voucher_discount' => $sellerVoucherDiscount,
+                    'origin_hub_id' => $route['origin']->id,
+                    'destination_hub_id' => $route['destination']->id,
                     'ship_province' => $buyer->buyerProfile?->province,
                     'ship_municipality' => $buyer->buyerProfile?->municipality,
                     'ship_barangay' => $buyer->buyerProfile?->barangay,
@@ -285,7 +301,7 @@ class CheckoutController extends Controller
                     ) ?: null,
                 ]);
 
-                $order->logStatusEvent(null, $buyer->id);
+                $lifecycle->placed($order, $buyer->id);
 
                 // Allocate voucher discount proportionally to eligible items
                 $eligibleItemsForVoucher = collect();

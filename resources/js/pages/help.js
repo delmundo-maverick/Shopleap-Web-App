@@ -31,10 +31,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return d.innerHTML;
     };
 
-    const btnPrimary = 'rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white transition hover:bg-sky-blue disabled:opacity-50';
-    const btnGhost = 'rounded-xl border border-charcoal/15 bg-white px-4 py-2.5 text-sm font-semibold text-charcoal/70 transition hover:bg-primary/5 hover:text-primary';
-    const optionCard = 'flex cursor-pointer items-center gap-3 rounded-xl border border-charcoal/10 bg-white px-3 py-2.5 text-sm transition hover:border-primary/40 has-[:checked]:border-primary has-[:checked]:bg-primary/5';
-    const fieldClass = 'w-full rounded-xl border border-charcoal/15 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10';
+    // Same button, option and field styles as the orders page.
+    const btnPrimary = 'inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-5 py-2 text-xs font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60';
+    const btnGhost = 'inline-flex min-h-10 items-center justify-center rounded-lg border border-line bg-white px-5 py-2 text-xs font-bold text-charcoal transition-colors hover:border-primary hover:text-primary';
+    const optionCard = 'flex cursor-pointer items-center gap-3 rounded-lg border border-line bg-white px-3.5 py-2.5 text-sm transition-colors hover:border-primary has-[:checked]:border-primary has-[:checked]:bg-primary/5';
+    const fieldClass = 'frost-input w-full rounded-lg px-3.5 py-2.5 text-sm';
 
     function setStep(n) {
         state.step = n;
@@ -43,8 +44,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const i = parseInt(dot.dataset.stepDot, 10);
             const done = n === 4 || i < n;
             const active = i === n;
-            dot.className = 'flex h-6 w-6 items-center justify-center rounded-full ' +
-                (done ? 'bg-leaf-green text-white' : active ? 'bg-primary text-white' : 'bg-light-gray text-charcoal/50');
+            dot.className = 'flex h-6 w-6 items-center justify-center rounded-full border ' +
+                (done
+                    ? 'border-leaf-green bg-leaf-green text-white'
+                    : active
+                        ? 'border-primary bg-primary text-white'
+                        : 'border-line bg-ice-blue text-charcoal/50');
             dot.textContent = done ? '✓' : i;
         });
         render();
@@ -58,15 +63,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------- Step 1: topic ----------------
     function renderTopics() {
         body.innerHTML = `
-            <h2 class="text-base font-bold text-charcoal">What do you need help with?</h2>
-            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+            <h2 class="text-sm font-bold text-charcoal sm:text-base">What do you need help with?</h2>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2 sm:gap-3">
                 ${Object.entries(topics).map(([key, t]) => `
                     <button type="button" data-topic="${esc(key)}"
-                        class="flex items-start gap-3 rounded-xl border border-charcoal/10 bg-white p-3 text-left transition hover:border-primary hover:bg-primary/5">
-                        <span class="text-xl leading-none">${t.icon}</span>
+                        class="flex items-start gap-3 rounded-xl border border-line bg-white p-3 text-left transition-colors hover:border-primary">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-ice-blue text-lg leading-none">${t.icon}</span>
                         <span class="min-w-0">
                             <span class="block text-sm font-semibold text-charcoal">${esc(t.label)}</span>
-                            <span class="block text-xs text-charcoal/55">${esc(t.description)}</span>
+                            <span class="block text-xs text-charcoal/60">${esc(t.description)}</span>
                         </span>
                     </button>`).join('')}
             </div>`;
@@ -89,8 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const orderRequired = t.order === 'required';
 
         body.innerHTML = `
-            <button type="button" id="wizBack" class="text-xs font-semibold text-primary hover:underline">← Change topic</button>
-            <h2 class="mt-2 text-base font-bold text-charcoal">${t.icon} ${esc(t.label)}</h2>
+            <button type="button" id="wizBack" class="text-xs font-bold text-primary hover:underline">← Change topic</button>
+            <h2 class="mt-2 text-sm font-bold text-charcoal sm:text-base">${t.icon} ${esc(t.label)}</h2>
 
             <fieldset class="mt-4">
                 <legend class="mb-2 text-sm font-semibold text-charcoal">What's going on?</legend>
@@ -117,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ${needsOrder ? `
                 <div class="mt-4">
                     <label for="wizOrder" class="mb-2 block text-sm font-semibold text-charcoal">
-                        Which order is this about? ${orderRequired ? '<span class="text-sale-red">*</span>' : '<span class="font-normal text-charcoal/45">(optional)</span>'}
+                        Which order is this about? ${orderRequired ? '<span class="text-sale-red">*</span>' : '<span class="font-normal text-charcoal/60">(optional)</span>'}
                     </label>
                     <select id="wizOrder" class="${fieldClass}">
                         <option value="">${orderRequired ? 'Select an order' : 'Not about a specific order'}</option>
@@ -130,19 +135,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 <label for="wizDetails" class="mb-2 block text-sm font-semibold text-charcoal">Tell us more</label>
                 <textarea id="wizDetails" rows="4" maxlength="1500" placeholder="Describe what happened so we can help faster."
                     class="${fieldClass} resize-none">${esc(state.details)}</textarea>
-                <p class="mt-1 text-right text-[11px] text-charcoal/45"><span id="wizCount">${state.details.length}</span>/1500</p>
+                <p class="mt-1 text-right text-[11px] text-charcoal/60"><span id="wizCount">${state.details.length}</span>/1500</p>
             </div>
 
             <div class="mt-2">
-                <p class="mb-2 text-sm font-semibold text-charcoal">Photos <span class="font-normal text-charcoal/45">(optional, up to ${MAX_FILES})</span></p>
+                <p class="mb-2 text-sm font-semibold text-charcoal">Photos <span class="font-normal text-charcoal/60">(optional, up to ${MAX_FILES})</span></p>
                 <div id="wizPhotos" class="flex flex-wrap items-center gap-2"></div>
                 <input type="file" id="wizFile" accept="image/jpeg,image/png,image/webp,image/gif" multiple class="hidden">
             </div>
 
             <p id="wizError" class="mt-3 hidden text-xs font-semibold text-sale-red"></p>
 
-            <div class="mt-4 flex justify-end">
-                <button type="button" id="wizNext" class="${btnPrimary}">Review</button>
+            <div class="mt-4 flex justify-end border-t border-line pt-4">
+                <button type="button" id="wizNext" class="${btnPrimary} w-full sm:w-auto">Review</button>
             </div>`;
 
         const followUpBox = body.querySelector('#followUpBox');
@@ -175,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.files.forEach((file, index) => {
                 const url = URL.createObjectURL(file);
                 const chip = document.createElement('div');
-                chip.className = 'relative h-16 w-16 overflow-hidden rounded-lg border border-charcoal/10 bg-white';
+                chip.className = 'relative h-16 w-16 overflow-hidden rounded-lg border border-line bg-ice-blue';
                 chip.innerHTML = `
                     <img src="${url}" alt="" class="h-full w-full object-cover">
                     <button type="button" aria-label="Remove photo"
@@ -191,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.files.length < MAX_FILES) {
                 const add = document.createElement('button');
                 add.type = 'button';
-                add.className = 'flex h-16 w-16 flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-charcoal/25 text-[11px] font-semibold text-charcoal/55 transition hover:border-primary hover:text-primary';
+                add.className = 'flex h-16 w-16 flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-dashed border-line bg-ice-blue text-[11px] font-semibold text-charcoal/60 transition-colors hover:border-primary/50 hover:text-primary';
                 add.innerHTML = '<span class="text-lg leading-none">+</span><span>Add</span>';
                 add.addEventListener('click', () => fileInput.click());
                 photosEl.appendChild(add);
@@ -254,16 +259,16 @@ document.addEventListener('DOMContentLoaded', () => {
         ].filter(Boolean);
 
         body.innerHTML = `
-            <h2 class="text-base font-bold text-charcoal">Review your ticket</h2>
-            <dl class="mt-3 divide-y divide-charcoal/10 rounded-xl border border-charcoal/10 bg-white">
+            <h2 class="text-sm font-bold text-charcoal sm:text-base">Review your ticket</h2>
+            <dl class="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
                 ${rows.map(([k, v]) => `
-                    <div class="px-3 py-2.5">
-                        <dt class="text-[11px] font-semibold uppercase tracking-wide text-charcoal/45">${esc(k)}</dt>
-                        <dd class="mt-0.5 whitespace-pre-line break-words text-sm text-charcoal">${esc(v)}</dd>
+                    <div class="px-3.5 py-3">
+                        <dt class="text-card-label">${esc(k)}</dt>
+                        <dd class="mt-1 whitespace-pre-line break-words text-sm text-charcoal">${esc(v)}</dd>
                     </div>`).join('')}
             </dl>
             <p id="wizError" class="mt-3 ${state.error ? '' : 'hidden'} text-xs font-semibold text-sale-red">${esc(state.error)}</p>
-            <div class="mt-4 flex items-center justify-between gap-2">
+            <div class="mt-4 flex items-center justify-between gap-2 border-t border-line pt-4">
                 <button type="button" id="wizEdit" class="${btnGhost}">Edit</button>
                 <button type="button" id="wizSubmit" class="${btnPrimary}" ${state.submitting ? 'disabled' : ''}>
                     ${state.submitting ? 'Sending…' : 'Submit ticket'}
@@ -322,12 +327,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDone() {
         const { ticket_number: number, conversation_id: id } = state.result;
         body.innerHTML = `
-            <div class="py-4 text-center">
-                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-leaf-green/10 text-xl text-leaf-green">✓</div>
-                <h2 class="mt-3 text-base font-bold text-charcoal">Your ticket has been sent</h2>
-                <p class="mt-1 text-sm text-charcoal/60">Ticket number <span class="font-bold text-charcoal">${esc(number)}</span></p>
-                <p class="mt-1 text-xs text-charcoal/50">Our support team will reply inside your ticket.</p>
-                <div class="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+            <div class="flex flex-col items-center justify-center p-4 text-center sm:p-10">
+                <div class="flex h-12 w-12 items-center justify-center rounded-full border border-leaf-green/40 bg-leaf-green/10 text-xl text-leaf-green">✓</div>
+                <h2 class="mt-3 text-sm font-bold text-charcoal sm:text-base">Your ticket has been sent</h2>
+                <p class="mt-1 text-sm text-charcoal/70">Ticket number <span class="font-bold text-charcoal">${esc(number)}</span></p>
+                <p class="mt-1 text-xs text-charcoal/60">Our support team will reply inside your ticket.</p>
+                <div class="mt-5 flex w-full flex-col justify-center gap-2 sm:w-auto sm:flex-row">
                     <a href="${root.dataset.ticketsUrl}?conversation=${id}" class="${btnPrimary}">View ticket</a>
                     <a href="${window.location.pathname}" class="${btnGhost}">Start another</a>
                 </div>

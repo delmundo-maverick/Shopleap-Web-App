@@ -131,8 +131,12 @@
                                     </tr>
                                 </thead>
 
+                                {{-- Divider: on md+ every cell of every row except the last gets a bottom line.
+                                     Applied on cells so it works with any border-collapse mode.
+                                     Replaces the old divide-y, which is unreliable on table-row-group.
+                                     Mobile rows are already separate bordered cards. --}}
                                 <tbody
-                                    class="block space-y-3 p-3 md:table-row-group md:space-y-0 md:divide-y md:divide-white/50 md:p-0">
+                                    class="block space-y-3 p-3 md:table-row-group md:space-y-0 md:p-0 md:[&>tr:not(:last-child)>td]:border-b md:[&>tr:not(:last-child)>td]:border-charcoal/10">
                                     @foreach ($orders as $order)
                                         <tr
                                             class="block rounded-xl border border-white/50 bg-white/30 p-3 transition hover:bg-white/40 md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0">

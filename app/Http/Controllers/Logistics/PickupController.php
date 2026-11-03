@@ -6,20 +6,25 @@ use App\Http\Controllers\Controller;
 use App\Models\CourierProfile;
 use App\Models\HubServiceArea;
 use App\Models\Order;
+use App\Services\HubContext;
+use App\Services\Notifier;
 use App\Services\OrderTransitions;
+use App\Services\ParcelLifecycle;
+use App\Services\RiderCoverage;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class PickupController extends Controller
 {
     public function index(Request $request)
     {
-        $hub = $request->user()->logisticsProfile;
+        $hub = HubContext::require($request);
         $tab = $request->get('tab') === 'scheduled' ? 'scheduled' : 'to_assign';
 
-        $base = Order::where('logistics_profile_id', $hub->id)
+        $base = Order::originatingFrom($hub->id)
             ->where('status', Order::STATUS_READY_FOR_PICKUP);
 
         $counts = [
@@ -31,8 +36,8 @@ class PickupController extends Controller
             ->with(['items', 'seller.sellerProfile', 'pickupRider'])
             ->when(
                 $tab === 'scheduled',
-                fn($q) => $q->whereNotNull('pickup_rider_id'),
-                fn($q) => $q->whereNull('pickup_rider_id')
+                fn ($q) => $q->whereNotNull('pickup_rider_id'),
+                fn ($q) => $q->whereNull('pickup_rider_id')
             )
             ->orderBy('pickup_date')
             ->orderBy('id')
@@ -45,7 +50,7 @@ class PickupController extends Controller
         $areas = $hub->serviceAreas()
             ->with(['rider', 'barangays.rider'])
             ->get()
-            ->keyBy(fn($a) => $a->area_key);
+            ->keyBy(fn ($a) => $a->area_key);
 
         $suggested = $orders->getCollection()->mapWithKeys(function ($o) use ($areas) {
             $seller = $o->seller->sellerProfile;
@@ -71,8 +76,8 @@ class PickupController extends Controller
      */
     public function assign(Request $request, Order $order)
     {
-        $hub = $request->user()->logisticsProfile;
-        $this->authorizeOwnership($order, $hub->id);
+        $hub = HubContext::require($request);
+        $this->authorize('actAsOriginHub', $order);
 
         if ($order->status !== Order::STATUS_READY_FOR_PICKUP) {
             return back()->withErrors([
@@ -95,6 +100,23 @@ class PickupController extends Controller
         if (! $rider) {
             return back()->withErrors([
                 'rider_id' => 'Choose one of your active, approved riders.',
+            ]);
+        }
+
+        $order->loadMissing('seller.sellerProfile');
+        $seller = $order->seller?->sellerProfile;
+
+        if (! RiderCoverage::coversAddress(
+            $rider,
+            $seller?->province,
+            $seller?->municipality,
+            $seller?->barangay,
+            $order->origin_hub_id ?? $hub->id
+        )) {
+            throw ValidationException::withMessages([
+                'rider_id' => "{$rider->full_name} does not cover the seller's address"
+                    .($seller?->barangay ? " (Brgy. {$seller->barangay}, {$seller->municipality})" : '')
+                    .'. Assign a rider who covers it, or update Service Areas.',
             ]);
         }
 
@@ -122,20 +144,20 @@ class PickupController extends Controller
             ]);
 
             $order->logInternalEvent(
-                'Pickup scheduled' . (
+                'Pickup scheduled'.(
                     $changed
                     ? ' (schedule adjusted by sorting center)'
                     : ''
                 ),
                 "{$rider->full_name} · "
-                    . Carbon::parse($validated['pickup_date'])->format('M d, Y')
-                    . ' · '
-                    . Order::PICKUP_SLOTS[$validated['pickup_time_slot']]
+                    .Carbon::parse($validated['pickup_date'])->format('M d, Y')
+                    .' · '
+                    .Order::PICKUP_SLOTS[$validated['pickup_time_slot']]
             );
         });
 
         // Notify relevant users that a pickup rider was assigned.
-        app(\App\Services\Notifier::class)->pickupAssigned(
+        app(Notifier::class)->pickupAssigned(
             $order,
             $rider,
             $request->user()->id
@@ -151,10 +173,10 @@ class PickupController extends Controller
      * Hub can't serve this pickup:
      * send it back to the seller to choose another hub.
      */
-    public function decline(Request $request, Order $order)
+    public function decline(Request $request, Order $order, ParcelLifecycle $lifecycle)
     {
-        $hub = $request->user()->logisticsProfile;
-        $this->authorizeOwnership($order, $hub->id);
+        $hub = HubContext::require($request);
+        $this->authorize('actAsOriginHub', $order);
 
         if (
             $order->status !== Order::STATUS_READY_FOR_PICKUP
@@ -169,28 +191,36 @@ class PickupController extends Controller
             'reason' => ['required', 'string', 'max:255'],
         ]);
 
-        DB::transaction(function () use ($order, $hub, $validated) {
-            $order->update([
-                'status' => Order::STATUS_PREPARING,
-                'logistics_profile_id' => null,
-                'pickup_status' => 'declined',
-                'pickup_decline_reason' => $validated['reason'],
-                'pickup_date' => null,
-                'pickup_time_slot' => null,
-            ]);
-
-            $order->logStatusEvent(
-                'Seller is rearranging the pickup.'
+        DB::transaction(function () use ($order, $hub, $validated, $request, $lifecycle) {
+            // Keep origin/destination hubs so the checkout route survives the
+            // decline and the seller can rebook the same pickup hub.
+            $moved = $lifecycle->transition(
+                $order,
+                Order::STATUS_READY_FOR_PICKUP,
+                Order::STATUS_PREPARING,
+                [
+                    'logistics_profile_id' => null,
+                    'current_hub_id' => null,
+                    'pickup_status' => 'declined',
+                    'pickup_decline_reason' => $validated['reason'],
+                    'pickup_date' => null,
+                    'pickup_time_slot' => null,
+                ],
+                'Seller is rearranging the pickup.',
+                $request->user()->id,
+                $hub->id,
             );
 
-            $order->logInternalEvent(
-                "Pickup declined by {$hub->business_name}",
-                $validated['reason']
-            );
+            if ($moved) {
+                $order->logInternalEvent(
+                    "Pickup declined by {$hub->business_name}",
+                    $validated['reason']
+                );
+            }
         });
 
         // Notify relevant users that the pickup request was declined.
-        app(\App\Services\Notifier::class)->pickupDeclined(
+        app(Notifier::class)->pickupDeclined(
             $order,
             $hub->business_name,
             $validated['reason'],
@@ -213,8 +243,8 @@ class PickupController extends Controller
         Order $order,
         OrderTransitions $transitions
     ) {
-        $hub = $request->user()->logisticsProfile;
-        $this->authorizeOwnership($order, $hub->id);
+        HubContext::require($request);
+        $this->authorize('actAsOriginHub', $order);
 
         if (
             $order->status !== Order::STATUS_READY_FOR_PICKUP
@@ -250,14 +280,5 @@ class PickupController extends Controller
             ->where('is_active', true)
             ->orderBy('first_name')
             ->get();
-    }
-
-    private function authorizeOwnership(Order $order, int $hubId): void
-    {
-        abort_unless(
-            $order->logistics_profile_id === $hubId,
-            403,
-            'This order is not assigned to your sorting center.'
-        );
     }
 }

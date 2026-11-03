@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Services\Notifier;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -29,6 +30,9 @@ class Order extends Model
         'ship_street',
         'ship_contact_no',
         'logistics_profile_id',
+        'origin_hub_id',
+        'destination_hub_id',
+        'current_hub_id',
         'pickup_rider_id',
         'delivery_rider_id',
         'delivery_area',
@@ -90,6 +94,8 @@ class Order extends Model
     const STATUS_AT_SORTING_CENTER = 'AT_SORTING_CENTER';
 
     const STATUS_SORTED = 'SORTED';
+
+    const STATUS_AWAITING_TRANSFER = 'AWAITING_TRANSFER';
 
     const STATUS_ASSIGNED_TO_RIDER = 'ASSIGNED_TO_RIDER';
 
@@ -153,6 +159,7 @@ class Order extends Model
         self::STATUS_PICKED_UP,
         self::STATUS_AT_SORTING_CENTER,
         self::STATUS_SORTED,
+        self::STATUS_AWAITING_TRANSFER,
         self::STATUS_ASSIGNED_TO_RIDER,
         self::STATUS_OUT_FOR_DELIVERY,
         self::STATUS_DELIVERY_FAILED,
@@ -201,6 +208,7 @@ class Order extends Model
         self::STATUS_PICKED_UP,
         self::STATUS_AT_SORTING_CENTER,
         self::STATUS_SORTED,
+        self::STATUS_AWAITING_TRANSFER,
         self::STATUS_ASSIGNED_TO_RIDER,
         self::STATUS_OUT_FOR_DELIVERY,
         self::STATUS_DELIVERED,
@@ -233,6 +241,7 @@ class Order extends Model
         self::STATUS_PICKED_UP,
         self::STATUS_AT_SORTING_CENTER,
         self::STATUS_SORTED,
+        self::STATUS_AWAITING_TRANSFER,
         self::STATUS_ASSIGNED_TO_RIDER,
         self::STATUS_OUT_FOR_DELIVERY,
         self::STATUS_DELIVERED,
@@ -300,6 +309,7 @@ class Order extends Model
         self::STATUS_PICKED_UP => 'Picked Up',
         self::STATUS_AT_SORTING_CENTER => 'At Sorting Center',
         self::STATUS_SORTED => 'Sorted',
+        self::STATUS_AWAITING_TRANSFER => 'Awaiting Transfer',
         self::STATUS_ASSIGNED_TO_RIDER => 'Assigned to Rider',
         self::STATUS_OUT_FOR_DELIVERY => 'Out for Delivery',
         self::STATUS_DELIVERED => 'Delivered',
@@ -317,6 +327,7 @@ class Order extends Model
         self::STATUS_PICKED_UP => 'bg-primary/10 text-primary',
         self::STATUS_AT_SORTING_CENTER => 'bg-primary/10 text-primary',
         self::STATUS_SORTED => 'bg-primary/10 text-primary',
+        self::STATUS_AWAITING_TRANSFER => 'bg-orange-100 text-orange-600',
         self::STATUS_ASSIGNED_TO_RIDER => 'bg-primary/10 text-primary',
         self::STATUS_OUT_FOR_DELIVERY => 'bg-primary/10 text-primary',
         self::STATUS_DELIVERED => 'bg-leaf-green/10 text-leaf-green',
@@ -335,6 +346,7 @@ class Order extends Model
         self::STATUS_PICKED_UP => 'Parcel picked up by courier',
         self::STATUS_AT_SORTING_CENTER => 'Parcel arrived at the sorting center',
         self::STATUS_SORTED => 'Parcel sorted for delivery',
+        self::STATUS_AWAITING_TRANSFER => 'Parcel awaiting transfer to its destination hub',
         self::STATUS_ASSIGNED_TO_RIDER => 'Rider assigned for delivery',
         self::STATUS_OUT_FOR_DELIVERY => 'Out for delivery',
         self::STATUS_DELIVERED => 'Parcel delivered',
@@ -387,6 +399,57 @@ class Order extends Model
         return $this->belongsTo(LogisticsProfile::class);
     }
 
+    /** The hub that owns the pickup leg. Set when the seller chooses a hub. */
+    public function originHub()
+    {
+        return $this->belongsTo(LogisticsProfile::class, 'origin_hub_id');
+    }
+
+    /** The hub that serves the delivery address. Set when the route is resolved. */
+    public function destinationHub()
+    {
+        return $this->belongsTo(LogisticsProfile::class, 'destination_hub_id');
+    }
+
+    /** The hub physically holding the parcel right now. */
+    public function currentHub()
+    {
+        return $this->belongsTo(LogisticsProfile::class, 'current_hub_id');
+    }
+
+    /** Orders currently held by a hub (current hub or the hub that owns the order). */
+    public function scopeHeldBy($query, int $hubId)
+    {
+        return $query->where(function ($q) use ($hubId) {
+            $q->where('current_hub_id', $hubId)
+                ->orWhere('logistics_profile_id', $hubId);
+        });
+    }
+
+    /** Orders that are not yet final (still in motion). */
+    public function scopeNonFinal($query)
+    {
+        return $query->whereIn('status', [
+            self::STATUS_PLACED,
+            self::STATUS_CONFIRMED,
+            self::STATUS_PREPARING,
+            self::STATUS_READY_FOR_PICKUP,
+            self::STATUS_PICKED_UP,
+            self::STATUS_AT_SORTING_CENTER,
+            self::STATUS_SORTED,
+            self::STATUS_AWAITING_TRANSFER,
+            self::STATUS_ASSIGNED_TO_RIDER,
+            self::STATUS_OUT_FOR_DELIVERY,
+            self::STATUS_DELIVERY_FAILED,
+        ]);
+    }
+
+    /** Orders whose pickup leg belongs to a hub. */
+    public function scopeOriginatingFrom($query, int $hubId)
+    {
+        return $query->where('origin_hub_id', $hubId);
+    }
+
     public function pickupRider()
     {
         return $this->belongsTo(CourierProfile::class, 'pickup_rider_id');
@@ -400,6 +463,16 @@ class Order extends Model
     public function events()
     {
         return $this->hasMany(OrderEvent::class)->orderBy('id');
+    }
+
+    public function parcelEvents()
+    {
+        return $this->hasMany(ParcelEvent::class)->orderBy('id');
+    }
+
+    public function shipmentBagItems()
+    {
+        return $this->hasMany(ShipmentBagItem::class);
     }
 
     // ── Accessors ──
@@ -619,6 +692,49 @@ class Order extends Model
     }
 
     // ── Tracking timeline ──
+
+    /**
+     * Public tracking rows for the buyer and seller timelines.
+     * Parcel events are the source of truth; orders created before they
+     * existed fall back to the older order events.
+     *
+     * @return Collection<int, array{id: int, title: string, note: string|null, created_at: Carbon}>
+     */
+    public function trackingTimeline(): Collection
+    {
+        $parcelEvents = $this->relationLoaded('parcelEvents')
+            ? $this->parcelEvents
+            : $this->parcelEvents()->with('hub')->get();
+
+        if ($parcelEvents->isNotEmpty()) {
+            return $parcelEvents
+                ->reject(fn (ParcelEvent $event) => $event->event_type === ParcelEvent::TYPE_STALE)
+                ->map(fn (ParcelEvent $event) => [
+                    'id' => $event->id,
+                    'title' => $event->title,
+                    'note' => $event->note,
+                    'created_at' => $event->created_at,
+                ])
+                ->sortByDesc('id')
+                ->values();
+        }
+
+        $events = $this->relationLoaded('events')
+            ? $this->events
+            : $this->events()->get();
+
+        return $events
+            ->whereNotNull('status')
+            ->map(fn (OrderEvent $event) => [
+                'id' => $event->id,
+                'title' => $event->title,
+                'note' => $event->note,
+                'created_at' => $event->created_at,
+            ])
+            ->sortByDesc('id')
+            ->values();
+    }
+
     public function logStatusEvent(
         ?string $note = null,
         ?int $actorId = null

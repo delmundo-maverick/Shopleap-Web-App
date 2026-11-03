@@ -1,54 +1,80 @@
 @props(['product'])
 
-<div
-    class="group relative overflow-hidden rounded-lg border border-light-gray bg-white transition hover:shadow-lg hover:shadow-charcoal/10">
+@php
+    // Only a real markdown counts: was_price must be higher than what the buyer pays.
+    $hasDiscount = $product->was_price && $product->was_price > $product->display_price;
+    $discountPct = $hasDiscount
+        ? round((($product->was_price - $product->display_price) / $product->was_price) * 100)
+        : null;
 
-    <a href="{{ route('buyer.products.show', $product) }}" class="block">
+    $reviewCount = (int) ($product->reviews_count ?? 0);
+    $isNew = $product->created_at?->gt(now()->subDays(14));
+@endphp
+
+<div
+    class="group relative flex h-full flex-col overflow-hidden rounded-xl border border-line bg-white transition-colors hover:border-primary">
+
+    <a href="{{ route('buyer.products.show', $product) }}" class="flex flex-1 flex-col">
 
         <!-- IMAGE -->
-        <div class="relative aspect-square w-full overflow-hidden bg-ice-blue/60">
+        <div class="relative aspect-[5/4] w-full overflow-hidden bg-ice-blue">
             @if ($product->main_image_url)
-                <img src="{{ $product->main_image_url }}" alt="{{ $product->name }}"
-                    class="h-full w-full object-cover transition group-hover:scale-105">
+                <img src="{{ $product->main_image_url }}" alt="{{ $product->name }}" loading="lazy"
+                    class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105">
             @else
                 <div class="flex h-full w-full items-center justify-center text-charcoal/25">
-                    <svg class="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                             d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16v14H4V6z" />
                     </svg>
                 </div>
             @endif
 
-            @if ($product->was_price)
-                @php $discountPct = round((($product->was_price - $product->display_price) / $product->was_price) * 100); @endphp
+            @if ($hasDiscount)
                 <span
-                    class="absolute left-1.5 top-1.5 rounded bg-sale-red px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    class="absolute left-2 top-2 rounded-sm bg-sale-red px-1.5 py-1 text-[11px] font-bold leading-none text-white">
                     -{{ $discountPct }}%
                 </span>
             @endif
         </div>
 
         <!-- DETAILS -->
-        <div class="space-y-1 p-2.5">
+        <div class="flex flex-1 flex-col p-2.5 sm:p-3">
 
-            <p class="line-clamp-2 text-xs leading-snug text-charcoal">{{ $product->name }}</p>
+            <p class="line-clamp-2 min-h-[2.4rem] text-[13px] leading-snug text-charcoal">{{ $product->name }}</p>
 
-            <div class="flex items-baseline gap-1.5">
-                <span class="text-sm font-bold text-primary">₱{{ number_format($product->display_price) }}</span>
-                @if ($product->was_price)
-                    <span
-                        class="text-[11px] text-charcoal/40 line-through">₱{{ number_format($product->was_price) }}</span>
+            <div class="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span class="text-[15px] font-bold tabular-nums text-primary sm:text-base">
+                    ₱{{ number_format($product->display_price) }}
+                </span>
+                @if ($hasDiscount)
+                    <span class="text-[11px] tabular-nums text-charcoal/50 line-through">
+                        ₱{{ number_format($product->was_price) }}
+                    </span>
                 @endif
             </div>
 
-            {{-- No reviews/per-product sales data yet — shown honestly rather than faked --}}
-            <div class="flex items-center gap-1 text-[11px] text-charcoal/50">
-                <span class="rounded bg-leaf-green/10 px-1.5 py-0.5 font-semibold text-leaf-green">New Arrival</span>
-            </div>
+            {{-- Rating when the query provides it; otherwise a "New" tag for recent listings. --}}
+            @if ($reviewCount > 0)
+                <p class="mt-1.5 flex items-center gap-1 text-[11px] text-charcoal/60">
+                    <span class="text-amber-400">★</span>
+                    <span
+                        class="font-semibold text-charcoal/80">{{ number_format($product->reviews_avg_rating, 1) }}</span>
+                    <span>({{ number_format($reviewCount) }})</span>
+                </p>
+            @elseif ($isNew)
+                <p class="mt-1.5">
+                    <span
+                        class="inline-block rounded-sm border border-leaf-green/40 bg-leaf-green/10 px-1.5 py-0.5 text-[10px] font-semibold text-charcoal">
+                        New Arrival
+                    </span>
+                </p>
+            @endif
 
             @if ($product->seller_location)
-                <p class="flex items-center gap-1 text-[11px] text-charcoal/40">
-                    <svg class="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <p class="mt-auto flex items-center gap-1 pt-2 text-[11px] text-charcoal/60">
+                    <svg class="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -63,6 +89,6 @@
 
     {{-- Sibling of the link, not a child: valid HTML and independently focusable. --}}
     @if (auth()->user()?->role === 'buyer')
-        <x-Buyer.wishlist-button :product="$product" class="absolute right-1.5 top-1.5 z-10" />
+        <x-Buyer.wishlist-button :product="$product" class="absolute right-2 top-2 z-10" />
     @endif
 </div>

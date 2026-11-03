@@ -151,7 +151,11 @@
                                             <th scope="col"><span class="sr-only">Actions</span></th>
                                         </tr>
                                     </thead>
-                                    <tbody class="block space-y-3 p-3 md:table-row-group md:space-y-0 md:p-0">
+                                    {{-- Divider: on md+ every cell of every row except the last gets a bottom line.
+                                         Applied on cells so it works with any border-collapse mode.
+                                         Mobile rows are already separate bordered cards. --}}
+                                    <tbody
+                                        class="block space-y-3 p-3 md:table-row-group md:space-y-0 md:p-0 md:[&>tr:not(:last-child)>td]:border-b md:[&>tr:not(:last-child)>td]:border-charcoal/10">
                         @endif
 
                         @php
@@ -300,8 +304,7 @@
                     <div x-show="images.length" class="grid grid-cols-3 gap-2 sm:grid-cols-5">
                         <template x-for="(img, index) in images" :key="img.id">
                             <div class="relative overflow-hidden rounded-lg border border-white/60 bg-ice-blue/50">
-                                <img :src="img.url" alt=""
-                                    class="aspect-square w-full object-cover">
+                                <img :src="img.url" alt="" class="aspect-square w-full object-cover">
 
                                 <span x-show="index === 0"
                                     class="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[9px] font-bold text-white">Main</span>
@@ -469,8 +472,8 @@
                                             </td>
                                             <td data-label="Weight" class="{{ $variantCell }}">
                                                 <div class="min-w-0">
-                                                    <input type="number" inputmode="decimal" min="0" step="0.001"
-                                                        x-model="v.weight_kg" placeholder="Default"
+                                                    <input type="number" inputmode="decimal" min="0"
+                                                        step="0.001" x-model="v.weight_kg" placeholder="Default"
                                                         class="frost-input field-control w-full md:w-24"
                                                         :aria-label="'Weight in kg for ' + variantLabel(v)"
                                                         :aria-invalid="variantError(i, 'weight_kg') ? 'true' : 'false'">

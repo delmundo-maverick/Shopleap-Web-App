@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/hubs', [HubController::class, 'index'])
     ->middleware('throttle:60,1');
 
+// Public: the barangays inside a hub's service areas.
+Route::get('/hubs/{hub}/barangays', [HubController::class, 'barangays'])
+    ->middleware('throttle:60,1');
+
 Route::prefix('courier')->group(function () {
 
     // Registration and sign-in (no token required).

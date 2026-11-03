@@ -26,7 +26,7 @@
             $order->cancel_request_status === 'pending' &&
             in_array($order->status, \App\Models\Order::BUYER_CANCEL_REQUEST_FROM, true);
 
-        $defaultHubId = old('logistics_profile_id', $lastHubId ?? ($hubs->count() === 1 ? $hubs->first()->id : null));
+        $defaultHubId = old('logistics_profile_id', $hubs->first()?->id ?? $lastHubId);
         $inputClass =
             'frost-input w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition focus:ring-4 focus:ring-primary/10';
     @endphp
@@ -353,10 +353,10 @@
                                     <h2 class="mb-1 text-section-label">Request Pickup</h2>
 
                                     <p class="mb-4 text-xs text-charcoal/60">
-                                        Sorting centers that cover your area
-                                        (<b>{{ $sellerProfile->municipality }}, {{ $sellerProfile->province }}</b>)
-                                        and the buyer's
-                                        (<b>{{ $ship['municipality'] ?? '—' }}, {{ $ship['province'] ?? '—' }}</b>).
+                                        The sorting center assigned to your pickup address
+                                        (<b>{{ $sellerProfile->municipality }}, {{ $sellerProfile->province }}</b>).
+                                        The buyer's parcel is routed to the hub serving
+                                        <b>Brgy. {{ $ship['barangay'] ?? '—' }}, {{ $ship['municipality'] ?? '—' }}</b>.
                                     </p>
 
                                     @if ($order->pickup_status === 'declined' && $order->pickup_decline_reason)
@@ -370,7 +370,7 @@
                                     @if ($hubs->isEmpty())
                                         <div
                                             class="rounded-xl bg-ice-blue/60 p-4 text-xs leading-relaxed text-charcoal/60">
-                                            No sorting center covers both your area and the buyer's area.
+                                            No sorting center serves your pickup address yet.
                                             <a href="{{ route('messages.support') }}"
                                                 class="font-semibold text-primary hover:underline">Contact support</a>
                                             to get connected, or cancel this order.
@@ -383,7 +383,7 @@
 
                                             <fieldset class="space-y-2">
                                                 <legend class="mb-2 text-xs font-semibold text-charcoal">
-                                                    Choose a sorting center
+                                                    Pickup sorting center
                                                 </legend>
 
                                                 @foreach ($hubs as $hub)
@@ -620,31 +620,29 @@
                             @endif
 
                             {{-- Order timeline --}}
-                            @if ($order->events->isNotEmpty())
+                            @php $timeline = $order->trackingTimeline(); @endphp
+                            @if ($timeline->isNotEmpty())
                                 <section class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5">
                                     <h2 class="mb-4 text-section-label">Order Timeline</h2>
 
                                     <ol class="space-y-4 border-l border-charcoal/10 pl-5">
-                                        @foreach ($order->events->sortByDesc('id') as $event)
+                                        @foreach ($timeline as $event)
                                             <li class="relative min-w-0">
                                                 <span aria-hidden="true"
-                                                    class="absolute -left-[1.6rem] top-1.5 h-2.5 w-2.5 rounded-full {{ $event->status ? 'bg-primary' : 'bg-charcoal/25' }}"></span>
+                                                    class="absolute -left-[1.6rem] top-1.5 h-2.5 w-2.5 rounded-full {{ $loop->first ? 'bg-primary' : 'bg-charcoal/25' }}"></span>
 
                                                 <p class="break-words text-sm font-semibold text-charcoal">
-                                                    {{ $event->title }}
+                                                    {{ $event['title'] }}
                                                 </p>
 
-                                                @if ($event->note)
+                                                @if ($event['note'])
                                                     <p class="break-words text-xs text-charcoal/55">
-                                                        {{ $event->note }}
+                                                        {{ $event['note'] }}
                                                     </p>
                                                 @endif
 
                                                 <p class="text-[11px] text-charcoal/40">
-                                                    {{ $event->created_at->format('M d, g:i A') }}
-                                                    @unless ($event->status)
-                                                        · Seller &amp; logistics only
-                                                    @endunless
+                                                    {{ $event['created_at']->format('M d, g:i A') }}
                                                 </p>
                                             </li>
                                         @endforeach

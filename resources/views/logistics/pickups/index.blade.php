@@ -9,11 +9,6 @@
         </div>
     @endif
 
-    <div class="frost-panel rounded-2xl px-4 py-3 text-xs text-charcoal/60">
-        Until the rider app is live, staff use <b>Confirm Picked Up</b> on the rider's behalf once they collect the
-        parcel.
-    </div>
-
     {{-- TABS --}}
     <div class="frost-panel-solid flex rounded-2xl">
         @foreach (['to_assign' => 'To Assign', 'scheduled' => 'Scheduled'] as $key => $label)

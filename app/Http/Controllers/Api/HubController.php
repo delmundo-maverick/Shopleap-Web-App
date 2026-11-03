@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\LogisticsProfile;
+use App\Services\HubBarangayCatalog;
 use Illuminate\Http\Request;
 
 class HubController extends Controller
@@ -15,15 +16,15 @@ class HubController extends Controller
 
         $hubs = LogisticsProfile::available()
             ->with('serviceAreas')
-            ->when($q !== '', fn($query) => $query->where(function ($w) use ($q) {
+            ->when($q !== '', fn ($query) => $query->where(function ($w) use ($q) {
                 $w->where('business_name', 'ilike', "%{$q}%")
                     ->orWhere('company_name', 'ilike', "%{$q}%")
                     ->orWhere('municipality', 'ilike', "%{$q}%")
-                    ->orWhereHas('serviceAreas', fn($a) => $a->where('municipality', 'ilike', "%{$q}%"));
+                    ->orWhereHas('serviceAreas', fn ($a) => $a->where('municipality', 'ilike', "%{$q}%"));
             }))
             ->orderBy('company_name')->orderBy('business_name')
             ->get()
-            ->map(fn($hub) => [
+            ->map(fn ($hub) => [
                 'id' => $hub->id,
                 'name' => $hub->business_name,
                 'company' => $hub->company_name,
@@ -34,4 +35,17 @@ class HubController extends Controller
 
         return response()->json(['data' => $hubs]);
     }
+
+    /** The barangays inside a hub's service areas. Riders must choose one of these. */
+    public function barangays(LogisticsProfile $hub)
+    {
+        abort_unless(
+            LogisticsProfile::available()->whereKey($hub->id)->exists(),
+            404,
+            'That sorting center is not available.'
+        );
+
+        return response()->json(['data' => HubBarangayCatalog::forHub($hub)]);
+    }
 }
+    

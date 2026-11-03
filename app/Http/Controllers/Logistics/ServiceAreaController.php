@@ -3,133 +3,84 @@
 namespace App\Http\Controllers\Logistics;
 
 use App\Http\Controllers\Controller;
-use App\Models\CourierProfile;
 use App\Models\HubServiceArea;
+use App\Services\ActivityLogger;
+use App\Services\HubContext;
+use App\Services\HubServiceAreaService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class ServiceAreaController extends Controller
 {
-    public function index(Request $request)
+    public function __construct(
+        private HubServiceAreaService $areas,
+    ) {}
+
+    public function index(Request $request): View
     {
-        $hub = $request->user()->logisticsProfile;
+        $hub = HubContext::require($request);
 
-        $areas = $hub->serviceAreas()
-            ->with(['rider', 'barangays.rider'])
-            ->orderBy('province')->orderBy('municipality')->get();
+        $locationKnown = $this->areas->hubLocationIsKnown($hub);
 
-        $riders = CourierProfile::where('logistics_profile_id', $hub->id)
-            ->where('status', 'approved')->orderBy('first_name')->get();
-
-        return view('logistics.areas.index', compact('hub', 'areas', 'riders'));
+        return view('logistics.areas.index', [
+            'hub' => $hub,
+            'barangays' => $locationKnown ? $this->areas->barangayStatus($hub) : [],
+            'riders' => $this->areas->hubRiders($hub),
+            'otherAreas' => $this->areas->otherAreas($hub),
+            'locationKnown' => $locationKnown,
+        ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse|RedirectResponse
     {
-        $hub = $request->user()->logisticsProfile;
+        $hub = HubContext::require($request);
 
-        $validated = $request->validate([
-            'province' => ['required', 'string', 'max:100'],
-            'municipality' => ['required', 'string', 'max:100'],
-            'zone_name' => ['nullable', 'string', 'max:50'],
-            'rider_id' => ['nullable', 'integer'],
+        $barangays = $request->input('barangays', []);
+        $riders = $request->input('riders', []);
+
+        $this->areas->claimBarangays($hub, [
+            'barangays' => is_array($barangays) ? $barangays : [],
+            'riders' => is_array($riders) ? $riders : [],
         ]);
 
-        $key = HubServiceArea::keyFor($validated['province'], $validated['municipality']);
+        $message = "Service areas saved for {$hub->municipality}, {$hub->province}.";
 
-        if ($hub->serviceAreas()->get()->contains(fn($a) => $a->area_key === $key)) {
-            return back()->withErrors(['municipality' => 'That municipality is already in your service areas.'])->withInput();
+        ActivityLogger::log(
+            'area.barangays_saved',
+            'Logistics',
+            "Saved service barangays for {$hub->municipality}, {$hub->province}",
+            $hub
+        );
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message]);
         }
-
-        $hub->serviceAreas()->create([
-            'province' => $validated['province'],
-            'municipality' => $validated['municipality'],
-            'zone_name' => $validated['zone_name'] ?? null,
-            'rider_id' => $this->resolveRiderId($hub->id, $validated['rider_id'] ?? null),
-        ]);
-
-        return back()->with('status', "{$validated['municipality']} added to your service areas.");
-    }
-
-    public function update(Request $request, HubServiceArea $area)
-    {
-        $hub = $request->user()->logisticsProfile;
-        abort_unless($area->logistics_profile_id === $hub->id, 403);
-
-        $validated = $request->validate([
-            'zone_name' => ['nullable', 'string', 'max:50'],
-            'rider_id' => ['nullable', 'integer'],
-        ]);
-
-        $area->update([
-            'zone_name' => $validated['zone_name'] ?? null,
-            'rider_id' => $this->resolveRiderId($hub->id, $validated['rider_id'] ?? null),
-        ]);
-
-        return back()->with('status', "{$area->municipality} updated.");
-    }
-
-    /** Assign (or clear, with no rider chosen) one rider for the ticked barangays of this municipality. */
-    public function updateBarangays(Request $request, HubServiceArea $area)
-    {
-        $hub = $request->user()->logisticsProfile;
-        abort_unless($area->logistics_profile_id === $hub->id, 403);
-
-        $validated = $request->validate([
-            'barangays' => ['required', 'array', 'min:1', 'max:300'],
-            'barangays.*' => ['required', 'string', 'max:150', 'not_regex:/^\d+$/'],
-            'rider_id' => ['nullable', 'integer'],
-        ], [
-            'barangays.required' => 'Tick at least one barangay first.',
-            'barangays.min' => 'Tick at least one barangay first.',
-        ]);
-
-        $riderId = $this->resolveRiderId($hub->id, $validated['rider_id'] ?? null);
-
-        $existing = $area->barangays()->get()->keyBy(fn($b) => HubServiceArea::barangayKey($b->barangay));
-        $names = collect($validated['barangays'])->unique(fn($n) => HubServiceArea::barangayKey($n))->values();
-
-        DB::transaction(function () use ($area, $names, $existing, $riderId) {
-            foreach ($names as $name) {
-                $row = $existing->get(HubServiceArea::barangayKey($name));
-
-                if ($riderId === null) {
-                    $row?->delete();
-                    continue;
-                }
-
-                if ($row) {
-                    $row->update(['rider_id' => $riderId]);
-                } else {
-                    $area->barangays()->create(['barangay' => trim($name), 'rider_id' => $riderId]);
-                }
-            }
-        });
-
-        $message = $riderId === null
-            ? "{$names->count()} barangay(s) in {$area->municipality} cleared."
-            : "{$names->count()} barangay(s) in {$area->municipality} assigned.";
 
         return back()->with('status', $message);
     }
 
-    public function destroy(Request $request, HubServiceArea $area)
+    public function destroy(Request $request, HubServiceArea $area): RedirectResponse
     {
-        abort_unless($area->logistics_profile_id === $request->user()->logisticsProfile->id, 403);
+        $hub = HubContext::require($request);
+        abort_unless((int) $area->logistics_profile_id === (int) $hub->id, 403);
 
-        $area->delete();
+        $homeKey = HubServiceArea::keyFor($hub->province, $hub->municipality);
+        abort_if($area->area_key === $homeKey, 403, 'The home area cannot be deleted.');
 
-        return back()->with('status', "{$area->municipality} removed from your service areas.");
-    }
+        $areaName = $area->municipality;
+        $areaProvince = $area->province;
 
-    private function resolveRiderId(int $hubId, ?int $riderId): ?int
-    {
-        if (! $riderId) {
-            return null;
-        }
+        $this->areas->deleteArea($hub, $area);
 
-        return CourierProfile::where('logistics_profile_id', $hubId)
-            ->where('status', 'approved')
-            ->findOrFail($riderId)->id;
+        ActivityLogger::log(
+            'area.deleted',
+            'Logistics',
+            "Removed service area {$areaName} ({$areaProvince})",
+            $area
+        );
+
+        return back()->with('status', "{$areaName} removed from your service areas.");
     }
 }

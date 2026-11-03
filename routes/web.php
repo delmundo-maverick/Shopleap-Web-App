@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\BuyerManagementController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\HubAdminController;
 use App\Http\Controllers\Admin\LogisticsManagementController;
 use App\Http\Controllers\Admin\PlatformSettingController;
 use App\Http\Controllers\Admin\ReturnController as AdminReturnController;
@@ -27,8 +28,11 @@ use App\Http\Controllers\Buyer\WishlistController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\Logistics\DashboardController as LogisticsDashboardController;
 use App\Http\Controllers\Logistics\DeliveryController;
+use App\Http\Controllers\Logistics\InboundController;
 use App\Http\Controllers\Logistics\IncomingParcelController;
+use App\Http\Controllers\Logistics\OutboundController;
 use App\Http\Controllers\Logistics\PickupController;
+use App\Http\Controllers\Logistics\ReportController as LogisticsReportController;
 use App\Http\Controllers\Logistics\RiderController;
 use App\Http\Controllers\Logistics\ServiceAreaController;
 use App\Http\Controllers\Logistics\SortingController;
@@ -485,7 +489,7 @@ Route::middleware(['auth', 'seller'])
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'logistics'])
+Route::middleware(['auth', 'logistics', 'hub.scope'])
     ->prefix('logistics')
     ->name('logistics.')
     ->group(function () {
@@ -531,8 +535,6 @@ Route::middleware(['auth', 'logistics'])
             ->group(function () {
                 Route::get('/', 'index')->name('index');
                 Route::post('/', 'store')->name('store');
-                Route::post('/{area}', 'update')->name('update');
-                Route::post('/{area}/barangays', 'updateBarangays')->name('barangays');
                 Route::delete('/{area}', 'destroy')->name('destroy');
             });
 
@@ -578,6 +580,52 @@ Route::middleware(['auth', 'logistics'])
                 Route::post('/{order}/reschedule', 'reschedule')->name('reschedule');
                 Route::post('/{order}/return', 'returnToSeller')->name('return');
             });
+
+        // Outbound hub-to-hub transfer
+        Route::prefix('outbound')
+            ->name('outbound.')
+            ->controller(OutboundController::class)
+            ->group(function () {
+                Route::get('/', 'index')->name('index');
+                Route::post('/bags', 'store')->name('bags.store');
+                Route::get('/bags/{bag}', 'show')->name('show');
+                Route::post('/bags/{bag}/orders', 'addOrders')->name('orders.store');
+                Route::post('/bags/{bag}/scan', 'scan')
+                    ->middleware('throttle:120,1')
+                    ->name('scan');
+                Route::delete('/bags/{bag}/orders/{order}', 'removeOrder')->name('orders.destroy');
+                Route::post('/bags/{bag}/seal', 'seal')->name('seal');
+                Route::post('/bags/{bag}/dispatch', 'dispatch')->name('dispatch');
+                Route::get('/bags/{bag}/manifest', 'manifest')->name('manifest');
+            });
+
+        // Inbound hub-to-hub transfer
+        Route::prefix('inbound')
+            ->name('inbound.')
+            ->controller(InboundController::class)
+            ->group(function () {
+                Route::get('/', 'index')->name('index');
+                Route::get('/bags/{bag}', 'show')->name('show');
+                Route::post('/bags/{bag}/verify', 'verify')
+                    ->middleware('throttle:120,1')
+                    ->name('verify');
+                Route::post('/bags/{bag}/scan', 'scan')
+                    ->middleware('throttle:120,1')
+                    ->name('scan');
+                Route::post('/bags/{bag}/parcels/{order}', 'confirmParcel')->name('parcels.confirm');
+                Route::post('/bags/{bag}/close', 'close')->name('close');
+            });
+
+        // Reports
+        Route::prefix('reports')
+            ->name('reports.')
+            ->controller(LogisticsReportController::class)
+            ->group(function () {
+                Route::get('/', 'index')->name('index');
+                Route::get('/export/csv', 'exportCsv')->name('export.csv');
+                Route::get('/export/pdf', 'exportPdf')->name('export.pdf');
+            });
+
     });
 
 /*
@@ -639,6 +687,16 @@ Route::middleware(['auth', 'admin'])
                 Route::post('/{orderReturn}/refunded', 'markRefunded')->name('refunded');
             });
 
+        // Hub & company administration (super admin)
+        Route::prefix('hubs')
+            ->name('hubs.')
+            ->controller(HubAdminController::class)
+            ->group(function () {
+                Route::get('/', 'companies')->name('companies');
+                Route::get('/barangays', 'barangays')->name('barangays');
+                Route::get('/transfers', 'transfers')->name('transfers');
+            });
+
         // Activity logs
         Route::get('/logs', [ActivityLogController::class, 'index'])
             ->name('logs.index');
@@ -695,3 +753,7 @@ Schedule::command('returns:process-deadlines')->hourly();
 
 // Close stale sorting sessions after 12 hours of inactivity.
 Schedule::command('sorting:close-stale-sessions')->hourly();
+
+// Flag bags that stay in transit too long and parcels with no tracking updates.
+Schedule::command('bags:flag-stale-in-transit')->hourly();
+Schedule::command('parcels:flag-stale-events')->hourly();

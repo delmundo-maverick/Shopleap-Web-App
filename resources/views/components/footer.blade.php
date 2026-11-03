@@ -1,7 +1,7 @@
 <footer class="mt-auto border-t border-light-gray bg-white">
     <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-5 py-6 sm:flex-row">
         <p class="text-xs text-charcoal/60">
-            © {{ date('Y') }} Shopleap. All rights reserved.
+            © {{ date('Y') }} Shopleap.
         </p>
 
         <p class="text-xs text-charcoal/60">

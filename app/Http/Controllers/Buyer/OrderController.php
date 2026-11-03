@@ -6,8 +6,10 @@ use App\Http\Controllers\Buyer\Concerns\LoadsCartSummary;
 use App\Http\Controllers\Controller;
 use App\Models\CartItem;
 use App\Models\Order;
+use App\Models\ParcelEvent;
 use App\Models\ProductVariant;
 use App\Services\OrderCancellation;
+use App\Services\ParcelLifecycle;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -40,6 +42,7 @@ class OrderController extends Controller
             'items.review',
             'seller.sellerProfile',
             'events',
+            'parcelEvents.hub',
             'returns',
         ])
             ->where('buyer_id', $request->user()->id)
@@ -111,7 +114,7 @@ class OrderController extends Controller
 
         if ($mode === 'request') {
             if ($cancellation->request($order, $data['reason'], $note, $request->user()->id)) {
-                return back()->with('status', 'Cancellation request sent. The seller has ' . Order::CANCEL_REQUEST_AUTO_APPROVE_HOURS . ' hours to respond. If they don\'t, your order is cancelled automatically.');
+                return back()->with('status', 'Cancellation request sent. The seller has '.Order::CANCEL_REQUEST_AUTO_APPROVE_HOURS.' hours to respond. If they don\'t, your order is cancelled automatically.');
             }
 
             return back()->withErrors(['cancel' => 'This order was just updated. Please refresh and try again.']);
@@ -142,20 +145,23 @@ class OrderController extends Controller
      * Buyer confirms the parcel arrived (DELIVERED -> COMPLETED).
      * The conditional update makes a double-click or a second tab a harmless no-op.
      */
-    public function confirmReceived(Request $request, Order $order)
+    public function confirmReceived(Request $request, Order $order, ParcelLifecycle $lifecycle)
     {
         if ($order->buyer_id !== $request->user()->id) {
             abort(403);
         }
 
-        $updated = Order::whereKey($order->id)
-            ->where('status', Order::STATUS_DELIVERED)
-            ->update(['status' => Order::STATUS_COMPLETED]);
+        $updated = $lifecycle->transition(
+            $order,
+            Order::STATUS_DELIVERED,
+            Order::STATUS_COMPLETED,
+            [],
+            'Receipt confirmed by the buyer.',
+            $request->user()->id,
+            eventType: ParcelEvent::TYPE_COMPLETED,
+        );
 
-        if ($updated) {
-            $order->status = Order::STATUS_COMPLETED;
-            $order->logStatusEvent();
-        } elseif ($order->status !== Order::STATUS_COMPLETED) {
+        if (! $updated && $order->status !== Order::STATUS_COMPLETED) {
             return back()->with('status', 'This order can only be confirmed once it has been delivered.');
         }
 
@@ -183,6 +189,7 @@ class OrderController extends Controller
 
             if (! $product || $product->status !== 'active') {
                 $skipped++;
+
                 continue;
             }
 
@@ -194,17 +201,20 @@ class OrderController extends Controller
 
                 if (! $variant) {
                     $skipped++;
+
                     continue;
                 }
             } elseif ($product->hasVariants()) {
                 // The product gained variants since this order; the buyer must pick one on its page.
                 $skipped++;
+
                 continue;
             }
 
             $stock = $variant ? $variant->stock_quantity : $product->stock_quantity;
             if ($stock < 1) {
                 $skipped++;
+
                 continue;
             }
 
@@ -219,6 +229,7 @@ class OrderController extends Controller
 
             if ($newQty <= $current) {
                 $skipped++;
+
                 continue;
             }
 

@@ -21,6 +21,7 @@ class LogisticsProfile extends Model
         'street_address',
         'business_name',
         'company_name',
+        'joining_existing_company',
         'id_upload_path',
         'business_permit_path',
         'status',
@@ -33,12 +34,39 @@ class LogisticsProfile extends Model
         return [
             'birthday' => 'date',
             'reviewed_at' => 'datetime',
+            'joining_existing_company' => 'boolean',
         ];
     }
 
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** A hub can only route parcels while it is approved and its account is active. */
+    public function isAvailable(): bool
+    {
+        return $this->status === 'approved'
+            && $this->user?->account_status === 'active';
+    }
+
+    /**
+     * Normalized company name. Hubs without a company name are treated as
+     * their own company so two unnamed hubs never match by accident.
+     */
+    public function companyKey(): string
+    {
+        $name = $this->company_name ?: $this->business_name;
+
+        return $name
+            ? HubServiceArea::nameKey($name)
+            : 'hub:'.$this->getKey();
+    }
+
+    /** Whether this hub and another hub belong to the same logistics company. */
+    public function isSameCompanyAs(self $other): bool
+    {
+        return $this->companyKey() === $other->companyKey();
     }
 
     public function riders()
@@ -60,7 +88,7 @@ class LogisticsProfile extends Model
     public function scopeAvailable($query)
     {
         return $query->where('status', 'approved')
-            ->whereHas('user', fn($u) => $u->where('account_status', 'active'));
+            ->whereHas('user', fn ($u) => $u->where('account_status', 'active'));
     }
 
     /**
@@ -73,10 +101,10 @@ class LogisticsProfile extends Model
         $municipality = mb_strtolower(trim((string) $municipality));
 
         return $query->where(function ($q) use ($province, $municipality) {
-            $q->whereHas('serviceAreas', fn($a) => $a
+            $q->whereHas('serviceAreas', fn ($a) => $a
                 ->whereRaw('LOWER(hub_service_areas.province) = ?', [$province])
                 ->whereRaw('LOWER(hub_service_areas.municipality) = ?', [$municipality]))
-                ->orWhere(fn($own) => $own
+                ->orWhere(fn ($own) => $own
                     ->whereDoesntHave('serviceAreas')
                     ->whereRaw('LOWER(logistics_profiles.province) = ?', [$province])
                     ->whereRaw('LOWER(logistics_profiles.municipality) = ?', [$municipality]));
