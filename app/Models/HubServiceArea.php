@@ -23,14 +23,25 @@ class HubServiceArea extends Model
         return $this->hasMany(HubServiceAreaBarangay::class);
     }
 
+    /** Normalized name used for every place key so case and extra spaces do not create duplicates. */
+    public static function nameKey(?string $value): string
+    {
+        return mb_strtolower(trim(preg_replace('/\s+/', ' ', (string) $value)));
+    }
+
     public static function keyFor(?string $province, ?string $municipality): string
     {
-        return mb_strtolower(trim((string) $province)) . '|' . mb_strtolower(trim((string) $municipality));
+        return self::nameKey($province).'|'.self::nameKey($municipality);
     }
 
     public static function barangayKey(?string $barangay): string
     {
-        return mb_strtolower(trim(preg_replace('/\s+/', ' ', (string) $barangay)));
+        return self::nameKey($barangay);
+    }
+
+    public static function placeKey(?string $province, ?string $municipality, ?string $barangay): string
+    {
+        return self::nameKey($province).'|'.self::nameKey($municipality).'|'.self::nameKey($barangay);
     }
 
     public function getAreaKeyAttribute(): string
@@ -49,7 +60,7 @@ class HubServiceArea extends Model
         $candidates = [];
 
         if ($key !== '') {
-            $mapped = $this->barangays->first(fn($b) => self::barangayKey($b->barangay) === $key);
+            $mapped = $this->barangays->first(fn ($b) => self::barangayKey($b->barangay) === $key);
             $candidates[] = $mapped?->rider;
         }
 

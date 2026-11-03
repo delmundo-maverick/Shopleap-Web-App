@@ -5,17 +5,22 @@ namespace App\Http\Controllers\Logistics;
 use App\Http\Controllers\Controller;
 use App\Models\HubServiceArea;
 use App\Models\Order;
+use App\Models\ParcelEvent;
 use App\Models\SortingScan;
 use App\Models\SortingSession;
 use App\Services\ActivityLogger;
+use App\Services\HubContext;
+use App\Services\HubCoverage;
+use App\Services\ParcelLifecycle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class SortingSessionController extends Controller
 {
     public function start(Request $request)
     {
-        $hub = $request->user()->logisticsProfile;
+        $hub = HubContext::require($request);
         $user = $request->user();
 
         // Check for an existing active session for this user or hub
@@ -54,9 +59,9 @@ class SortingSessionController extends Controller
         ]);
     }
 
-    public function scan(Request $request, SortingSession $session)
+    public function scan(Request $request, SortingSession $session, HubCoverage $coverage, ParcelLifecycle $lifecycle)
     {
-        $hub = $request->user()->logisticsProfile;
+        $hub = HubContext::require($request);
 
         abort_unless($session->logistics_profile_id === $hub->id, 403);
         abort_unless($session->isActive(), 422, 'This sorting session has ended.');
@@ -67,7 +72,7 @@ class SortingSessionController extends Controller
 
         $code = trim($validated['code']);
 
-        return DB::transaction(function () use ($session, $code, $hub) {
+        return DB::transaction(function () use ($session, $code, $hub, $coverage, $request, $lifecycle) {
             // Parse the scanned code
             $orderId = $this->parseCode($code);
 
@@ -89,7 +94,7 @@ class SortingSessionController extends Controller
             // Find the order
             $order = Order::with(['buyer.buyerProfile'])->find($orderId);
 
-            if (! $order || $order->logistics_profile_id !== $hub->id) {
+            if (! $order || Gate::denies('actAsHoldingHub', $order)) {
                 $scan = $session->scans()->create([
                     'scanned_code' => $code,
                     'order_id' => $order?->id,
@@ -121,6 +126,7 @@ class SortingSessionController extends Controller
                     'destination_municipality' => $existingScan->destination_municipality,
                     'destination_province' => $existingScan->destination_province,
                     'destination_barangay' => $existingScan->destination_barangay,
+                    'metadata' => $existingScan->metadata,
                 ]);
 
                 return response()->json([
@@ -153,47 +159,93 @@ class SortingSessionController extends Controller
                 ]);
             }
 
-            // Resolve destination
+            // Resolve the destination hub from the buyer's barangay.
             $dest = $order->ship_to;
-            $areas = $hub->serviceAreas()->with(['rider', 'barangays.rider'])->get()->keyBy(fn($a) => $a->area_key);
-            $area = $areas->get(HubServiceArea::keyFor($dest['province'], $dest['municipality']));
+            $destination = $coverage->destinationHubFor(
+                $hub,
+                $dest['province'],
+                $dest['municipality'],
+                $dest['barangay']
+            );
 
-            // If destination is not in service areas, mark as needs review
-            if (! $area) {
+            // If no hub in this company serves the barangay, mark as needs review.
+            if (! $destination) {
                 $scan = $session->scans()->create([
                     'scanned_code' => $code,
                     'order_id' => $order->id,
                     'result' => SortingScan::RESULT_NEEDS_REVIEW,
-                    'message' => "Order #{$order->id}: Destination not in your service areas.",
+                    'message' => "Order #{$order->id}: No destination hub in your company serves Brgy. {$dest['barangay']}, {$dest['municipality']}.",
                     'destination_municipality' => $dest['municipality'],
                     'destination_province' => $dest['province'],
                     'destination_barangay' => $dest['barangay'],
-                    'metadata' => ['reason' => 'no_service_area'],
+                    'metadata' => ['reason' => 'no_destination_hub'],
                 ]);
 
                 return response()->json([
                     'result' => 'needs_review',
                     'message' => $scan->message,
                     'order_reference' => "#$order->id",
-                    'destination' => $dest['municipality'] . ', ' . $dest['province'],
+                    'destination' => $dest['municipality'].', '.$dest['province'],
                     'scan' => $scan,
                     'progress' => $this->getProgress($session),
                 ]);
             }
 
-            // Sort the order using existing logic
-            $label = $area->zone_name ?: $dest['municipality'];
-            $order->update(['status' => Order::STATUS_SORTED, 'delivery_area' => $label]);
-            $order->logStatusEvent('Sorted for delivery to ' . $dest['municipality'] . '.');
+            $label = $coverage->deliveryAreaLabel($destination, $dest['province'], $dest['municipality']);
+            $sameHub = (int) $destination->id === (int) $hub->id;
+
+            $note = $sameHub
+                ? 'Sorted for delivery to '.$dest['municipality'].'.'
+                : 'Sorted and awaiting transfer to '.$destination->business_name.'.';
+
+            $moved = $lifecycle->transition(
+                $order,
+                Order::STATUS_AT_SORTING_CENTER,
+                $sameHub ? Order::STATUS_SORTED : Order::STATUS_AWAITING_TRANSFER,
+                [
+                    'origin_hub_id' => $order->origin_hub_id ?? $hub->id,
+                    'destination_hub_id' => $destination->id,
+                    'current_hub_id' => $hub->id,
+                    'delivery_area' => $label,
+                ],
+                $note,
+                $request->user()->id,
+                $hub->id,
+                eventType: ParcelEvent::TYPE_SORTED,
+            );
+
+            if (! $moved) {
+                $scan = $session->scans()->create([
+                    'scanned_code' => $code,
+                    'order_id' => $order->id,
+                    'result' => SortingScan::RESULT_REJECTED,
+                    'message' => "Order #{$order->id} was just updated. Please scan it again.",
+                ]);
+
+                return response()->json([
+                    'result' => 'rejected',
+                    'message' => $scan->message,
+                    'order_reference' => "#$order->id",
+                    'scan' => $scan,
+                    'progress' => $this->getProgress($session),
+                ]);
+            }
 
             $scan = $session->scans()->create([
                 'scanned_code' => $code,
                 'order_id' => $order->id,
                 'result' => SortingScan::RESULT_SORTED,
-                'message' => "Order #{$order->id} sorted for {$label}.",
+                'message' => $sameHub
+                    ? "Order #{$order->id} sorted for {$label}."
+                    : "Order #{$order->id} sorted and awaiting transfer to {$destination->business_name}.",
                 'destination_municipality' => $dest['municipality'],
                 'destination_province' => $dest['province'],
                 'destination_barangay' => $dest['barangay'],
+                'metadata' => [
+                    'destination_hub_id' => $destination->id,
+                    'destination_hub_name' => $destination->business_name,
+                    'awaiting_transfer' => ! $sameHub,
+                ],
             ]);
 
             return response()->json([
@@ -201,7 +253,8 @@ class SortingSessionController extends Controller
                 'message' => $scan->message,
                 'order_reference' => "#$order->id",
                 'destination' => $label,
-                'group' => $area->zone_name ?: $dest['municipality'],
+                'destination_hub' => $destination->business_name,
+                'group' => $destination->business_name.' · '.($dest['barangay'] ?: $dest['municipality']),
                 'scan' => $scan,
                 'progress' => $this->getProgress($session),
             ]);
@@ -210,7 +263,7 @@ class SortingSessionController extends Controller
 
     public function end(Request $request, SortingSession $session)
     {
-        $hub = $request->user()->logisticsProfile;
+        $hub = HubContext::require($request);
 
         abort_unless($session->logistics_profile_id === $hub->id, 403);
         abort_unless($session->isActive(), 422, 'This session has already ended.');
@@ -226,7 +279,7 @@ class SortingSessionController extends Controller
         ActivityLogger::log(
             'sorting_session_ended',
             'sorting_session',
-            "{$request->user()->name} ended a sorting session after " . gmdate('H:i:s', $duration) . '.',
+            "{$request->user()->name} ended a sorting session after ".gmdate('H:i:s', $duration).'.',
             $session
         );
 
@@ -238,7 +291,7 @@ class SortingSessionController extends Controller
 
     public function summary(Request $request, SortingSession $session)
     {
-        $hub = $request->user()->logisticsProfile;
+        $hub = HubContext::require($request);
 
         abort_unless($session->logistics_profile_id === $hub->id, 403);
 
@@ -247,7 +300,7 @@ class SortingSessionController extends Controller
 
     public function index(Request $request)
     {
-        $hub = $request->user()->logisticsProfile;
+        $hub = HubContext::require($request);
 
         $sessions = SortingSession::forHub($hub->id)
             ->with('user')
@@ -276,6 +329,7 @@ class SortingSessionController extends Controller
     {
         return match ($status) {
             Order::STATUS_SORTED => 'Already sorted.',
+            Order::STATUS_AWAITING_TRANSFER => 'Already sorted and awaiting transfer.',
             Order::STATUS_ASSIGNED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY => 'Already assigned to a rider.',
             Order::STATUS_DELIVERED, Order::STATUS_COMPLETED => 'Already delivered.',
             Order::STATUS_CANCELLED => 'This order was cancelled.',
@@ -298,7 +352,7 @@ class SortingSessionController extends Controller
 
     private function getSummary(SortingSession $session): array
     {
-        $session->load(['scans.order', 'user']);
+        $session->load(['scans.order.destinationHub', 'user']);
 
         return [
             'session_id' => $session->id,
@@ -310,10 +364,66 @@ class SortingSessionController extends Controller
             'auto_closed' => $session->auto_closed,
             'total_scans' => $session->scans->count(),
             'sorted' => $session->sortedCount(),
+            'awaiting_transfer' => $session->scans
+                ->where('result', SortingScan::RESULT_SORTED)
+                ->filter(fn (SortingScan $scan) => (bool) ($scan->metadata['awaiting_transfer'] ?? false))
+                ->count(),
             'needs_review' => $session->needsReviewCount(),
             'rejected' => $session->rejectedCount(),
             'duplicates' => $session->duplicateCount(),
             'assigned_during_session' => $session->assignedDuringSessionCount(),
+            'groups' => $this->summaryGroups($session),
         ];
+    }
+
+    /**
+     * Sorted scans grouped by destination hub first, then by barangay.
+     *
+     * @return array<int, array{
+     *     hub_id: int|null,
+     *     hub_name: string,
+     *     company: string|null,
+     *     total: int,
+     *     barangays: array<int, array{barangay: string, count: int, order_ids: array<int, int>}>
+     * }>
+     */
+    private function summaryGroups(SortingSession $session): array
+    {
+        return $session->scans
+            ->where('result', SortingScan::RESULT_SORTED)
+            ->filter(fn (SortingScan $scan) => $scan->order !== null)
+            ->groupBy(fn (SortingScan $scan) => $scan->order->destination_hub_id ?? 'unknown')
+            ->map(function ($scans, $hubId) {
+                $first = $scans->first();
+                $hub = $first->order->destinationHub;
+
+                $barangays = $scans
+                    ->groupBy(fn (SortingScan $scan) => HubServiceArea::barangayKey(
+                        $scan->destination_barangay ?: $scan->order->ship_to['barangay']
+                    ))
+                    ->map(function ($group) {
+                        $scan = $group->first();
+
+                        return [
+                            'barangay' => $scan->destination_barangay
+                                ?: $scan->order->ship_to['barangay']
+                                ?: 'Unknown barangay',
+                            'count' => $group->count(),
+                            'order_ids' => $group->pluck('order_id')->filter()->values()->all(),
+                        ];
+                    })
+                    ->values()
+                    ->all();
+
+                return [
+                    'hub_id' => is_numeric($hubId) ? (int) $hubId : null,
+                    'hub_name' => $hub?->business_name ?? 'Unknown hub',
+                    'company' => $hub?->company_name,
+                    'total' => $scans->count(),
+                    'barangays' => $barangays,
+                ];
+            })
+            ->values()
+            ->all();
     }
 }

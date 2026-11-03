@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CourierProfile;
 use App\Notifications\RiderDecisionNotification;
 use App\Services\ActivityLogger;
+use App\Services\HubContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
 
@@ -13,7 +14,7 @@ class RiderController extends Controller
 {
     public function index(Request $request)
     {
-        $logisticsProfile = $request->user()->logisticsProfile;
+        $logisticsProfile = HubContext::require($request);
 
         $query = CourierProfile::with('user')
             ->where('logistics_profile_id', $logisticsProfile->id)
@@ -186,8 +187,8 @@ class RiderController extends Controller
 
         return back()->with(
             'status',
-            "{$rider->full_name} is now " .
-                ($rider->is_active ? 'active' : 'inactive') .
+            "{$rider->full_name} is now ".
+                ($rider->is_active ? 'active' : 'inactive').
                 '.'
         );
     }

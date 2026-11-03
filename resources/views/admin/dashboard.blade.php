@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/pages/admin/admin-dashboard.js'])
 
     <title>Admin Dashboard | Shopleap</title>
 </head>
@@ -18,22 +18,22 @@
 
         <x-navbars.admin active="dashboard" />
 
-        <div class="flex flex-1 flex-col">
+        <div class="flex min-w-0 flex-1 flex-col">
 
             <!-- TOPBAR -->
-            <header class="frost-panel-solid flex h-20 items-center justify-between border-b border-white/50 px-6">
+            <header class="frost-panel-solid flex h-20 items-center justify-between border-0 border-b border-line px-6">
 
                 <div class="flex items-center gap-3">
                     <button type="button" data-sidebar-toggle
-                        class="frost-btn rounded-lg p-2 text-charcoal/60 transition hover:bg-ice-blue hover:text-primary lg:hidden">
+                        class="frost-btn rounded-lg p-2 text-charcoal/60 hover:bg-ice-blue hover:text-primary lg:hidden">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </button>
                     <div>
-                        <h2 class="text-xl font-bold text-charcoal">Dashboard Overview</h2>
-                        <p class="text-sm text-charcoal/55">Welcome back, {{ auth()->user()->name ?? 'Admin' }}</p>
+                        <h2 class="text-page-title">Dashboard Overview</h2>
+                        <p class="text-sm text-charcoal/60">Welcome back, {{ auth()->user()->name ?? 'Admin' }}</p>
                     </div>
                 </div>
                 <x-notification-bell />
@@ -46,74 +46,126 @@
                 <x-announcement-banner audience="super_admin" />
 
                 <!-- STAT CARDS (real data) -->
-                <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
 
-                    <div class="frost-panel rounded-2xl p-4 sm:p-5">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/45">Pending Approvals</p>
-                        <p class="mt-2 text-2xl font-bold text-charcoal sm:text-3xl">{{ $stats['pending_approvals'] }}
-                        </p>
-                        <p class="mt-1 text-xs text-charcoal/50">Buyer, Seller & Logistics applications</p>
+                    <div class="frost-panel rounded-xl p-4 sm:p-5">
+                        <div class="flex items-start justify-between gap-3">
+                            <p class="text-card-label">Pending Approvals</p>
+                            <span
+                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+                                </svg>
+                            </span>
+                        </div>
+                        <p class="mt-3 text-2xl font-bold tabular-nums text-charcoal sm:text-3xl">
+                            {{ $stats['pending_approvals'] }}</p>
+                        <p class="mt-1 text-xs text-charcoal/60">Buyer, Seller & Logistics applications</p>
                     </div>
 
-                    <div class="frost-panel rounded-2xl p-4 sm:p-5">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/45">Active Users</p>
-                        <p class="mt-2 text-2xl font-bold text-charcoal sm:text-3xl">{{ $stats['active_users'] }}</p>
-                        <p class="mt-1 text-xs text-charcoal/50">Across all roles</p>
+                    <div class="frost-panel rounded-xl p-4 sm:p-5">
+                        <div class="flex items-start justify-between gap-3">
+                            <p class="text-card-label">Active Users</p>
+                            <span
+                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </span>
+                        </div>
+                        <p class="mt-3 text-2xl font-bold tabular-nums text-charcoal sm:text-3xl">
+                            {{ $stats['active_users'] }}</p>
+                        <p class="mt-1 text-xs text-charcoal/60">Across all roles</p>
                     </div>
 
-                    <div class="frost-panel rounded-2xl p-4 sm:p-5">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/45">Open Complaints</p>
-                        <p class="mt-2 text-2xl font-bold text-charcoal sm:text-3xl">{{ $stats['open_complaints'] }}</p>
-                        <p class="mt-1 text-xs text-charcoal/50">Complaints module not built yet</p>
+                    <div class="frost-panel rounded-xl p-4 sm:p-5">
+                        <div class="flex items-start justify-between gap-3">
+                            <p class="text-card-label">Open Complaints</p>
+                            <span
+                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-danger/10 text-danger">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </span>
+                        </div>
+                        <p class="mt-3 text-2xl font-bold tabular-nums text-charcoal sm:text-3xl">
+                            {{ $stats['open_complaints'] }}</p>
+                        <p class="mt-1 text-xs text-charcoal/60">Complaints module not built yet</p>
                     </div>
 
-                    <div class="frost-panel rounded-2xl p-4 sm:p-5">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-charcoal/45">Commission Earned</p>
-                        <p class="mt-2 text-2xl font-bold text-charcoal sm:text-3xl">₱
-                            {{ number_format($stats['commission_this_month'], 2) }}</p>
-                        <p class="mt-1 text-xs text-charcoal/50">This month · 10%</p>
+                    <div class="frost-panel rounded-xl p-4 sm:p-5">
+                        <div class="flex items-start justify-between gap-3">
+                            <p class="text-card-label">Commission Earned</p>
+                            <span
+                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </span>
+                        </div>
+                        <p class="mt-3 text-2xl font-bold tabular-nums text-charcoal sm:text-3xl">
+                            ₱ {{ number_format($stats['commission_this_month'], 2) }}</p>
+                        <p class="mt-1 text-xs text-charcoal/60">This month · 10%</p>
                     </div>
 
                 </div>
 
-                <!-- REGISTRATIONS -->
-                <div class="frost-panel rounded-2xl p-4 sm:p-5">
-                    <div class="mb-4">
-                        <h3 class="text-sm font-bold text-charcoal">Platform Registrations</h3>
-                        <p class="text-xs text-charcoal/50">New accounts by role, last 6 months</p>
+                <!-- REGISTRATIONS + COMMISSION (side by side on large screens) -->
+                <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+
+                    <div class="frost-panel rounded-xl p-4 sm:p-5">
+                        <div class="mb-4">
+                            <h3 class="text-card-title">Platform Registrations</h3>
+                            <p class="text-card-hint">New accounts by role, last 6 months</p>
+                        </div>
+                        <div class="relative h-64 sm:h-72">
+                            <canvas id="registrationsChart"></canvas>
+                        </div>
                     </div>
-                    <div class="relative h-64 sm:h-72">
-                        <canvas id="registrationsChart"></canvas>
+
+                    <div class="frost-panel rounded-xl p-4 sm:p-5">
+                        <div class="mb-4">
+                            <h3 class="text-card-title">Commission Revenue</h3>
+                            <p class="text-card-hint">Platform earnings (10% per order), last 6 months</p>
+                        </div>
+                        <div class="relative h-64 sm:h-72">
+                            <canvas id="commissionChart"></canvas>
+                        </div>
                     </div>
+
                 </div>
 
                 <!-- APPLICATION STATUS ROW — seller / logistics / buyer, always one line on sm+ -->
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
 
-                    <div class="frost-panel rounded-2xl p-4 sm:p-5">
-                        <div class="mb-3 text-center sm:mb-4">
-                            <h3 class="text-sm font-bold text-charcoal">Seller Applications</h3>
-                            <p class="text-xs text-charcoal/50">Current status breakdown</p>
+                    <div class="frost-panel rounded-xl p-4 sm:p-5">
+                        <div class="mb-3 sm:mb-4">
+                            <h3 class="text-card-title">Seller Applications</h3>
+                            <p class="text-card-hint">Current status breakdown</p>
                         </div>
                         <div class="relative mx-auto h-48 w-full max-w-[220px] sm:h-56">
                             <canvas id="sellerStatusChart"></canvas>
                         </div>
                     </div>
 
-                    <div class="frost-panel rounded-2xl p-4 sm:p-5">
-                        <div class="mb-3 text-center sm:mb-4">
-                            <h3 class="text-sm font-bold text-charcoal">Logistics Applications</h3>
-                            <p class="text-xs text-charcoal/50">Current status breakdown</p>
+                    <div class="frost-panel rounded-xl p-4 sm:p-5">
+                        <div class="mb-3 sm:mb-4">
+                            <h3 class="text-card-title">Logistics Applications</h3>
+                            <p class="text-card-hint">Current status breakdown</p>
                         </div>
                         <div class="relative mx-auto h-48 w-full max-w-[220px] sm:h-56">
                             <canvas id="logisticsStatusChart"></canvas>
                         </div>
                     </div>
 
-                    <div class="frost-panel rounded-2xl p-4 sm:p-5">
-                        <div class="mb-3 text-center sm:mb-4">
-                            <h3 class="text-sm font-bold text-charcoal">Buyer Applications</h3>
-                            <p class="text-xs text-charcoal/50">Current status breakdown</p>
+                    <div class="frost-panel rounded-xl p-4 sm:p-5">
+                        <div class="mb-3 sm:mb-4">
+                            <h3 class="text-card-title">Buyer Applications</h3>
+                            <p class="text-card-hint">Current status breakdown</p>
                         </div>
                         <div class="relative mx-auto h-48 w-full max-w-[220px] sm:h-56">
                             <canvas id="buyerStatusChart"></canvas>
@@ -122,22 +174,11 @@
 
                 </div>
 
-                <!-- COMMISSION -->
-                <div class="frost-panel rounded-2xl p-4 sm:p-5">
-                    <div class="mb-4">
-                        <h3 class="text-sm font-bold text-charcoal">Commission Revenue</h3>
-                        <p class="text-xs text-charcoal/50">Platform earnings (10% per order), last 6 months</p>
-                    </div>
-                    <div class="relative h-56 sm:h-64">
-                        <canvas id="commissionChart"></canvas>
-                    </div>
-                </div>
-
                 <!-- ORDERS BY STATUS -->
-                <div class="frost-panel rounded-2xl p-4 sm:p-5">
+                <div class="frost-panel rounded-xl p-4 sm:p-5">
                     <div class="mb-4">
-                        <h3 class="text-sm font-bold text-charcoal">Orders by Status</h3>
-                        <p class="text-xs text-charcoal/50">Every order across the full fulfillment chain, right now</p>
+                        <h3 class="text-card-title">Orders by Status</h3>
+                        <p class="text-card-hint">Every order across the full fulfillment chain, right now</p>
                     </div>
                     <div class="relative h-72 sm:h-80">
                         <canvas id="orderStatusChart"></canvas>
@@ -150,232 +191,18 @@
 
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-    <script>
-        const PRIMARY_BLUE = '#1A5FB4'; // matches --color-primary in app.css
-        const SKY_BLUE = '#4A90D9'; // matches --color-sky-blue in app.css
-        const CHARCOAL_MUTED = '#2E3A46';
-
-        const registrationsByMonth = @json($registrationsByMonth);
-        const sellerStatusCounts = @json($sellerStatusCounts);
-        const logisticsStatusCounts = @json($logisticsStatusCounts);
-        const buyerStatusCounts = @json($buyerStatusCounts);
-        const orderStatusCounts = @json($orderStatusCounts);
-        const commissionByMonth = @json($commissionByMonth);
-
-        // Charts sit inside fixed-height wrapper divs now (see the blade
-        // markup), so every chart uses maintainAspectRatio: false and just
-        // fills its container — this is what makes them behave on mobile
-        // instead of collapsing to 0px or growing endlessly.
-        const isMobile = window.matchMedia('(max-width: 639px)').matches;
-
-        const STATUS_LEGEND_OPTIONS = {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '62%',
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        boxWidth: 9,
-                        padding: 10,
-                        font: {
-                            size: 11
-                        }
-                    }
-                }
-            }
-        };
-
-        new Chart(document.getElementById('registrationsChart'), {
-            type: 'bar',
-            data: {
-                labels: registrationsByMonth.labels,
-                datasets: [{
-                        label: 'Buyers',
-                        data: registrationsByMonth.buyers,
-                        backgroundColor: PRIMARY_BLUE,
-                        borderRadius: 4
-                    },
-                    {
-                        label: 'Sellers',
-                        data: registrationsByMonth.sellers,
-                        backgroundColor: SKY_BLUE,
-                        borderRadius: 4
-                    },
-                    {
-                        label: 'Logistics',
-                        data: registrationsByMonth.logistics,
-                        backgroundColor: CHARCOAL_MUTED,
-                        borderRadius: 4
-                    },
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            boxWidth: 10,
-                            font: {
-                                size: 11
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            precision: 0
-                        },
-                        grid: {
-                            color: '#E5E7EB'
-                        }
-                    },
-                    x: {
-                        grid: {
-                            display: false
-                        }
-                    },
-                }
-            }
-        });
-
-        new Chart(document.getElementById('sellerStatusChart'), {
-            type: 'doughnut',
-            data: {
-                labels: ['Pending', 'Approved', 'Rejected'],
-                datasets: [{
-                    data: [sellerStatusCounts.pending, sellerStatusCounts.approved, sellerStatusCounts
-                        .rejected
-                    ],
-                    backgroundColor: ['#F59E0B', '#16A34A', '#DC2626'],
-                    borderWidth: 0,
-                }]
-            },
-            options: STATUS_LEGEND_OPTIONS
-        });
-
-        new Chart(document.getElementById('logisticsStatusChart'), {
-            type: 'doughnut',
-            data: {
-                labels: ['Pending', 'Approved', 'Rejected'],
-                datasets: [{
-                    data: [logisticsStatusCounts.pending, logisticsStatusCounts.approved,
-                        logisticsStatusCounts.rejected
-                    ],
-                    backgroundColor: ['#F59E0B', '#16A34A', '#DC2626'],
-                    borderWidth: 0,
-                }]
-            },
-            options: STATUS_LEGEND_OPTIONS
-        });
-
-        new Chart(document.getElementById('buyerStatusChart'), {
-            type: 'doughnut',
-            data: {
-                labels: ['Pending', 'Approved', 'Rejected'],
-                datasets: [{
-                    data: [buyerStatusCounts.pending, buyerStatusCounts.approved, buyerStatusCounts
-                        .rejected
-                    ],
-                    backgroundColor: ['#F59E0B', '#16A34A', '#DC2626'],
-                    borderWidth: 0,
-                }]
-            },
-            options: STATUS_LEGEND_OPTIONS
-        });
-
-        new Chart(document.getElementById('commissionChart'), {
-            type: 'line',
-            data: {
-                labels: commissionByMonth.labels,
-                datasets: [{
-                    label: 'Commission (₱)',
-                    data: commissionByMonth.totals,
-                    borderColor: PRIMARY_BLUE,
-                    backgroundColor: 'rgba(26, 95, 180, 0.08)',
-                    tension: 0.35,
-                    fill: true,
-                    pointRadius: isMobile ? 2 : 3,
-                    pointBackgroundColor: PRIMARY_BLUE,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: {
-                            color: '#E5E7EB'
-                        }
-                    },
-                    x: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            maxRotation: 0,
-                            autoSkip: true
-                        }
-                    },
-                }
-            }
-        });
-
-        new Chart(document.getElementById('orderStatusChart'), {
-            type: 'bar',
-            data: {
-                labels: Object.keys(orderStatusCounts),
-                datasets: [{
-                    label: 'Orders',
-                    data: Object.values(orderStatusCounts),
-                    backgroundColor: PRIMARY_BLUE,
-                    borderRadius: 4,
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    x: {
-                        beginAtZero: true,
-                        ticks: {
-                            precision: 0
-                        },
-                        grid: {
-                            color: '#E5E7EB'
-                        }
-                    },
-                    y: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            font: {
-                                size: isMobile ? 10 : 12
-                            }
-                        }
-                    },
-                }
-            }
-        });
-    </script>
+    {{-- Data for resources/js/pages/admin/admin-dashboard.js --}}
+    @php
+        $dashboardData = [
+            'registrationsByMonth' => $registrationsByMonth,
+            'sellerStatusCounts' => $sellerStatusCounts,
+            'logisticsStatusCounts' => $logisticsStatusCounts,
+            'buyerStatusCounts' => $buyerStatusCounts,
+            'orderStatusCounts' => $orderStatusCounts,
+            'commissionByMonth' => $commissionByMonth,
+        ];
+    @endphp
+    <script type="application/json" id="admin-dashboard-data">@json($dashboardData)</script>
 
 </body>
 

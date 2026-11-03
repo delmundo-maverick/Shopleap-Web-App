@@ -4,8 +4,9 @@ namespace App\Console\Commands;
 
 use App\Models\Order;
 use App\Models\OrderReturn;
+use App\Models\ParcelEvent;
+use App\Services\ParcelLifecycle;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 class AutoCompleteDeliveredOrders extends Command
 {
@@ -13,7 +14,7 @@ class AutoCompleteDeliveredOrders extends Command
 
     protected $description = 'Complete delivered orders the buyer never confirmed';
 
-    public function handle(): int
+    public function handle(ParcelLifecycle $lifecycle): int
     {
         $days = Order::AUTO_COMPLETE_DAYS;
         $completed = 0;
@@ -21,22 +22,21 @@ class AutoCompleteDeliveredOrders extends Command
         Order::where('status', Order::STATUS_DELIVERED)
             ->whereNotNull('delivered_at')
             ->where('delivered_at', '<=', now()->subDays($days))
-            ->whereDoesntHave('returns', fn($q) => $q->whereIn('status', OrderReturn::OPEN_STATUSES))
-            ->chunkById(100, function ($orders) use ($days, &$completed) {
+            ->whereDoesntHave('returns', fn ($q) => $q->whereIn('status', OrderReturn::OPEN_STATUSES))
+            ->chunkById(100, function ($orders) use ($days, $lifecycle, &$completed) {
                 foreach ($orders as $order) {
-                    DB::transaction(function () use ($order, $days, &$completed) {
-                        $moved = Order::whereKey($order->id)
-                            ->where('status', Order::STATUS_DELIVERED)
-                            ->update(['status' => Order::STATUS_COMPLETED]) > 0;
+                    $moved = $lifecycle->transition(
+                        $order,
+                        Order::STATUS_DELIVERED,
+                        Order::STATUS_COMPLETED,
+                        [],
+                        "Automatically completed {$days} days after delivery.",
+                        eventType: ParcelEvent::TYPE_COMPLETED,
+                    );
 
-                        if (! $moved) {
-                            return;
-                        }
-
-                        $order->refresh();
-                        $order->logStatusEvent("Automatically completed {$days} days after delivery.");
+                    if ($moved) {
                         $completed++;
-                    });
+                    }
                 }
             });
 

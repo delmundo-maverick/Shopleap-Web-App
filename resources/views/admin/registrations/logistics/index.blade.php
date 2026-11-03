@@ -132,7 +132,12 @@
                                             </p>
                                             <p class="text-xs text-charcoal/50">{{ $profile->user->email }}</p>
                                         </td>
-                                        <td class="px-5 py-4 text-charcoal/80">{{ $profile->business_name }}</td>
+                                        <td class="px-5 py-4 text-charcoal/80">
+                                            {{ $profile->business_name }}
+                                            @if ($profile->joining_existing_company)
+                                                <span class="ml-1 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold text-orange-600">joining existing company</span>
+                                            @endif
+                                        </td>
                                         <td class="px-5 py-4">
                                             <span data-badge="registration"
                                                 class="status-badge reg-badge--{{ $profile->status }}">{{ $profile->status }}</span>

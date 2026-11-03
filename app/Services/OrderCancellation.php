@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Order;
+use App\Models\ParcelEvent;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\DB;
  */
 class OrderCancellation
 {
+    public function __construct(private ParcelLifecycle $lifecycle) {}
+
     /** Cancels the order if it is still in one of $fromStatuses. Returns false if it moved on. */
     public function cancel(
         Order $order,
@@ -24,22 +27,24 @@ class OrderCancellation
         ?string $eventNote = null,
     ): bool {
         return DB::transaction(function () use ($order, $by, $reason, $note, $actorId, $fromStatuses, $eventNote) {
-            $moved = Order::whereKey($order->id)
-                ->whereIn('status', $fromStatuses)
-                ->update([
-                    'status' => Order::STATUS_CANCELLED,
+            $moved = $this->lifecycle->transition(
+                $order,
+                $fromStatuses,
+                Order::STATUS_CANCELLED,
+                [
                     'cancelled_by' => $by,
                     'cancel_reason' => $reason,
                     'cancel_note' => $note,
                     'cancelled_at' => now(),
-                    'updated_at' => now(),
-                ]) > 0;
+                ],
+                $eventNote ?? $this->describe($by, $reason, $note),
+                $actorId,
+                eventType: ParcelEvent::TYPE_CANCELLED,
+            );
 
             if (! $moved) {
                 return false;
             }
-
-            $order->refresh();
 
             $extra = [];
 
@@ -58,8 +63,6 @@ class OrderCancellation
 
             $order->restoreStock();
 
-            $order->logStatusEvent($eventNote ?? $this->describe($by, $reason, $note), $actorId);
-
             return true;
         });
     }
@@ -70,7 +73,7 @@ class OrderCancellation
         return DB::transaction(function () use ($order, $reason, $note, $actorId) {
             $saved = Order::whereKey($order->id)
                 ->whereIn('status', Order::BUYER_CANCEL_REQUEST_FROM)
-                ->where(fn($q) => $q->whereNull('cancel_request_status')->orWhere('cancel_request_status', 'withdrawn'))
+                ->where(fn ($q) => $q->whereNull('cancel_request_status')->orWhere('cancel_request_status', 'withdrawn'))
                 ->update([
                     'cancel_request_status' => 'pending',
                     'cancel_request_reason' => $reason,
@@ -87,7 +90,7 @@ class OrderCancellation
 
             $order->refresh()->logInternalEvent(
                 'Buyer requested cancellation',
-                $reason . ($note ? " — {$note}" : ''),
+                $reason.($note ? " — {$note}" : ''),
                 $actorId
             );
 
@@ -122,7 +125,7 @@ class OrderCancellation
             $order->cancel_request_note,
             $actorId,
             Order::BUYER_CANCEL_REQUEST_FROM,
-            $eventNote ?? "Cancelled at the buyer's request. Reason: " . ($order->cancel_request_reason ?? 'Changed my mind') . '.'
+            $eventNote ?? "Cancelled at the buyer's request. Reason: ".($order->cancel_request_reason ?? 'Changed my mind').'.'
         );
     }
 
@@ -163,6 +166,6 @@ class OrderCancellation
     {
         $who = Order::CANCELLED_BY_LABELS[$by] ?? $by;
 
-        return "Cancelled by {$who}. Reason: {$reason}." . ($note ? " {$note}" : '');
+        return "Cancelled by {$who}. Reason: {$reason}.".($note ? " {$note}" : '');
     }
 }

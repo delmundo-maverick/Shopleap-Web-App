@@ -40,6 +40,18 @@
                 'icon' => 'M4 12h16M4 12l6-6M4 12l6 6',
             ],
             [
+                'key' => 'outbound',
+                'label' => 'Outbound Transfer',
+                'route' => 'logistics.outbound.index',
+                'icon' => 'M5 12h14M13 6l6 6-6 6',
+            ],
+            [
+                'key' => 'inbound',
+                'label' => 'Inbound Bags',
+                'route' => 'logistics.inbound.index',
+                'icon' => 'M19 12H5m6 6l-6-6 6-6',
+            ],
+            [
                 'key' => 'sorting',
                 'label' => 'Sort & Assign',
                 'route' => 'logistics.sorting.index',
@@ -63,7 +75,7 @@
             [
                 'key' => 'reports',
                 'label' => 'Reports',
-                'route' => null,
+                'route' => 'logistics.reports.index',
                 'icon' => 'M9 17v-6h6v6M4 21h16a1 1 0 001-1V4a1 1 0 00-1-1H4a1 1 0 00-1 1v16a1 1 0 001 1z',
             ],
         ],

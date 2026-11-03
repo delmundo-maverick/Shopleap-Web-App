@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CourierProfile;
 use App\Models\Order;
 use App\Services\OrderTransitions;
+use App\Services\RiderCoverage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -25,6 +26,7 @@ class PickupController extends Controller
         ])
             ->where('pickup_rider_id', $courier->id)
             ->where('status', Order::STATUS_READY_FOR_PICKUP)
+            ->whereRaw('COALESCE(origin_hub_id, logistics_profile_id) = ?', [$courier->logistics_profile_id])
             ->when(
                 $request->query('filter') === 'awaiting_accept',
                 fn ($q) => $q->where('pickup_status', 'assigned')
@@ -44,6 +46,12 @@ class PickupController extends Controller
     public function accept(Request $request, Order $order): JsonResponse
     {
         $courier = $this->owned($request, $order);
+
+        if (! $this->coversSeller($courier, $order)) {
+            return response()->json([
+                'message' => 'You do not cover this pickup address. Ask the sorting center to reassign it.',
+            ], 422);
+        }
 
         if ($order->status !== Order::STATUS_READY_FOR_PICKUP) {
             return response()->json([
@@ -129,7 +137,13 @@ class PickupController extends Controller
         Order $order,
         OrderTransitions $transitions
     ): JsonResponse {
-        $this->owned($request, $order);
+        $courier = $this->owned($request, $order);
+
+        if (! $this->coversSeller($courier, $order)) {
+            return response()->json([
+                'message' => 'You do not cover this pickup address. Ask the sorting center to reassign it.',
+            ], 422);
+        }
 
         $data = $request->validate([
             'scan' => ['required', 'string', 'max:100'],
@@ -170,6 +184,21 @@ class PickupController extends Controller
         ]);
     }
 
+    /** Pickup riders cover the seller's address inside their own hub. */
+    private function coversSeller(CourierProfile $courier, Order $order): bool
+    {
+        $order->loadMissing('seller.sellerProfile');
+        $seller = $order->seller?->sellerProfile;
+
+        return RiderCoverage::coversAddress(
+            $courier,
+            $seller?->province,
+            $seller?->municipality,
+            $seller?->barangay,
+            $order->origin_hub_id ?? $order->logistics_profile_id
+        );
+    }
+
     /**
      * Verify ownership before revealing whether an order was cancelled.
      */
@@ -183,6 +212,12 @@ class PickupController extends Controller
             $order->pickup_rider_id === $courier->id,
             403,
             'This pickup is not assigned to you.'
+        );
+
+        abort_unless(
+            (int) ($order->origin_hub_id ?? $order->logistics_profile_id) === (int) $courier->logistics_profile_id,
+            403,
+            'This pickup belongs to another hub.'
         );
 
         abort_if(
@@ -205,6 +240,8 @@ class PickupController extends Controller
             'order_id' => $o->id,
             'status' => $o->status,
             'pickup_status' => $o->pickup_status,
+            'hub_id' => $o->origin_hub_id ?? $o->logistics_profile_id,
+            'hub_name' => $o->logisticsProfile?->business_name,
             'pickup_date' => $o->pickup_date?->toDateString(),
             'pickup_window' => Order::PICKUP_SLOTS[$o->pickup_time_slot] ?? null,
 

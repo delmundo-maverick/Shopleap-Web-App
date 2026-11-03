@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Api\Courier;
 
 use App\Http\Controllers\Controller;
 use App\Models\CourierProfile;
+use App\Models\HubServiceArea;
+use App\Models\HubServiceAreaBarangay;
 use App\Models\LogisticsProfile;
 use App\Models\User;
+use App\Services\HubBarangayCatalog;
 use App\Services\OtpService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -14,8 +17,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
-use App\Models\HubServiceArea;
-use App\Models\HubServiceAreaBarangay;
 
 class AuthController extends Controller
 {
@@ -54,6 +55,23 @@ class AuthController extends Controller
         if (! $hub) {
             throw ValidationException::withMessages(['hub_id' => 'Please choose an available sorting center.']);
         }
+
+        $place = HubBarangayCatalog::findForHub(
+            $hub,
+            $v['province'],
+            $v['municipality'],
+            $v['barangay']
+        );
+
+        if (! $place) {
+            throw ValidationException::withMessages([
+                'barangay' => "Choose a barangay inside {$hub->business_name}'s service areas.",
+            ]);
+        }
+
+        $v['province'] = $place['province'];
+        $v['municipality'] = $place['municipality'];
+        $v['barangay'] = $place['barangay'];
 
         $email = strtolower($v['email']);
 
@@ -193,6 +211,9 @@ class AuthController extends Controller
 
         $data = $request->validate([
             'hub_id' => ['nullable', 'integer'],
+            'province' => ['nullable', 'string', 'max:100', 'not_regex:/^\d+$/'],
+            'municipality' => ['nullable', 'string', 'max:100', 'not_regex:/^\d+$/'],
+            'barangay' => ['nullable', 'string', 'max:150', 'not_regex:/^\d+$/'],
             'license_upload' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'or_cr_upload' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
         ]);
@@ -203,8 +224,24 @@ class AuthController extends Controller
             throw ValidationException::withMessages(['hub_id' => 'Please choose an available sorting center.']);
         }
 
+        $place = HubBarangayCatalog::findForHub(
+            $hub,
+            $data['province'] ?? $courier->province,
+            $data['municipality'] ?? $courier->municipality,
+            $data['barangay'] ?? $courier->barangay
+        );
+
+        if (! $place) {
+            throw ValidationException::withMessages([
+                'barangay' => "Choose a barangay inside {$hub->business_name}'s service areas.",
+            ]);
+        }
+
         $update = [
             'logistics_profile_id' => $hub->id,
+            'province' => $place['province'],
+            'municipality' => $place['municipality'],
+            'barangay' => $place['barangay'],
             'status' => 'pending',
             'is_active' => false,
             'rejection_reason' => null,
@@ -220,9 +257,9 @@ class AuthController extends Controller
         }
 
         DB::transaction(function () use ($courier, $hub, $update) {
-            // Moving to another hub: the old hub's barangay and municipality mappings no longer apply.
+            // Moving to another hub: the old hub keeps the barangays, but this rider's coverage is cleared.
             if ($courier->logistics_profile_id !== $hub->id) {
-                HubServiceAreaBarangay::where('rider_id', $courier->id)->delete();
+                HubServiceAreaBarangay::where('rider_id', $courier->id)->update(['rider_id' => null]);
                 HubServiceArea::where('rider_id', $courier->id)->update(['rider_id' => null]);
             }
 
@@ -312,7 +349,7 @@ class AuthController extends Controller
 
     private function cacheKey(string $email): string
     {
-        return 'courier_registration:' . $email;
+        return 'courier_registration:'.$email;
     }
 
     private function payload(CourierProfile $p): array

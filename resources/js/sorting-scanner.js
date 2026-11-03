@@ -281,16 +281,35 @@ export default function sortingScanner() {
         },
 
         showSessionSummary(summary) {
-            alert(
-                `Session Summary\n\n` +
-                `Duration: ${this.formatDuration(summary.duration_seconds)}\n` +
-                `Total scans: ${summary.total_scans}\n` +
-                `Sorted: ${summary.sorted}\n` +
-                `Needs review: ${summary.needs_review}\n` +
-                `Rejected: ${summary.rejected}\n` +
-                `Duplicates: ${summary.duplicates}\n` +
-                `Assigned during session: ${summary.assigned_during_session}`
-            );
+            const lines = [
+                'Session Summary',
+                '',
+                `Duration: ${this.formatDuration(summary.duration_seconds)}`,
+                `Total scans: ${summary.total_scans}`,
+                `Sorted: ${summary.sorted}`,
+                `Awaiting transfer: ${summary.awaiting_transfer ?? 0}`,
+                `Needs review: ${summary.needs_review}`,
+                `Rejected: ${summary.rejected}`,
+                `Duplicates: ${summary.duplicates}`,
+                `Assigned during session: ${summary.assigned_during_session}`,
+            ];
+
+            const groups = Array.isArray(summary.groups) ? summary.groups : [];
+
+            if (groups.length) {
+                lines.push('', 'Sorted by destination hub:');
+
+                groups.forEach((group) => {
+                    const company = group.company ? ` (${group.company})` : '';
+                    lines.push(`• ${group.hub_name}${company} — ${group.total} parcel(s)`);
+
+                    (group.barangays || []).forEach((barangay) => {
+                        lines.push(`   - Brgy. ${barangay.barangay}: ${barangay.count}`);
+                    });
+                });
+            }
+
+            alert(lines.join('\n'));
         },
 
         // ---------- timer ----------

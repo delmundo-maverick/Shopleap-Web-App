@@ -5,6 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
     const checkoutRoute = document.getElementById('productPageData')?.dataset.checkoutRoute;
 
+    // Out-of-stock products render their purchase buttons disabled; setBusy()
+    // must never re-enable them.
+    const unavailable = baseStock < 1;
+
     let modalIntent = 'cart';
 
     // ---------------------------------------------------
@@ -80,23 +84,19 @@ document.addEventListener('DOMContentLoaded', () => {
         variantModalOverlay.classList.remove('flex');
     }
 
+    // The selected look of an option button is styled in app.css from
+    // aria-pressed, so the script only has to set that attribute.
+    function markVariantButton(btn, active) {
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+
     document.querySelectorAll('.variant-value-btn').forEach(btn => {
         btn.addEventListener('click', function () {
             const groupName = this.dataset.optionName;
             const value = this.dataset.optionValue;
 
             document.querySelectorAll(`.variant-value-btn[data-option-name="${groupName}"]`)
-                .forEach(sibling => {
-                    const active = sibling.dataset.optionValue === value;
-
-                    sibling.classList.toggle('border-primary', active);
-                    sibling.classList.toggle('bg-primary/5', active);
-                    sibling.classList.toggle('bg-white', !active);
-                    sibling.classList.toggle('text-primary', active);
-                    sibling.classList.toggle('border-light-gray', !active);
-                    sibling.classList.toggle('text-charcoal', !active);
-                    sibling.setAttribute('aria-pressed', active ? 'true' : 'false');
-                });
+                .forEach(sibling => markVariantButton(sibling, sibling.dataset.optionValue === value));
 
             selectedOptions[groupName] = value;
             resolveSelectedVariant();
@@ -160,13 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.variant-value-btn').forEach(btn => {
             const active = variant.options?.[btn.dataset.optionName] === btn.dataset.optionValue;
 
-            btn.classList.toggle('border-primary', active);
-            btn.classList.toggle('bg-primary/5', active);
-            btn.classList.toggle('bg-white', !active);
-            btn.classList.toggle('text-primary', active);
-            btn.classList.toggle('border-light-gray', !active);
-            btn.classList.toggle('text-charcoal', !active);
-            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+            markVariantButton(btn, active);
 
             if (active) {
                 selectedOptions[btn.dataset.optionName] = btn.dataset.optionValue;
@@ -213,21 +207,24 @@ document.addEventListener('DOMContentLoaded', () => {
     function showToast(message, isError = false) {
         const toast = document.getElementById('toast');
         toast.textContent = message;
-        toast.style.background = isError ? '#DC2626' : '#16A34A';
+        toast.classList.toggle('bg-sale-red', isError);
+        toast.classList.toggle('bg-charcoal', !isError);
         toast.classList.remove('hidden');
         setTimeout(() => toast.classList.add('hidden'), 3000);
     }
 
-    const addBtn = document.getElementById('addToCartBtn');
-    const buyBtn = document.getElementById('buyNowBtn');
+    // Every visible purchase button (desktop row and mobile sticky bar).
+    const addButtons = document.querySelectorAll('[data-action="add-to-cart"]');
+    const buyButtons = document.querySelectorAll('[data-action="buy-now"]');
 
     function setBusy(busy) {
-        if (addBtn) addBtn.disabled = busy;
-        if (buyBtn) buyBtn.disabled = busy;
+        [...addButtons, ...buyButtons].forEach(btn => {
+            btn.disabled = busy || unavailable;
+        });
+
         if (modalConfirmBtn) {
             modalConfirmBtn.disabled = busy || !selectedVariant || selectedVariant.stock_quantity < 1;
         }
-        [addBtn, buyBtn].forEach(b => b?.classList.toggle('opacity-60', busy));
     }
 
     async function addToCart(quantity, variantId, options, buyNow = false) {
@@ -278,7 +275,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    document.getElementById('addToCartBtn')?.addEventListener('click', function () {
+    function readQuantity() {
+        return Math.max(1, Math.min(parseInt(qtyInput.max), parseInt(qtyInput.value || 1)));
+    }
+
+    function handleAddToCart() {
         if (hasOptions) {
             // Chips in the product page select the variant directly. Only fall
             // back to the modal when a complete combination is still missing.
@@ -291,11 +292,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const quantity = Math.max(1, Math.min(parseInt(qtyInput.max), parseInt(qtyInput.value || 1)));
-        addToCart(quantity, null, null, false);
-    });
+        addToCart(readQuantity(), null, null, false);
+    }
 
-    document.getElementById('buyNowBtn')?.addEventListener('click', function () {
+    function handleBuyNow() {
         if (hasOptions) {
             if (!selectedVariant) {
                 openVariantModal('buyNow');
@@ -307,9 +307,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const quantity = Math.max(1, Math.min(parseInt(qtyInput.max), parseInt(qtyInput.value || 1)));
-        addToCart(quantity, null, null, true);
-    });
+        addToCart(readQuantity(), null, null, true);
+    }
+
+    addButtons.forEach(btn => btn.addEventListener('click', handleAddToCart));
+    buyButtons.forEach(btn => btn.addEventListener('click', handleBuyNow));
 
     modalConfirmBtn?.addEventListener('click', function () {
         if (!selectedVariant) return;

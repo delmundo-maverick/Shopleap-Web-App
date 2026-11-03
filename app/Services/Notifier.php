@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\CourierProfile;
 use App\Models\Order;
 use App\Models\OrderReturn;
+use App\Models\ShipmentBag;
 use App\Models\User;
 use App\Notifications\ActivityNotification;
 use Illuminate\Support\Collection;
@@ -95,7 +97,7 @@ class Notifier
             'cancel.requested',
             'Cancellation request',
             "Order #{$order->id}: the buyer asked to cancel ({$order->cancel_request_reason}). Answer within "
-                . Order::CANCEL_REQUEST_AUTO_APPROVE_HOURS . ' hours, or it is approved automatically.',
+                .Order::CANCEL_REQUEST_AUTO_APPROVE_HOURS.' hours, or it is approved automatically.',
             route('seller.orders.show', $order, false),
             ['order_id' => $order->id]
         );
@@ -146,8 +148,8 @@ class Notifier
     {
         $return->loadMissing(['buyer', 'seller']);
 
-        $no = '#' . $return->order_id;
-        $money = '₱' . number_format((float) $return->refund_amount, 2);
+        $no = '#'.$return->order_id;
+        $money = '₱'.number_format((float) $return->refund_amount, 2);
         $meta = ['return_id' => $return->id, 'order_id' => $return->order_id];
 
         $buyerUrl = route('buyer.returns.show', $return, false);
@@ -373,7 +375,7 @@ class Notifier
         $meta = ['order_id' => $order->id, 'status' => $status];
         $buyerUrl = route('buyer.orders.index', ['tab' => $this->buyerTab($status)], false);
         $sellerUrl = route('seller.orders.show', $order, false);
-        $cash = '₱' . number_format($order->grand_total, 2);
+        $cash = '₱'.number_format($order->grand_total, 2);
 
         switch ($status) {
             case Order::STATUS_PLACED:
@@ -383,7 +385,7 @@ class Notifier
                     $actorId,
                     'order.placed',
                     'New order',
-                    "Order {$no} from {$order->buyer_name}: {$items} item(s), ₱" . number_format((float) $order->total_amount, 2) . '. Confirm it to start preparing.',
+                    "Order {$no} from {$order->buyer_name}: {$items} item(s), ₱".number_format((float) $order->total_amount, 2).'. Confirm it to start preparing.',
                     $sellerUrl,
                     $meta
                 );
@@ -492,7 +494,7 @@ class Notifier
                         $actorId,
                         'order.rescheduled',
                         'Delivery rescheduled',
-                        "Order {$no}: we'll try delivering again (attempt " . ($order->delivery_attempts + 1) . ' of ' . Order::MAX_DELIVERY_ATTEMPTS . ').',
+                        "Order {$no}: we'll try delivering again (attempt ".($order->delivery_attempts + 1).' of '.Order::MAX_DELIVERY_ATTEMPTS.').',
                         $buyerUrl,
                         $meta
                     );
@@ -506,7 +508,7 @@ class Notifier
                     $actorId,
                     'order.out_for_delivery',
                     'Out for delivery',
-                    "Order {$no} is out for delivery." . ($rider ? " Your rider is {$rider}." : '') . " Please prepare {$cash} cash.",
+                    "Order {$no} is out for delivery.".($rider ? " Your rider is {$rider}." : '')." Please prepare {$cash} cash.",
                     $buyerUrl,
                     $meta
                 );
@@ -527,7 +529,7 @@ class Notifier
                     $actorId,
                     'order.delivered',
                     'Order delivered',
-                    "Order {$no} was delivered. It completes when the buyer confirms, or automatically after " . Order::AUTO_COMPLETE_DAYS . ' days.',
+                    "Order {$no} was delivered. It completes when the buyer confirms, or automatically after ".Order::AUTO_COMPLETE_DAYS.' days.',
                     $sellerUrl,
                     $meta
                 );
@@ -539,7 +541,7 @@ class Notifier
                     $actorId,
                     'order.delivery_failed',
                     'Delivery unsuccessful',
-                    "We couldn't deliver order {$no}." . ($note ? " {$note}" : ''),
+                    "We couldn't deliver order {$no}.".($note ? " {$note}" : ''),
                     $buyerUrl,
                     $meta
                 );
@@ -567,7 +569,7 @@ class Notifier
                 break;
 
             case Order::STATUS_COMPLETED:
-                $earned = '₱' . number_format((float) $order->total_amount - (float) $order->commission_amount, 2);
+                $earned = '₱'.number_format((float) $order->total_amount - (float) $order->commission_amount, 2);
                 $this->send(
                     $order->seller,
                     $actorId,
@@ -585,7 +587,7 @@ class Notifier
                     $actorId,
                     'order.completed',
                     'Order completed',
-                    "Order {$no} was completed automatically." . ($until ? " You can still rate it or request a return/refund until {$until}." : ''),
+                    "Order {$no} was completed automatically.".($until ? " You can still rate it or request a return/refund until {$until}." : ''),
                     $buyerUrl,
                     $meta
                 );
@@ -593,7 +595,7 @@ class Notifier
         }
     }
 
-    public function pickupAssigned(Order $order, \App\Models\CourierProfile $rider, ?int $actorId): void
+    public function pickupAssigned(Order $order, CourierProfile $rider, ?int $actorId): void
     {
         $slot = Order::PICKUP_SLOTS[$order->pickup_time_slot] ?? '';
 
@@ -614,8 +616,8 @@ class Notifier
             $actorId,
             'pickup.assigned_rider',
             'New pickup assigned',
-            "Order #{$order->id}: collect from " . ($order->seller?->sellerProfile?->business_name ?? $order->seller?->name)
-                . " on {$order->pickup_date?->format('M d')} ({$slot}). Please accept it.",
+            "Order #{$order->id}: collect from ".($order->seller?->sellerProfile?->business_name ?? $order->seller?->name)
+                ." on {$order->pickup_date?->format('M d')} ({$slot}). Please accept it.",
             null,
             ['order_id' => $order->id]
         );
@@ -630,6 +632,115 @@ class Notifier
             'Pickup request declined',
             "Order #{$order->id}: {$hubName} can't collect it ({$reason}). Please choose another sorting center.",
             route('seller.orders.show', $order, false),
+            ['order_id' => $order->id]
+        );
+    }
+
+    // ── Shipment bags ──
+
+    public function bagDispatched(ShipmentBag $bag, ?int $actorId): void
+    {
+        $bag->loadMissing(['fromHub', 'toHub.user']);
+
+        $this->send(
+            $bag->toHub?->user,
+            $actorId,
+            'bag.dispatched',
+            'Incoming bag',
+            "Bag {$bag->code} from {$bag->fromHub?->business_name} is on its way with {$bag->items()->count()} parcel(s).",
+            route('logistics.inbound.show', $bag, false),
+            ['bag_id' => $bag->id]
+        );
+    }
+
+    public function bagReceived(ShipmentBag $bag, ?int $actorId): void
+    {
+        $bag->loadMissing(['fromHub.user', 'toHub']);
+
+        $this->send(
+            $bag->fromHub?->user,
+            $actorId,
+            'bag.received',
+            'Bag received',
+            "Bag {$bag->code} was received by {$bag->toHub?->business_name}.",
+            route('logistics.outbound.show', $bag, false),
+            ['bag_id' => $bag->id]
+        );
+    }
+
+    /**
+     * A bag closed with parcels that never arrived.
+     *
+     * @param  Collection<int, Order>  $missingOrders
+     */
+    public function bagDiscrepancy(ShipmentBag $bag, Collection $missingOrders, ?int $actorId): void
+    {
+        $bag->loadMissing(['fromHub.user', 'toHub.user']);
+
+        $codes = $missingOrders->map(fn (Order $order) => "#{$order->id}")->implode(', ');
+        $count = $missingOrders->count();
+        $body = "Bag {$bag->code} was received with {$count} missing parcel(s): {$codes}.";
+
+        $this->send(
+            $bag->fromHub?->user,
+            $actorId,
+            'bag.discrepancy',
+            'Bag discrepancy',
+            $body,
+            route('logistics.outbound.show', $bag, false),
+            ['bag_id' => $bag->id]
+        );
+
+        $this->send(
+            $bag->toHub?->user,
+            $actorId,
+            'bag.discrepancy',
+            'Bag discrepancy',
+            $body,
+            route('logistics.inbound.show', $bag, false),
+            ['bag_id' => $bag->id]
+        );
+    }
+
+    public function staleBag(ShipmentBag $bag): void
+    {
+        $bag->loadMissing(['fromHub.user', 'toHub.user']);
+
+        $body = "Bag {$bag->code} has been in transit since "
+            .$bag->dispatched_at?->format('M d, Y g:i A').'. Please confirm its status.';
+
+        $this->send(
+            $bag->fromHub?->user,
+            null,
+            'bag.stale',
+            'Bag still in transit',
+            $body,
+            route('logistics.outbound.show', $bag, false),
+            ['bag_id' => $bag->id]
+        );
+
+        $this->send(
+            $bag->toHub?->user,
+            null,
+            'bag.stale',
+            'Bag still in transit',
+            $body,
+            route('logistics.inbound.show', $bag, false),
+            ['bag_id' => $bag->id]
+        );
+    }
+
+    public function staleParcel(Order $order, int $hours): void
+    {
+        $order->loadMissing(['currentHub.user']);
+
+        $this->send(
+            $order->currentHub?->user,
+            null,
+            'parcel.stale',
+            'Parcel needs attention',
+            "Order #{$order->id} has had no tracking update for {$hours} hours.",
+            route('logistics.incoming.index', [], false),
             ['order_id' => $order->id]
         );
     }
@@ -662,7 +773,7 @@ class Notifier
         $users = $to instanceof User ? collect([$to]) : collect($to ?? []);
 
         $users->filter()
-            ->reject(fn($user) => $user->id === $exceptUserId)
+            ->reject(fn ($user) => $user->id === $exceptUserId)
             ->unique('id')
             ->each(function (User $user) use ($kind, $title, $body, $url, $meta) {
                 try {

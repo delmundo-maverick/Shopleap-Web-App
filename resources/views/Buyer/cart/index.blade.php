@@ -26,6 +26,11 @@
     };
 
     $gridCols = 'sm:grid-cols-[minmax(0,1fr)_6rem_7.5rem_6rem_2.5rem]';
+
+    // Same button style as the orders page.
+    $btnBase =
+        'inline-flex min-h-10 w-full items-center justify-center rounded-lg px-5 py-2 text-xs font-bold transition-colors sm:w-auto';
+    $btnPrimary = "$btnBase bg-primary text-white hover:bg-primary/90";
 @endphp
 
 <!DOCTYPE html>
@@ -47,13 +52,13 @@
     <x-Buyer.header :cart-count="$headerCartCount" :cart-preview-items="$headerCartPreview" />
 
     {{-- Main Content --}}
-    <main class="mx-auto w-full max-w-7xl flex-1 px-3 py-5 pb-32 md:px-8 md:py-6 md:pb-32">
+    <main class="mx-auto w-full max-w-7xl flex-1 px-3 py-4 pb-32 sm:px-6 sm:py-6 sm:pb-32 lg:px-8">
 
         @if ($cartItems->isEmpty())
 
             {{-- Empty Cart --}}
             <div
-                class="flex flex-col items-center justify-center rounded-xl bg-white p-8 text-center shadow-sm shadow-charcoal/5 sm:p-16">
+                class="flex flex-col items-center justify-center rounded-xl border border-line bg-white p-8 text-center sm:p-16">
                 <svg class="h-14 w-14 text-charcoal/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                     aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -61,36 +66,35 @@
                 </svg>
 
                 <p class="mt-4 text-sm font-semibold text-charcoal">Your cart is empty</p>
-                <p class="mt-1 text-xs text-charcoal/50">
+                <p class="mt-1 text-xs text-charcoal/60">
                     Browse the shop and add something you like.
                 </p>
 
-                <a href="{{ route('buyer.home') }}"
-                    class="mt-5 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white transition hover:bg-sky-blue">
+                <a href="{{ route('buyer.home') }}" class="{{ $btnPrimary }} mt-5 !w-auto">
                     Continue Shopping
                 </a>
             </div>
         @else
             {{-- Unavailable Items Notice --}}
             <div id="unavailableBanner" role="status"
-                class="mb-3 hidden items-center justify-between gap-3 rounded-lg border border-sale-red/20 bg-sale-red/5 px-4 py-3 text-sm text-sale-red">
+                class="mb-3 hidden items-center justify-between gap-3 rounded-xl border border-sale-red/30 bg-sale-red/5 px-4 py-3 text-xs text-sale-red sm:text-sm">
                 <p>
                     <span id="unavailableCount">0</span>
                     item(s) in your cart can't be purchased right now.
                 </p>
 
-                <button type="button" id="removeUnavailableBtn" class="shrink-0 font-semibold underline">
+                <button type="button" id="removeUnavailableBtn" class="shrink-0 font-bold underline">
                     Remove them
                 </button>
             </div>
 
             {{-- Column Headings (Desktop) --}}
             <div
-                class="mb-3 hidden items-center gap-x-4 rounded-lg bg-white px-4 py-3 text-xs font-semibold uppercase tracking-wide text-charcoal/40 shadow-sm shadow-charcoal/5 sm:grid {{ $gridCols }}">
+                class="mb-3 hidden items-center gap-x-4 rounded-xl border border-line bg-white px-4 py-3 text-xs font-semibold uppercase tracking-wide text-charcoal/60 sm:grid {{ $gridCols }}">
 
                 <label class="flex items-center gap-3">
                     <input type="checkbox" id="selectAllTop" aria-label="Select all items"
-                        class="h-4 w-4 shrink-0 rounded border-light-gray text-primary focus:ring-primary">
+                        class="h-4 w-4 shrink-0 rounded border-line text-primary focus:ring-primary">
                     <span>Product</span>
                 </label>
 
@@ -101,7 +105,7 @@
             </div>
 
             {{-- Cart Items --}}
-            <div class="space-y-4" id="cartItemsList">
+            <div class="space-y-3 sm:space-y-4" id="cartItemsList">
 
                 @foreach ($shops as $sellerId => $items)
                     @php
@@ -109,14 +113,13 @@
                         $name = $shopName($seller);
                     @endphp
 
-                    <section class="shop-group overflow-hidden rounded-xl bg-white shadow-sm shadow-charcoal/5"
+                    <section class="shop-group overflow-hidden rounded-xl border border-line bg-white"
                         data-shop-id="{{ $sellerId }}" aria-label="Items from {{ $name }}">
 
                         {{-- Shop Header --}}
-                        <div
-                            class="flex flex-wrap items-center gap-3 border-b border-light-gray bg-ice-blue/40 px-4 py-3">
+                        <div class="flex flex-wrap items-center gap-3 border-b border-line bg-ice-blue px-4 py-3">
                             <input type="checkbox"
-                                class="shop-checkbox h-4 w-4 shrink-0 rounded border-light-gray text-primary focus:ring-primary"
+                                class="shop-checkbox h-4 w-4 shrink-0 rounded border-line text-primary focus:ring-primary"
                                 aria-label="Select all items from {{ $name }}">
 
                             <svg class="h-4.5 w-4.5 shrink-0 text-primary" fill="none" stroke="currentColor"
@@ -127,7 +130,7 @@
 
                             @if ($seller)
                                 <a href="{{ route('buyer.shop.show', $seller) }}"
-                                    class="min-w-0 truncate text-sm font-bold text-charcoal hover:text-primary">
+                                    class="min-w-0 truncate text-sm font-bold text-charcoal transition-colors hover:text-primary">
                                     {{ $name }}
                                 </a>
                             @else
@@ -136,7 +139,8 @@
                                 </span>
                             @endif
 
-                            <span class="shrink-0 text-xs text-charcoal/45">
+                            <span
+                                class="shrink-0 rounded-sm border border-line bg-white px-1.5 py-0.5 text-[10px] font-bold text-charcoal/60">
                                 {{ $items->count() }}
                                 {{ $items->count() === 1 ? 'item' : 'items' }}
                             </span>
@@ -145,7 +149,7 @@
                         </div>
 
                         {{-- Shop Items --}}
-                        <div class="divide-y divide-light-gray">
+                        <div class="divide-y divide-line">
 
                             @foreach ($items as $item)
                                 @php
@@ -174,10 +178,10 @@
 
                                         <input type="checkbox" @disabled(!$available)
                                             aria-label="Select {{ $itemName }}"
-                                            class="item-checkbox h-4 w-4 shrink-0 rounded border-light-gray text-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-40">
+                                            class="item-checkbox h-4 w-4 shrink-0 rounded border-line text-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-40">
 
                                         <a href="{{ route('buyer.products.show', $item->product) }}"
-                                            class="row-thumb h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-ice-blue/60 sm:h-20 sm:w-20 {{ $available ? '' : 'opacity-50' }}">
+                                            class="row-thumb h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-line bg-ice-blue sm:h-20 sm:w-20 {{ $available ? '' : 'opacity-50' }}">
 
                                             @if ($item->product->main_image_url)
                                                 <img src="{{ $item->product->main_image_url }}"
@@ -189,20 +193,20 @@
                                         <div class="min-w-0 flex-1">
 
                                             <a href="{{ route('buyer.products.show', $item->product) }}"
-                                                class="line-clamp-2 text-sm font-medium text-charcoal hover:text-primary">
+                                                class="line-clamp-2 text-sm font-semibold text-charcoal transition-colors hover:text-primary">
                                                 {{ $itemName }}
                                             </a>
 
                                             <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
 
                                                 <p
-                                                    class="selected-options-label text-xs text-charcoal/45 {{ $item->selected_options ? '' : 'hidden' }}">
+                                                    class="selected-options-label text-xs text-charcoal/60 {{ $item->selected_options ? '' : 'hidden' }}">
                                                     {{ $item->selected_options ? collect($item->selected_options)->map(fn($v, $k) => "{$k}: {$v}")->implode(', ') : '' }}
                                                 </p>
 
                                                 @if ($item->product->options->isNotEmpty())
                                                     <button type="button"
-                                                        class="change-variant-btn text-xs font-semibold text-primary hover:underline">
+                                                        class="change-variant-btn text-xs font-bold text-primary hover:underline">
                                                         Change
                                                     </button>
                                                 @endif
@@ -214,7 +218,8 @@
                                                 {{ $notice }}
                                             </p>
 
-                                            <p class="unit-price-cell mt-1 text-sm font-bold text-primary sm:hidden">
+                                            <p
+                                                class="unit-price-cell mt-1 text-sm font-bold tabular-nums text-primary sm:hidden">
                                                 ₱{{ number_format($item->unit_price, 2) }}
                                             </p>
 
@@ -222,7 +227,8 @@
                                     </div>
 
                                     {{-- Unit Price (Desktop) --}}
-                                    <p class="unit-price-cell hidden text-right text-sm text-charcoal/70 sm:block">
+                                    <p
+                                        class="unit-price-cell hidden text-right text-sm tabular-nums text-charcoal/70 sm:block">
                                         ₱{{ number_format($item->unit_price, 2) }}
                                     </p>
 
@@ -230,33 +236,34 @@
                                     <div class="flex min-w-0 items-center justify-between gap-3 sm:contents">
 
                                         <div
-                                            class="flex w-28 shrink-0 items-center justify-center rounded-lg border border-light-gray sm:justify-self-center">
+                                            class="flex w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-white sm:justify-self-center">
 
                                             <button type="button" @disabled(!$available)
                                                 aria-label="Decrease quantity of {{ $itemName }}"
-                                                class="qty-minus px-2.5 py-1.5 text-charcoal/60 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40">
+                                                class="qty-minus px-2.5 py-1.5 text-charcoal/60 transition-colors hover:bg-ice-blue hover:text-primary disabled:cursor-not-allowed disabled:opacity-40">
                                                 −
                                             </button>
 
                                             <input type="number" inputmode="numeric" @disabled(!$available)
                                                 aria-label="Quantity of {{ $itemName }}"
-                                                class="qty-input w-10 border-x border-light-gray py-1.5 text-center text-sm outline-none disabled:bg-transparent"
+                                                class="qty-input w-10 border-x border-line py-1.5 text-center text-sm tabular-nums outline-none disabled:bg-transparent"
                                                 value="{{ $item->quantity }}" min="1"
                                                 max="{{ max(1, $state['stock']) }}">
 
                                             <button type="button" @disabled(!$available)
                                                 aria-label="Increase quantity of {{ $itemName }}"
-                                                class="qty-plus px-2.5 py-1.5 text-charcoal/60 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40">
+                                                class="qty-plus px-2.5 py-1.5 text-charcoal/60 transition-colors hover:bg-ice-blue hover:text-primary disabled:cursor-not-allowed disabled:opacity-40">
                                                 +
                                             </button>
                                         </div>
 
-                                        <p class="line-total shrink-0 text-right text-sm font-bold text-sale-red">
+                                        <p
+                                            class="line-total shrink-0 text-right text-sm font-bold tabular-nums text-sale-red">
                                             ₱{{ number_format($item->line_total, 2) }}
                                         </p>
 
                                         <button type="button" aria-label="Remove {{ $itemName }} from cart"
-                                            class="remove-btn shrink-0 rounded-lg p-2 text-charcoal/40 transition hover:bg-sale-red/10 hover:text-sale-red sm:justify-self-end">
+                                            class="remove-btn shrink-0 rounded-lg border border-transparent p-2 text-charcoal/40 transition-colors hover:border-sale-red/30 hover:bg-sale-red/5 hover:text-sale-red sm:justify-self-end">
 
                                             <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24" aria-hidden="true">
@@ -282,24 +289,28 @@
 
     {{-- Fixed Checkout Bar --}}
     @if (!$cartItems->isEmpty())
-        <div
-            class="fixed inset-x-0 bottom-0 z-30 border-t border-light-gray bg-white px-3 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:px-6 md:px-8">
+        <div class="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white px-3 py-3 sm:px-6 lg:px-8">
 
             <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-3">
 
                 <div class="flex flex-wrap items-center gap-3 sm:gap-4">
 
-                    <label class="flex items-center gap-2 text-xs font-medium text-charcoal sm:text-sm">
+                    <label class="flex items-center gap-2 text-xs font-semibold text-charcoal sm:text-sm">
                         <input type="checkbox" id="selectAllBottom"
-                            class="h-4 w-4 rounded border-light-gray text-primary focus:ring-primary">
+                            class="h-4 w-4 rounded border-line text-primary focus:ring-primary">
 
                         Select All (<span id="totalItemCount">{{ $cartItems->count() }}</span>)
                     </label>
 
                     <button type="button" id="deleteSelectedBtn"
-                        class="text-xs font-medium text-sale-red transition hover:underline disabled:cursor-not-allowed disabled:text-charcoal/30 disabled:hover:no-underline sm:text-sm"
+                        class="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-sale-red/30 bg-white px-4 py-2 text-xs font-bold text-sale-red transition-colors hover:bg-sale-red/5 disabled:cursor-not-allowed disabled:border-line disabled:text-charcoal/30 disabled:hover:bg-white"
                         disabled>
-                        Delete
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                        </svg>
+                        Remove Selected
                     </button>
 
                 </div>
@@ -307,19 +318,19 @@
                 <div class="ml-auto flex items-center gap-3 sm:gap-4">
 
                     <div class="text-right">
-                        <p class="text-[11px] text-charcoal/50 sm:text-xs">
+                        <p class="text-[11px] text-charcoal/60 sm:text-xs">
                             Total (<span id="selectedCount">0</span> item<span id="selectedCountPlural">s</span>):
                         </p>
 
-                        <p id="selectedSubtotal" class="text-base font-bold text-sale-red sm:text-lg">
+                        <p id="selectedSubtotal" class="text-base font-bold tabular-nums text-sale-red sm:text-lg">
                             ₱0.00
                         </p>
 
-                        <p id="selectedShops" class="hidden text-[11px] text-charcoal/45"></p>
+                        <p id="selectedShops" class="hidden text-[11px] text-charcoal/60"></p>
                     </div>
 
                     <button type="button" id="checkoutBtn"
-                        class="rounded-xl bg-primary px-4 py-3 text-xs font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:bg-charcoal/20 disabled:shadow-none sm:px-8 sm:text-sm"
+                        class="min-h-10 rounded-lg bg-primary px-5 py-2 text-xs font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-charcoal/20 sm:px-8 sm:text-sm"
                         disabled>
                         Check Out
                     </button>
@@ -332,7 +343,7 @@
 
     {{-- Toast Notifications --}}
     <div id="toast" role="status" aria-live="polite"
-        class="fixed bottom-28 right-4 z-[80] hidden max-w-sm rounded-xl px-5 py-3.5 text-sm font-medium text-white shadow-xl transition sm:right-6">
+        class="fixed bottom-28 right-4 z-[80] hidden max-w-sm rounded-lg px-5 py-3.5 text-sm font-medium text-white shadow-xl transition sm:right-6">
     </div>
 
     {{-- Change Variant Modal --}}
@@ -340,24 +351,24 @@
         class="fixed inset-0 z-[95] hidden items-end justify-center bg-charcoal/50 p-0 sm:items-center sm:p-4">
 
         <div role="dialog" aria-modal="true" aria-labelledby="cartVariantModalTitle"
-            class="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-6 shadow-2xl sm:max-w-md sm:rounded-2xl">
+            class="max-h-[90vh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-3xl sm:p-6">
 
             <div class="flex items-start justify-between gap-3">
 
                 <div class="min-w-0">
                     <p id="cartVariantModalTitle" class="line-clamp-2 text-sm font-semibold text-charcoal"></p>
 
-                    <p id="cartVariantModalPrice" class="mt-1 text-xl font-bold text-primary">
+                    <p id="cartVariantModalPrice" class="mt-1 text-xl font-bold tabular-nums text-primary">
                         ₱0.00
                     </p>
 
-                    <p id="cartVariantModalStock" class="mt-1 text-xs text-charcoal/50">
+                    <p id="cartVariantModalStock" class="mt-1 text-xs text-charcoal/60">
                         0 in stock
                     </p>
                 </div>
 
                 <button type="button" id="cartVariantModalCloseBtn" aria-label="Close"
-                    class="shrink-0 rounded-full p-1.5 text-charcoal/40 transition hover:bg-ice-blue hover:text-charcoal">
+                    class="shrink-0 rounded-lg p-1.5 text-charcoal/50 transition-colors hover:bg-ice-blue hover:text-charcoal">
 
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                         aria-hidden="true">
@@ -368,7 +379,7 @@
                 </button>
             </div>
 
-            <div class="my-5 h-px bg-light-gray"></div>
+            <div class="my-5 h-px bg-line"></div>
 
             <div id="cartVariantOptionsContainer"></div>
 
@@ -377,7 +388,7 @@
             </p>
 
             <button type="button" id="cartVariantModalConfirmBtn" disabled
-                class="mt-6 w-full rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:bg-charcoal/20 disabled:shadow-none">
+                class="mt-6 min-h-12 w-full rounded-lg bg-primary px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-charcoal/20">
                 Confirm
             </button>
 
@@ -427,10 +438,6 @@
 
     {{-- Shared Message Widget --}}
     <x-Buyer.message-widget />
-
-    {{-- Shared Footer --}}
-    <x-footer />
-
 </body>
 
 </html>

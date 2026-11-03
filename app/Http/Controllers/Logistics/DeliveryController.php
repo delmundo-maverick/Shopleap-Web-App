@@ -5,11 +5,16 @@ namespace App\Http\Controllers\Logistics;
 use App\Http\Controllers\Controller;
 use App\Models\CourierProfile;
 use App\Models\Order;
+use App\Models\ParcelEvent;
 use App\Services\ActivityLogger;
+use App\Services\HubContext;
 use App\Services\OrderTransitions;
+use App\Services\ParcelLifecycle;
+use App\Services\RiderCoverage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * NOTE: The out / delivered / failed actions are STAND-INS for the rider's
@@ -17,6 +22,8 @@ use Illuminate\Validation\Rule;
  */
 class DeliveryController extends Controller
 {
+    public function __construct(private ParcelLifecycle $lifecycle) {}
+
     const FAILURE_REASONS = [
         'Recipient not available',
         'Wrong or incomplete address',
@@ -34,7 +41,7 @@ class DeliveryController extends Controller
 
     public function index(Request $request)
     {
-        $hub = $request->user()->logisticsProfile;
+        $hub = HubContext::require($request);
 
         $tab = $request->get('tab', 'assigned');
 
@@ -42,7 +49,7 @@ class DeliveryController extends Controller
             $tab = 'assigned';
         }
 
-        $base = Order::where('logistics_profile_id', $hub->id);
+        $base = Order::heldBy($hub->id);
 
         $counts = collect(self::TABS)
             ->map(fn ($statuses) => (clone $base)->whereIn('status', $statuses)->count())
@@ -80,7 +87,7 @@ class DeliveryController extends Controller
         Order $order,
         OrderTransitions $transitions
     ) {
-        $this->authorizeOwnership($request, $order);
+        $this->authorize('actAsHoldingHub', $order);
 
         if (! $transitions->outForDelivery($order, $request->user()->id)) {
             return $this->wrongStage();
@@ -97,7 +104,7 @@ class DeliveryController extends Controller
         Order $order,
         OrderTransitions $transitions
     ) {
-        $this->authorizeOwnership($request, $order);
+        $this->authorize('actAsHoldingHub', $order);
 
         // Stand-in: records the expected COD amount.
         // The app sends the cash actually collected.
@@ -116,7 +123,7 @@ class DeliveryController extends Controller
         Order $order,
         OrderTransitions $transitions
     ) {
-        $this->authorizeOwnership($request, $order);
+        $this->authorize('actAsHoldingHub', $order);
 
         $validated = $request->validate([
             'reason' => ['required', Rule::in(self::FAILURE_REASONS)],
@@ -142,9 +149,9 @@ class DeliveryController extends Controller
 
     public function reschedule(Request $request, Order $order)
     {
-        $hub = $request->user()->logisticsProfile;
+        $hub = HubContext::require($request);
 
-        $this->authorizeOwnership($request, $order);
+        $this->authorize('actAsHoldingHub', $order);
 
         if ($order->status !== Order::STATUS_DELIVERY_FAILED) {
             return $this->wrongStage();
@@ -161,6 +168,7 @@ class DeliveryController extends Controller
         ]);
 
         $riderId = $order->delivery_rider_id;
+        $rider = null;
 
         if (! empty($validated['rider_id'])) {
             $rider = $this->activeRiders($hub->id)
@@ -175,18 +183,41 @@ class DeliveryController extends Controller
             $riderId = $rider->id;
         }
 
-        DB::transaction(function () use ($order, $riderId) {
-            $order->update([
-                'status' => Order::STATUS_ASSIGNED_TO_RIDER,
-                'delivery_rider_id' => $riderId,
-            ]);
+        if ($riderId !== null) {
+            $assignedRider = $rider ?? CourierProfile::find($riderId);
+            $order->loadMissing('buyer.buyerProfile');
+            $dest = $order->ship_to;
 
-            $order->logStatusEvent(
+            if (! $assignedRider || ! RiderCoverage::coversAddress(
+                $assignedRider,
+                $dest['province'],
+                $dest['municipality'],
+                $dest['barangay'],
+                $hub->id
+            )) {
+                throw ValidationException::withMessages([
+                    'rider_id' => 'That rider does not cover the buyer\'s address'
+                        .($dest['barangay'] ? " (Brgy. {$dest['barangay']}, {$dest['municipality']})" : '')
+                        .'. Assign a rider who covers it, or update Service Areas.',
+                ]);
+            }
+        }
+
+        DB::transaction(function () use ($order, $riderId, $request, $hub) {
+            $this->lifecycle->transition(
+                $order,
+                Order::STATUS_DELIVERY_FAILED,
+                Order::STATUS_ASSIGNED_TO_RIDER,
+                ['delivery_rider_id' => $riderId],
                 'Delivery rescheduled. Attempt '
-                . ($order->delivery_attempts + 1)
-                . ' of '
-                . Order::MAX_DELIVERY_ATTEMPTS
-                . '.'
+                .($order->delivery_attempts + 1)
+                .' of '
+                .Order::MAX_DELIVERY_ATTEMPTS
+                .'.',
+                $request->user()->id,
+                $hub->id,
+                riderId: $riderId,
+                eventType: ParcelEvent::TYPE_ASSIGNED,
             );
         });
 
@@ -198,21 +229,23 @@ class DeliveryController extends Controller
 
     public function returnToSeller(Request $request, Order $order)
     {
-        $this->authorizeOwnership($request, $order);
+        $this->authorize('actAsHoldingHub', $order);
 
         if ($order->status !== Order::STATUS_DELIVERY_FAILED) {
             return $this->wrongStage();
         }
 
-        DB::transaction(function () use ($order) {
-            $order->update([
-                'status' => Order::STATUS_RETURNED,
-            ]);
-
-            $order->restoreStock();
-
-            $order->logStatusEvent(
-                'The parcel is being sent back to the seller.'
+        DB::transaction(function () use ($order, $request) {
+            $this->lifecycle->transition(
+                $order,
+                Order::STATUS_DELIVERY_FAILED,
+                Order::STATUS_RETURNED,
+                [],
+                'The parcel is being sent back to the seller.',
+                $request->user()->id,
+                riderId: $order->delivery_rider_id,
+                eventType: ParcelEvent::TYPE_RETURNED,
+                after: fn (Order $o) => $o->restoreStock(),
             );
         });
 
@@ -243,13 +276,5 @@ class DeliveryController extends Controller
             ->where('is_active', true)
             ->orderBy('first_name')
             ->get();
-    }
-
-    private function authorizeOwnership(Request $request, Order $order): void
-    {
-        abort_unless(
-            $order->logistics_profile_id === $request->user()->logisticsProfile->id,
-            403
-        );
     }
 }

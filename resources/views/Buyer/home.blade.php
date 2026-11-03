@@ -7,7 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="user-id" content="{{ auth()->id() }}">
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/pages/buyer/home.js'])
 
     <title>Shopleap — Shop Smart. Shop Simple.</title>
 </head>
@@ -20,73 +20,182 @@
     <!-- =====================================================
          MAIN
     ====================================================== -->
-    <main class="mx-auto max-w-7xl px-5 py-6 sm:px-8">
+    <main class="mx-auto max-w-7xl px-4 py-4 sm:px-8 sm:py-6">
 
         <x-announcement-banner audience="buyer" variant="flat" />
 
-        <!-- BANNER -->
-        <div class="mb-6 h-40 overflow-hidden rounded-lg bg-gradient-to-r from-primary to-sky-blue sm:h-56">
-            <div class="flex h-full items-center px-8 text-white">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-wide text-white/80">Limited Time</p>
-                    <h2 class="mt-1 text-2xl font-extrabold sm:text-3xl">Up to 50% Off Today</h2>
-                    <p class="mt-1 text-sm text-white/85">Shop the best deals across all categories</p>
-                </div>
-            </div>
-        </div>
+        <!-- HERO: image carousel on the left, two smaller images stacked on the right -->
+        @php
+            // Images live in public/images/home/header/.
+            // Suggested sizes: carousel slides about 1200 x 420 px, side tiles about 600 x 300 px.
+            $slides = [
+                [
+                    'label' => 'Featured promotion 1',
+                    'url' => route('buyer.products.index'),
+                    'image' => asset('images/home/header/page-1.jpg'),
+                ],
+                [
+                    'label' => 'Featured promotion 2',
+                    'url' => route('buyer.products.index', ['sort' => 'bestseller']),
+                    'image' => asset('images/home/header/page-2.jpg'),
+                ],
+                [
+                    'label' => 'Featured promotion 3',
+                    'url' => route('buyer.products.index'),
+                    'image' => asset('images/home/header/page-3.jpg'),
+                ],
+            ];
 
-        <!-- CATEGORY GRID -->
-        <section class="mb-8 rounded-lg bg-white p-5 shadow-sm shadow-charcoal/5">
-            <div class="grid grid-cols-4 gap-4 sm:grid-cols-5 lg:grid-cols-7">
-                @foreach ($categories as $category)
-                    @php
-                        $icons = [
-                            'paw' =>
-                                'M4.5 9.5a2 2 0 114 0 2 2 0 01-4 0zm11 0a2 2 0 114 0 2 2 0 01-4 0zM9 5.5a2 2 0 114 0 2 2 0 01-4 0zm6 0a2 2 0 114 0 2 2 0 01-4 0zM7 15c0-2.5 2.5-4 5-4s5 1.5 5 4-2 3.5-5 3.5-5-1-5-3.5z',
-                            'device' => 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z',
-                            'dress' => 'M9 3l3 3 3-3m-3 3v15M6 8l-2 3 2 2m12-5l2 3-2 2',
-                            'shirt' => 'M9 3L6 6l1 3-2 2v10h14V11l-2-2 1-3-3-3-3 2-3-2z',
-                            'baby' => 'M9 12h6m-6 4h6M9 5a3 3 0 116 0v2H9V5zM5 21a7 7 0 0114 0H5z',
-                            'home' => 'M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10',
-                            'ball' => 'M12 3a9 9 0 100 18 9 9 0 000-18zm0 0v18m9-9H3m14.5-6.5l-13 13m13 0l-13-13',
-                            'heart' => 'M12 21s-7-4.5-9.5-9A5.5 5.5 0 0112 5a5.5 5.5 0 019.5 7c-2.5 4.5-9.5 9-9.5 9z',
-                            'book' =>
-                                'M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 006.5 22H20V4a2 2 0 00-2-2H6.5A2.5 2.5 0 004 4.5v15z',
-                            'food' =>
-                                'M18 8h1a4 4 0 010 8h-1M3 8h15v9a4 4 0 01-4 4H7a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3',
-                            'car' =>
-                                'M5 17h14M6 17a2 2 0 11-4 0 2 2 0 014 0zm12 0a2 2 0 11-4 0 2 2 0 014 0zM3 17V9l2-5h14l2 5v8',
-                            'office' => 'M9 3h6a2 2 0 012 2v14l-5-3-5 3V5a2 2 0 012-2z',
-                            'gem' => 'M6 3h12l4 6-10 12L2 9l4-6z',
-                            'pencil' =>
-                                'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z',
-                        ];
-                        $iconPath = $icons[$category['icon']] ?? $icons['office'];
-                    @endphp
-                    <a href="{{ route('buyer.products.index', ['category' => $category['name']]) }}"
-                        class="group flex flex-col items-center gap-2 text-center">
-                        <div
-                            class="flex h-14 w-14 items-center justify-center rounded-full bg-ice-blue text-primary transition group-hover:bg-primary group-hover:text-white">
-                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
-                                    d="{{ $iconPath }}" />
-                            </svg>
+            $promoTiles = [
+                [
+                    'label' => 'Seller vouchers',
+                    'url' => route('buyer.products.index'),
+                    'image' => asset('images/home/header/seller-voucher.jpg'),
+                ],
+                [
+                    'label' => 'Promo 2',
+                    'url' => route('buyer.products.index'),
+                    'image' => asset('images/home/header/side-2.jpg'),
+                ],
+            ];
+
+            $placeholderIcon =
+                'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16v14H4V6z';
+        @endphp
+
+        <section aria-label="Featured promotions"
+            class="mb-6 grid gap-3 sm:mb-8 lg:h-80 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
+
+            {{-- CAROUSEL (behavior in resources/js/pages/buyer/home.js) --}}
+            <div class="relative h-48 overflow-hidden rounded-xl border border-line bg-white sm:h-64 lg:h-full"
+                data-carousel data-autoplay="5000" role="region" aria-roledescription="carousel"
+                aria-label="Promotions">
+
+                <div data-carousel-track
+                    class="flex h-full transition-transform duration-500 ease-out motion-reduce:transition-none">
+                    @foreach ($slides as $slide)
+                        <div data-carousel-slide role="group" aria-roledescription="slide"
+                            aria-label="{{ $loop->iteration }} of {{ count($slides) }}"
+                            class="relative h-full w-full shrink-0 basis-full">
+                            @if ($slide['image'])
+                                <a href="{{ $slide['url'] }}" class="block h-full w-full">
+                                    <img src="{{ $slide['image'] }}" alt="{{ $slide['label'] }}"
+                                        @if (!$loop->first) loading="lazy" @endif
+                                        class="h-full w-full object-cover">
+                                </a>
+                            @else
+                                <a href="{{ $slide['url'] }}"
+                                    class="flex h-full w-full flex-col items-center justify-center gap-2 bg-ice-blue text-charcoal/50">
+                                    <svg class="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                        aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="{{ $placeholderIcon }}" />
+                                    </svg>
+                                    <span class="text-sm font-semibold">{{ $slide['label'] }}</span>
+                                </a>
+                            @endif
                         </div>
-                        <span
-                            class="text-[11px] leading-tight text-charcoal/70 group-hover:text-primary">{{ $category['name'] }}</span>
+                    @endforeach
+                </div>
+
+                {{-- PREVIOUS / NEXT (hidden on phones: swipe instead) --}}
+                <button type="button" data-carousel-prev aria-label="Previous slide"
+                    class="absolute left-3 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg border border-line bg-white text-charcoal transition-colors hover:text-primary sm:flex">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+                <button type="button" data-carousel-next aria-label="Next slide"
+                    class="absolute right-3 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg border border-line bg-white text-charcoal transition-colors hover:text-primary sm:flex">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                </button>
+            </div>
+
+            {{-- SIDE IMAGES: stacked on the right on desktop, a row under the carousel on mobile --}}
+            <div class="grid grid-cols-2 gap-3 lg:min-h-0 lg:grid-cols-1 lg:grid-rows-2">
+                @foreach ($promoTiles as $tile)
+                    <a href="{{ $tile['url'] }}"
+                        class="group relative flex h-24 min-h-0 items-center justify-center overflow-hidden rounded-xl border bg-ice-blue transition-colors hover:border-primary sm:h-32 lg:h-auto {{ $tile['image'] ? 'border-line' : 'border-dashed border-charcoal/25' }}">
+                        @if ($tile['image'])
+                            <img src="{{ $tile['image'] }}" alt="{{ $tile['label'] }}" loading="lazy"
+                                class="h-full w-full object-cover">
+                        @else
+                            <span class="flex flex-col items-center gap-1.5 text-charcoal/50">
+                                <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                    aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                        d="{{ $placeholderIcon }}" />
+                                </svg>
+                                <span class="text-xs font-semibold">{{ $tile['label'] }}</span>
+                            </span>
+                        @endif
                     </a>
                 @endforeach
             </div>
         </section>
 
+        <!-- CATEGORIES -->
+        @php
+            $icons = [
+                'paw' =>
+                    'M4.5 9.5a2 2 0 114 0 2 2 0 01-4 0zm11 0a2 2 0 114 0 2 2 0 01-4 0zM9 5.5a2 2 0 114 0 2 2 0 01-4 0zm6 0a2 2 0 114 0 2 2 0 01-4 0zM7 15c0-2.5 2.5-4 5-4s5 1.5 5 4-2 3.5-5 3.5-5-1-5-3.5z',
+                'device' => 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z',
+                'dress' => 'M9 3l3 3 3-3m-3 3v15M6 8l-2 3 2 2m12-5l2 3-2 2',
+                'shirt' => 'M9 3L6 6l1 3-2 2v10h14V11l-2-2 1-3-3-3-3 2-3-2z',
+                'baby' => 'M9 12h6m-6 4h6M9 5a3 3 0 116 0v2H9V5zM5 21a7 7 0 0114 0H5z',
+                'home' => 'M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10',
+                'ball' => 'M12 3a9 9 0 100 18 9 9 0 000-18zm0 0v18m9-9H3m14.5-6.5l-13 13m13 0l-13-13',
+                'heart' => 'M12 21s-7-4.5-9.5-9A5.5 5.5 0 0112 5a5.5 5.5 0 019.5 7c-2.5 4.5-9.5 9-9.5 9z',
+                'book' =>
+                    'M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 006.5 22H20V4a2 2 0 00-2-2H6.5A2.5 2.5 0 004 4.5v15z',
+                'food' => 'M18 8h1a4 4 0 010 8h-1M3 8h15v9a4 4 0 01-4 4H7a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3',
+                'car' => 'M5 17h14M6 17a2 2 0 11-4 0 2 2 0 014 0zm12 0a2 2 0 11-4 0 2 2 0 014 0zM3 17V9l2-5h14l2 5v8',
+                'office' => 'M9 3h6a2 2 0 012 2v14l-5-3-5 3V5a2 2 0 012-2z',
+                'gem' => 'M6 3h12l4 6-10 12L2 9l4-6z',
+                'pencil' =>
+                    'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z',
+            ];
+        @endphp
+
+        <section class="mb-6 sm:mb-8">
+            <h2 class="mb-3 text-base font-bold text-charcoal">Categories</h2>
+
+            {{-- One connected block. Mobile: a single row that scrolls sideways. sm and up: a 7-column grid. --}}
+            <div class="overflow-hidden rounded-xl border border-line bg-white">
+                <div class="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div
+                        class="-mb-px -mr-px grid auto-cols-[5.5rem] grid-flow-col sm:auto-cols-auto sm:grid-flow-row sm:grid-cols-7">
+                        @foreach ($categories as $category)
+                            @php $iconPath = $icons[$category['icon']] ?? $icons['office']; @endphp
+                            <a href="{{ route('buyer.products.index', ['category' => $category['name']]) }}"
+                                class="group flex flex-col items-center gap-2 border-b border-r border-line px-1.5 py-3 text-center transition-colors hover:bg-ice-blue sm:px-2 sm:py-4">
+                                <span
+                                    class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white sm:h-12 sm:w-12">
+                                    <svg class="h-5 w-5 sm:h-6 sm:w-6" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
+                                            d="{{ $iconPath }}" />
+                                    </svg>
+                                </span>
+                                <span
+                                    class="line-clamp-2 text-[11px] leading-tight text-charcoal/75 group-hover:text-primary sm:text-xs">{{ $category['name'] }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- BEST SELLERS -->
-        <section class="mb-8">
-            <div class="mb-3 flex items-center justify-between">
+        <section class="mb-6 sm:mb-8">
+            <div class="mb-3 flex items-center justify-between gap-3">
                 <h2 class="text-base font-bold text-charcoal">Top Products / Best Sellers</h2>
                 <a href="{{ route('buyer.products.index', ['sort' => 'bestseller']) }}"
-                    class="text-xs font-semibold text-primary hover:underline">See all</a>
+                    class="shrink-0 text-xs font-semibold text-primary hover:underline">See all</a>
             </div>
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+            <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 @foreach ($bestSellers as $product)
                     <x-Buyer.product-card :product="$product" />
                 @endforeach
@@ -95,19 +204,19 @@
 
         <!-- DAILY DISCOVER / RECOMMENDED -->
         <section>
-            <div class="mb-3 flex items-center gap-2">
+            <div class="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                 <h2 class="text-base font-bold text-charcoal">Daily Discover</h2>
-                <span class="text-xs text-charcoal/45">Recommended for you</span>
+                <span class="text-xs text-charcoal/60">Recommended for you</span>
             </div>
 
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+            <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 @foreach ($recommended as $product)
                     <x-Buyer.product-card :product="$product" />
                 @endforeach
             </div>
 
             <!-- PAGINATION -->
-            <div class="pagination-frost mt-8 flex justify-center">
+            <div class="pagination-frost mt-6 flex justify-center sm:mt-8">
                 {{ $recommended->onEachSide(1)->links() }}
             </div>
         </section>
@@ -118,91 +227,34 @@
     <!-- =====================================================
          FOOTER
     ====================================================== -->
-    <footer class="mt-10 border-t border-light-gray bg-white">
-        <div class="mx-auto max-w-7xl px-5 py-10 sm:px-8">
+    <footer class="mt-8 border-t border-line bg-white sm:mt-10">
+        <div class="mx-auto max-w-7xl px-4 py-8 sm:px-8 sm:py-10">
 
             <!-- CATEGORY SITEMAP -->
-            <div class="mb-10 border-b border-light-gray pb-10">
-                <p class="mb-5 text-sm font-bold text-charcoal">Shop by Category</p>
-                <div class="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
+            <div class="mb-8 border-b border-line pb-8 sm:mb-10 sm:pb-10">
+                <p class="mb-4 text-sm font-bold text-charcoal sm:mb-5">Shop by Category</p>
+                <div class="grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-3 sm:gap-y-8 lg:grid-cols-5">
                     @foreach ($categories as $category)
                         <div>
                             <a href="{{ route('buyer.products.index', ['category' => $category['name']]) }}"
                                 class="mb-2 block text-xs font-bold text-charcoal hover:text-primary">
                                 {{ $category['name'] }}
                             </a>
-                            {{-- Subcategories are shown for reference only — the underlying field
-                                 is no longer set on any product (see tech doc §5), so these can't
-                                 filter results and are intentionally not links. --}}
                             <ul class="space-y-1.5">
                                 @foreach ($category['subcategories'] as $sub)
-                                    <li><span class="text-xs text-charcoal/50">{{ $sub }}</span></li>
+                                    <li><span class="text-xs text-charcoal/60">{{ $sub }}</span></li>
                                 @endforeach
                             </ul>
                         </div>
                     @endforeach
                 </div>
             </div>
-
-            <div class="grid grid-cols-2 gap-8 sm:grid-cols-4">
-
-                <div>
-                    <p class="mb-3 text-xs font-bold uppercase tracking-wide text-charcoal/50">Customer Service</p>
-                    <ul class="space-y-2 text-xs text-charcoal/65">
-                        <li><a href="{{ route('messages.support') }}" class="hover:text-primary">Help Center</a></li>
-                        <li><a href="#" class="hover:text-primary">How to Buy</a></li>
-                        <li><a href="#" class="hover:text-primary">Returns & Refunds</a></li>
-                        <li><a href="{{ route('messages.support') }}" class="hover:text-primary">Contact Us</a></li>
-                        <li><a href="{{ route('buyer.orders.index', ['tab' => 'to_deliver']) }}"
-                                class="hover:text-primary">Track My Order</a></li>
-                    </ul>
-                </div>
-
-                <div>
-                    <p class="mb-3 text-xs font-bold uppercase tracking-wide text-charcoal/50">About Shopleap</p>
-                    <ul class="space-y-2 text-xs text-charcoal/65">
-                        <li><a href="#" class="hover:text-primary">About Us</a></li>
-                        <li><a href="#" class="hover:text-primary">Careers</a></li>
-                        <li><a href="{{ route('register.seller') }}" class="hover:text-primary">Sell on Shopleap</a>
-                        </li>
-                        <li><a href="#" class="hover:text-primary">Terms & Policies</a></li>
-                        <li><a href="{{ route('policies.show', 'privacy-policy') }}" class="hover:text-primary">Privacy
-                                Policy</a></li>
-                    </ul>
-                </div>
-
-                <div>
-                    <p class="mb-3 text-xs font-bold uppercase tracking-wide text-charcoal/50">Payment Methods</p>
-                    <div class="flex flex-wrap gap-2">
-                        @foreach (['COD'] as $payment)
-                            <span
-                                class="rounded border border-light-gray px-2 py-1 text-[10px] font-semibold text-charcoal/60">{{ $payment }}</span>
-                        @endforeach
-                    </div>
-                </div>
-
-                <div>
-                    <p class="mb-3 text-xs font-bold uppercase tracking-wide text-charcoal/50">Delivery Partners</p>
-                    <div class="flex flex-wrap gap-2">
-                        @foreach ([] as $courier)
-                            <span
-                                class="rounded border border-light-gray px-2 py-1 text-[10px] font-semibold text-charcoal/60">{{ $courier }}</span>
-                        @endforeach
-                    </div>
-                </div>
-
-            </div>
-
-            <div
-                class="mt-8 flex flex-col items-center justify-between gap-3 border-t border-light-gray pt-6 sm:flex-row">
-                <p class="text-xs text-charcoal/50">© {{ date('Y') }} Shopleap. All rights reserved.</p>
-                <p class="text-xs text-charcoal/50">Shop Smart. Shop Simple.</p>
-            </div>
-
         </div>
     </footer>
 
     <x-Buyer.message-widget />
+    <x-footer />
 </body>
 
 </html>
+    

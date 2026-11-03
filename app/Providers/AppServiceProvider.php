@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\Order;
 use App\Models\ShopVoucher;
+use App\Policies\OrderPolicy;
 use App\Policies\ShopVoucherPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -22,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::policy(Order::class, OrderPolicy::class);
         Gate::policy(ShopVoucher::class, ShopVoucherPolicy::class);
     }
 }
