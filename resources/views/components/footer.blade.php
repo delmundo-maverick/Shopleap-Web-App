@@ -4,8 +4,10 @@
             © {{ date('Y') }} Shopleap.
         </p>
 
-        <p class="text-xs text-charcoal/60">
-            Shop Smart. Shop Simple.
-        </p>
+        <div class="flex flex-wrap items-center justify-center gap-4 text-xs text-charcoal/60">
+            <a href="{{ route('terms') }}" class="transition hover:text-primary">Terms and Conditions</a>
+            <a href="{{ route('privacy') }}" class="transition hover:text-primary">Privacy Policy</a>
+            <span>Shop Smart. Shop Simple.</span>
+        </div>
     </div>
 </footer>

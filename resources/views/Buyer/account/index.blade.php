@@ -35,12 +35,6 @@
 
         $sectionTitle = 'text-sm font-bold text-charcoal sm:text-base';
 
-        $addressData = [
-            'province' => old('province', $profile->province),
-            'municipality' => old('municipality', $profile->municipality),
-            'barangay' => old('barangay', $profile->barangay),
-        ];
-
         $statusStyles = [
             'active' => 'border border-leaf-green/40 bg-leaf-green/10 text-leaf-green',
             'suspended' => 'border border-orange-200 bg-orange-100 text-orange-600',
@@ -446,122 +440,7 @@
 
                 {{-- ADDRESS TAB --}}
                 <div x-show="tab === 'address'" x-cloak class="min-w-0">
-                    <section class="{{ $cardClass }}">
-                        <div class="{{ $cardHeaderClass }}">
-                            <h2 class="{{ $sectionTitle }}">Delivery Address</h2>
-                            <p class="mt-0.5 text-xs leading-relaxed text-charcoal/60">
-                                Used at checkout to calculate shipping and check delivery coverage. Existing orders keep
-                                the address they were placed with.
-                            </p>
-                        </div>
-
-                        <form method="POST" action="{{ route('buyer.account.address') }}"
-                            class="space-y-5 p-4 sm:p-5">
-                            @csrf
-
-                            <div class="grid min-w-0 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                                <div class="min-w-0">
-                                    <label for="province" class="{{ $labelClass }}">
-                                        Province <span class="text-sale-red">*</span>
-                                    </label>
-
-                                    <select id="province" name="province" required class="{{ $selectClass }}">
-                                        <option value="{{ $addressData['province'] }}" selected>
-                                            {{ $addressData['province'] }}
-                                        </option>
-                                    </select>
-
-                                    @error('province', 'address')
-                                        <p class="mt-1.5 text-xs font-semibold text-sale-red">{{ $message }}</p>
-                                    @enderror
-                                </div>
-
-                                <div class="min-w-0">
-                                    <label for="municipality" class="{{ $labelClass }}">
-                                        Municipality / City <span class="text-sale-red">*</span>
-                                    </label>
-
-                                    <select id="municipality" name="municipality" required
-                                        class="{{ $selectClass }}">
-                                        <option value="{{ $addressData['municipality'] }}" selected>
-                                            {{ $addressData['municipality'] }}
-                                        </option>
-                                    </select>
-
-                                    @error('municipality', 'address')
-                                        <p class="mt-1.5 text-xs font-semibold text-sale-red">{{ $message }}</p>
-                                    @enderror
-                                </div>
-
-                                <div class="min-w-0">
-                                    <label for="barangay" class="{{ $labelClass }}">
-                                        Barangay <span class="text-sale-red">*</span>
-                                    </label>
-
-                                    <select id="barangay" name="barangay" required class="{{ $selectClass }}">
-                                        <option value="{{ $addressData['barangay'] }}" selected>
-                                            {{ $addressData['barangay'] }}
-                                        </option>
-                                    </select>
-
-                                    @error('barangay', 'address')
-                                        <p class="mt-1.5 text-xs font-semibold text-sale-red">{{ $message }}</p>
-                                    @enderror
-                                </div>
-                            </div>
-
-                            <p id="addressHelp" role="status" class="text-xs text-sale-red"></p>
-
-                            <div class="grid min-w-0 gap-5 sm:grid-cols-3">
-                                <div class="min-w-0">
-                                    <label for="house_number" class="{{ $labelClass }}">
-                                        House / Unit No. <span class="text-sale-red">*</span>
-                                    </label>
-
-                                    <input type="text" id="house_number" name="house_number" required
-                                        maxlength="100" value="{{ old('house_number', $profile->house_number) }}"
-                                        class="{{ $inputClass }}">
-
-                                    @error('house_number', 'address')
-                                        <p class="mt-1.5 text-xs font-semibold text-sale-red">{{ $message }}</p>
-                                    @enderror
-                                </div>
-
-                                <div class="min-w-0 sm:col-span-2">
-                                    <label for="street" class="{{ $labelClass }}">
-                                        Street <span class="text-sale-red">*</span>
-                                    </label>
-
-                                    <input type="text" id="street" name="street" required maxlength="255"
-                                        value="{{ old('street', $profile->street) }}" class="{{ $inputClass }}">
-
-                                    @error('street', 'address')
-                                        <p class="mt-1.5 text-xs font-semibold text-sale-red">{{ $message }}</p>
-                                    @enderror
-                                </div>
-                            </div>
-
-                            <div class="min-w-0">
-                                <label for="additional_address" class="{{ $labelClass }}">
-                                    Landmarks / notes
-                                    <span class="font-normal text-charcoal/60">(optional)</span>
-                                </label>
-
-                                <textarea id="additional_address" name="additional_address" rows="3" maxlength="500"
-                                    placeholder="e.g. Blue gate, near the barangay hall" class="{{ $inputClass }} resize-y">{{ old('additional_address', $profile->additional_address) }}</textarea>
-
-                                @error('additional_address', 'address')
-                                    <p class="mt-1.5 text-xs font-semibold text-sale-red">{{ $message }}</p>
-                                @enderror
-                            </div>
-
-                            <div class="flex justify-end border-t border-line pt-5">
-                                <button type="submit" class="{{ $btnPrimary }}">
-                                    Save address
-                                </button>
-                            </div>
-                        </form>
-                    </section>
+                    <x-buyer-addresses :addresses="$addresses" />
                 </div>
 
                 {{-- CHANGE PASSWORD TAB --}}
@@ -768,7 +647,7 @@
         </div>
     </main>
 
-    <script id="addressData" type="application/json">@json($addressData)</script>
+
 
     <x-Buyer.seller-follow-data :ids="$followingIds" :counts="$followingCounts" :total="$following->total()" />
 

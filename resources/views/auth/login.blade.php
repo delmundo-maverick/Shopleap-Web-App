@@ -21,10 +21,6 @@
 
         $iconClass = 'h-5 w-5 text-charcoal/45';
 
-        $forgotPasswordUrl = \Illuminate\Support\Facades\Route::has('password.request')
-            ? route('password.request')
-            : '#';
-
         $highlights = [
             [
                 'title' => 'Track every order',
@@ -201,10 +197,7 @@
                                         Password
                                     </label>
 
-                                    <a href="{{ $forgotPasswordUrl }}"
-                                        class="text-xs font-bold text-primary transition hover:text-sky-blue hover:underline sm:text-sm">
-                                        Forgot password?
-                                    </a>
+
                                 </div>
 
                                 <div class="relative">
@@ -239,6 +232,10 @@
                                     </button>
                                 </div>
 
+                                <a href="{{ route('password.request') }}"
+                                    class="mt-2 inline-block text-xs font-bold text-primary transition hover:text-sky-blue hover:underline sm:text-sm">
+                                    Forgot password?
+                                </a>
                                 @error('password')
                                     <p class="mt-1.5 text-xs font-medium text-sale-red">{{ $message }}</p>
                                 @enderror

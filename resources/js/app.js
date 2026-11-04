@@ -1,8 +1,12 @@
 import Alpine from 'alpinejs';
-import sortingScanner from './sorting-scanner.js';
+import { addressBook } from './shared/buyer-addresses.js';
+import { checkoutPage, voucherCheckout } from './pages/buyer/checkout.js';
+import { termsAgreementState } from './shared/terms-modal.js';
 
 window.Alpine = Alpine;
-window.sortingScanner = sortingScanner;
+Alpine.data('addressBook', addressBook);
+Alpine.data('checkoutPage', checkoutPage);
+Alpine.data('voucherCheckout', voucherCheckout);
 
 Alpine.store('sidebar', {
     open: false,
@@ -10,9 +14,15 @@ Alpine.store('sidebar', {
 });
 
 Alpine.data('otpRegistration', (config = {}) => ({
+    ...termsAgreementState(config),
+
     verifyUrl: config.verifyUrl,
     resendUrl: config.resendUrl,
     loginUrl: config.loginUrl,
+
+    init() {
+        this.initTermsAgreement();
+    },
 
     submitting: false,
     showOtpModal: false,
@@ -30,6 +40,14 @@ Alpine.data('otpRegistration', (config = {}) => ({
     },
 
     async submitRegistration(event) {
+        if (!this.termsAccepted) {
+            this.openTermsModal();
+            this.termsError =
+                'Please read and agree to the Terms and Conditions and Privacy Policy before continuing.';
+            return;
+        }
+
+        this.termsError = '';
         this.submitting = true;
         this.formErrors = [];
 
@@ -50,7 +68,14 @@ Alpine.data('otpRegistration', (config = {}) => ({
             const data = await response.json();
 
             if (response.status === 422) {
-                this.formErrors = Object.values(data.errors ?? {}).flat();
+                const errors = data.errors ?? {};
+                this.formErrors = Object.values(errors).flat();
+
+                if (errors.terms_accepted?.length) {
+                    this.termsError = errors.terms_accepted[0];
+                    this.openTermsModal();
+                }
+
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 return;
             }

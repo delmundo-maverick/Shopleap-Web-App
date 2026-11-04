@@ -14,7 +14,10 @@
 <body x-data="otpRegistration({
     verifyUrl: '{{ route('register.otp.verify', 'logistics') }}',
     resendUrl: '{{ route('register.resend-otp', 'logistics') }}',
-    loginUrl: '{{ route('login') }}'
+    loginUrl: '{{ route('login') }}',
+    termsUrl: '{{ route('terms.content') }}',
+    privacyUrl: '{{ route('privacy.content') }}',
+    termsAccepted: @js((bool) old('terms_accepted'))
 })" class="min-h-screen bg-ice-blue text-charcoal antialiased">
 
     @php
@@ -32,30 +35,35 @@
     @endphp
 
     <!-- HEADER -->
-    <header class="border-b border-light-gray bg-white">
+    <header class="border-b border-white/10 bg-primary">
         <div class="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
+
+            <!-- BRAND -->
             <a href="{{ route('home') }}" class="flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white/10">
-                    <img src="{{ asset('images/Shopleap-Logo.png') }}" alt="Shopleap"
+                <div class="flex h-10 w-10 items-center justify-center overflow-hidden">
+                    <img src="{{ asset('images/Shopleap-Logo-White.png') }}" alt="Shopleap"
                         class="h-full w-full object-contain">
                 </div>
-
                 <div>
-                    <h1 class="font-logo text-[1.375rem] font-medium leading-none tracking-tight text-primary">
+                    <h1 class="font-logo text-[1.375rem] text-white font-medium leading-none tracking-tight">
                         Shopleap
                     </h1>
-                    <p class="text-xs text-charcoal/60">
+                    <p class="text-xs text-white/80">
                         Shop Smart. Shop Simple.
                     </p>
                 </div>
             </a>
 
+            <!-- LOGIN -->
             <div class="flex items-center gap-2 text-sm">
-                <span class="hidden text-charcoal/60 sm:inline">Already have an account?</span>
-                <a href="{{ route('login') }}" class="font-semibold text-primary transition hover:text-sky-blue">
+                <span class="hidden text-white/80 sm:inline">
+                    Already have an account?
+                </span>
+                <a href="{{ route('login') }}" class="font-semibold text-white transition hover:text-white/80">
                     Log in
                 </a>
             </div>
+
         </div>
     </header>
 
@@ -63,7 +71,7 @@
         <div class="mx-auto max-w-4xl">
 
             <form method="POST" action="{{ route('register.logistics') }}" enctype="multipart/form-data"
-                @submit.prevent="submitRegistration($event)"
+                @submit="guardTermsAgreement($event)"
                 class="overflow-hidden rounded-2xl border border-light-gray bg-white shadow-xl shadow-charcoal/5">
 
                 @csrf
@@ -493,24 +501,9 @@
                         </div>
                     </div>
 
-                    <div class="mt-6 flex items-start gap-3">
-                        <input type="checkbox" name="terms" id="terms" required
-                            class="mt-0.5 h-4 w-4 shrink-0 rounded border-light-gray text-primary accent-primary focus:ring-2 focus:ring-primary/20">
+                    <x-terms-consent />
 
-                        <label for="terms" class="text-xs leading-5 text-charcoal/65">
-                            I confirm that the information provided is accurate and complete, and I agree to the
-                            <a href="#"
-                                class="font-semibold text-primary underline hover:text-sky-blue">Shopleap Terms of
-                                Service</a>
-                            and
-                            <a href="#"
-                                class="font-semibold text-primary underline hover:text-sky-blue">Logistics Partner
-                                Policy</a>.
-                            <span class="text-sale-red">*</span>
-                        </label>
-                    </div>
-
-                    <button type="submit" :disabled="submitting"
+                    <button type="submit" :disabled="submitting || !termsAccepted"
                         class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60">
 
                         <span x-show="!submitting">Submit Registration</span>
@@ -618,4 +611,3 @@
 </body>
 
 </html>
-    

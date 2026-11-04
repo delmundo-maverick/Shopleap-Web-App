@@ -582,8 +582,8 @@
                         <li><a href="{{ route('register.seller') }}" class="hover:text-white">Sell on Shopleap</a>
                         </li>
                         <li><a href="{{ $riderRegisterUrl }}" class="hover:text-white">Ride with Shopleap</a></li>
-                        <li><a href="#" class="hover:text-white">Terms & Policies</a></li>
-                        <li><a href="#" class="hover:text-white">Privacy Policy</a></li>
+                        <li><a href="{{ route('terms') }}" class="hover:text-white">Terms & Conditions</a></li>
+                        <li><a href="{{ route('privacy') }}" class="hover:text-white">Privacy Policy</a></li>
                     </ul>
                 </div>
 

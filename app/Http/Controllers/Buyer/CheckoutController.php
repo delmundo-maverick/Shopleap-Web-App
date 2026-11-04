@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
+use App\Models\BuyerAddress;
 use App\Models\CartItem;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -27,6 +28,7 @@ class CheckoutController extends Controller
         ShippingFeeCalculator $shipping,
         HubCoverage $coverage
     ) {
+        $address = $this->selectedAddress($request);
         $cartItems = $this->selectedCartItems($request);
 
         if ($cartItems->isEmpty()) {
@@ -54,21 +56,28 @@ class CheckoutController extends Controller
 
         // Sellers whose pickup hub and delivery hub can't be paired under one
         // logistics company.
-        $profile = $request->user()->buyerProfile;
+        $profile = $address;
 
         $blockedSellerIds = $groupedBySeller
             ->filter(
                 fn ($items) => ! $coverage->isCovered(
                     $items->first()->product->seller,
                     $profile?->province,
-                    $profile?->municipality,
+                    $profile?->city_municipality,
                     $profile?->barangay
                 )
             )
             ->keys()
             ->all();
 
+        if ($request->expectsJson()) {
+            return response()->json(['shipping' => $shippingBySeller, 'shippingTotal' => $shippingTotal,
+                'grandTotal' => $subtotal + $shippingTotal, 'blocked' => $blockedSellerIds]);
+        }
+
         return view('Buyer.checkout.index', [
+            'addresses' => $request->user()->addresses()->orderByDesc('is_default')->latest('id')->get(),
+            'selectedAddress' => $address,
             'groupedBySeller' => $groupedBySeller,
             'total' => $subtotal,
             'weightBySeller' => $weightBySeller,
@@ -96,15 +105,7 @@ class CheckoutController extends Controller
             'notes.*' => ['nullable', 'string', 'max:255'],
         ]);
 
-        // Shipping fees and hub coverage require a complete delivery address.
-        if (
-            ! $buyer->buyerProfile?->province
-            || ! $buyer->buyerProfile?->municipality
-        ) {
-            return back()->withErrors([
-                'address' => 'Please add your delivery address before placing your order.',
-            ]);
-        }
+        $request->validate(['address_id' => ['required', 'integer']]);
 
         $placed = DB::transaction(function () use (
             $request,
@@ -114,6 +115,11 @@ class CheckoutController extends Controller
             $voucherService,
             $lifecycle
         ) {
+            $address = $buyer->addresses()->whereKey($request->integer('address_id'))->lockForUpdate()->first();
+            if (! $address) {
+                throw ValidationException::withMessages(['address_id' => 'Select one of your saved delivery addresses.']);
+            }
+
             // 1. Lock the cart rows so a double-click cannot place the order twice.
             $cartItems = $this->selectedCartItems(
                 $request,
@@ -206,9 +212,9 @@ class CheckoutController extends Controller
 
                 $route = $coverage->routeFor(
                     $seller,
-                    $buyer->buyerProfile->province,
-                    $buyer->buyerProfile->municipality,
-                    $buyer->buyerProfile->barangay
+                    $address->province,
+                    $address->city_municipality,
+                    $address->barangay
                 );
 
                 if (! $route) {
@@ -259,8 +265,8 @@ class CheckoutController extends Controller
                 // Recalculate shipping on the server using the current address.
                 $quote = $shipping->calculate(
                     $items->first()->product->seller,
-                    $buyer->buyerProfile?->province,
-                    $buyer->buyerProfile?->municipality
+                    $address->province,
+                    $address->city_municipality
                 );
 
                 // Commission calculated on order total (items subtotal) as per existing policy
@@ -283,17 +289,13 @@ class CheckoutController extends Controller
                     'voucher_discount' => $sellerVoucherDiscount,
                     'origin_hub_id' => $route['origin']->id,
                     'destination_hub_id' => $route['destination']->id,
-                    'ship_province' => $buyer->buyerProfile?->province,
-                    'ship_municipality' => $buyer->buyerProfile?->municipality,
-                    'ship_barangay' => $buyer->buyerProfile?->barangay,
-                    'ship_street' => $buyer->buyerProfile
-                        ? trim(
-                            ($buyer->buyerProfile->house_number ?? '')
-                                .' '
-                                .($buyer->buyerProfile->street ?? '')
-                        )
-                        : null,
-                    'ship_contact_no' => $buyer->buyerProfile?->contact_no,
+                    'ship_province' => $address->province,
+                    'ship_municipality' => $address->city_municipality,
+                    'ship_barangay' => $address->barangay,
+                    'ship_street' => $address->street_address,
+                    'address_id' => $address->id,
+                    'shipping_address' => $address->snapshot(),
+                    'ship_contact_no' => $address->phone,
 
                     // Save the optional note for this seller's order.
                     'buyer_note' => trim(
@@ -433,18 +435,36 @@ class CheckoutController extends Controller
         Collection $groupedBySeller,
         ShippingFeeCalculator $shipping
     ): array {
-        $profile = $request->user()->buyerProfile;
+        $profile = $this->selectedAddress($request);
         $quotes = [];
 
         foreach ($groupedBySeller as $sellerId => $items) {
             $quotes[$sellerId] = $shipping->calculate(
                 $items->first()->product->seller,
                 $profile?->province,
-                $profile?->municipality
+                $profile?->city_municipality
             );
         }
 
         return $quotes;
+    }
+
+    private function selectedAddress(Request $request): ?BuyerAddress
+    {
+        if (! $request->filled('address_id') && $request->old('address_id')) {
+            $request->merge(['address_id' => $request->old('address_id')]);
+        }
+        if ($request->filled('address_id')) {
+            $request->validate(['address_id' => ['integer']]);
+            $address = $request->user()->addresses()->find($request->integer('address_id'));
+            if (! $address) {
+                throw ValidationException::withMessages(['address_id' => 'Select one of your saved addresses.']);
+            }
+
+            return $address;
+        }
+
+        return $request->user()->defaultAddress;
     }
 
     /**

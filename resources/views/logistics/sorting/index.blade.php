@@ -7,7 +7,7 @@
     $rowDividers = 'md:[&>tr:not(:last-child)>td]:border-b md:[&>tr:not(:last-child)>td]:border-charcoal/10';
 @endphp
 <x-logistics.layout title="Sort & Assign" subtitle="Sort parcels by destination, then assign a delivery rider"
-    active="sorting" :scripts="['resources/js/sorting-scanner.js']">
+    active="sorting" :scripts="['resources/js/pages/logistics/sorting.js']">
     <div x-data="sortingScanner()" class="space-y-4 sm:space-y-5">
         {{-- Session data for Alpine --}}
         <script type="application/json" id="sessionData">
@@ -39,7 +39,7 @@
                 <div class="flex w-full items-center gap-3 sm:w-auto">
                     <template x-if="!session">
                         <button type="button" @click="startSession()" :disabled="startingSession"
-                            class="w-full rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
+                            class="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
                             <span x-show="!startingSession" class="flex items-center justify-center gap-2">
                                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                     aria-hidden="true">
@@ -72,7 +72,7 @@
                                 </div>
                             </div>
                             <button type="button" @click="endSession()" :disabled="endingSession"
-                                class="btn-soft btn-soft--danger flex-1 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
+                                class="btn btn-danger-outline flex-1 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
                                 <span x-show="!endingSession" class="flex items-center justify-center gap-2">
                                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                         aria-hidden="true">
@@ -99,6 +99,9 @@
                 </div>
             </div>
 
+            <p x-show="sessionError" x-text="sessionError" x-cloak role="alert"
+                class="mt-4 rounded-lg bg-sale-red/10 px-3 py-2 text-sm font-semibold text-sale-red"></p>
+
             {{-- Progress Bar --}}
             <template x-if="session && progress.total_scans > 0">
                 <div class="mt-5 border-t border-white/50 pt-5">
@@ -115,7 +118,7 @@
                         </div>
                     </div>
                     <div class="h-3 overflow-hidden rounded-full bg-light-gray shadow-inner">
-                        <div class="h-full bg-gradient-to-r from-primary to-leaf-green transition-all duration-300"
+                        <div class="h-full bg-primary transition-all duration-300"
                             :style="'width: ' + (progress.total_scans > 0 ? (progress.sorted / progress.total_scans * 100) :
                                 0) + '%'">
                         </div>
@@ -154,11 +157,28 @@
                             </label>
                             <button type="button" @click="isScanning ? stopScanner() : startScanner()"
                                 :disabled="cameraBusy"
-                                class="rounded-lg px-4 py-2 text-xs font-bold transition disabled:opacity-50"
-                                :class="isScanning ? 'bg-sale-red/10 text-sale-red hover:bg-sale-red/20' :
-                                    'bg-primary/10 text-primary hover:bg-primary/20'">
-                                <span x-show="!isScanning">▶ Start Camera</span>
-                                <span x-show="isScanning">⬛ Stop Camera</span>
+                                class="btn shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
+                                :class="isScanning ? 'btn-danger' : 'btn-primary'"
+                                :aria-label="isScanning ? 'Stop Camera' : 'Start Camera'">
+                                <span x-show="!isScanning" class="flex items-center justify-center gap-2">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                        aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z">
+                                        </path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                    Start Camera
+                                </span>
+                                <span x-show="isScanning" class="flex items-center justify-center gap-2">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                        aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                    Stop Camera
+                                </span>
                             </button>
                         </div>
 
@@ -173,7 +193,7 @@
 
                         <div x-show="!isScanning" x-transition:enter="transition ease-out duration-200"
                             x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                            class="flex h-[300px] items-center justify-center rounded-xl border-2 border-dashed border-charcoal/10 bg-gradient-to-br from-charcoal/5 to-primary/5 text-center">
+                            class="flex h-[300px] items-center justify-center rounded-xl border-2 border-dashed border-charcoal/10 bg-light-gray text-center">
                             <div>
                                 <svg class="mx-auto h-16 w-16 text-charcoal/30" fill="none" stroke="currentColor"
                                     viewBox="0 0 24 24" aria-hidden="true">
@@ -207,7 +227,7 @@
                                     aria-label="Tracking code or order ID" :disabled="scanning"
                                     class="{{ $field }} w-full disabled:opacity-50">
                                 <button type="submit" :disabled="!manualCode.trim() || scanning"
-                                    class="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50">
+                                    class="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50">
                                     <span x-show="!scanning" class="flex items-center justify-center gap-2">
                                         <svg class="h-5 w-5" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24" aria-hidden="true">
@@ -333,12 +353,30 @@
             {{-- TO SORT --}}
         @elseif ($tab === 'to_sort')
             <div class="flex justify-end">
-                <form method="POST" action="{{ route('logistics.sorting.sort-all') }}" class="w-full sm:w-auto">
+                <form method="POST" action="{{ route('logistics.sorting.sort-all') }}" class="w-full sm:w-auto"
+                    @submit="sortAll($event)">
                     @csrf
-                    <button type="submit" :disabled="!session"
-                        class="btn-primary w-full shadow-lg shadow-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                    <button type="submit" :disabled="!session || sortingAll"
+                        :aria-busy="sortingAll ? 'true' : 'false'"
+                        class="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                         :title="!session ? 'Start a session first' : ''">
-                        Sort all {{ $orders->count() }} parcel(s)
+                        <span x-show="!sortingAll" class="flex items-center justify-center gap-2">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Sort all {{ $orders->count() }} parcel(s)
+                        </span>
+                        <span x-show="sortingAll" class="flex items-center justify-center gap-2">
+                            <svg class="h-5 w-5 animate-spin" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                                </path>
+                            </svg>
+                            Sorting...
+                        </span>
                     </button>
                 </form>
             </div>
@@ -418,10 +456,10 @@
                                     <td class="block pt-2 md:table-cell md:px-5 md:py-4 md:pt-4 md:text-right">
                                         @if ($destinationHub)
                                             <form method="POST"
-                                                action="{{ route('logistics.sorting.sort', $order) }}">
+                                                action="{{ route('logistics.sorting.sort', $order) }}" data-loading>
                                                 @csrf
                                                 <button type="submit" :disabled="!session"
-                                                    class="btn-primary w-full !px-3.5 !py-2 !text-xs disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
+                                                    class="btn btn-primary btn-sm w-full disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
                                                     :title="!session ? 'Start a session first' : ''">
                                                     {{ $sameHub ? 'Sort' : 'Sort for transfer' }}
                                                 </button>
@@ -496,7 +534,7 @@
 
                                     @if ($assignableHere)
                                         <form method="POST" action="{{ route('logistics.sorting.assign', $order) }}"
-                                            class="flex w-full items-center gap-2 sm:w-auto">
+                                            class="flex w-full items-center gap-2 sm:w-auto" data-loading>
                                             @csrf
                                             <select name="rider_id" required aria-label="Select rider"
                                                 class="{{ $field }} min-w-0 flex-1 sm:flex-none">
@@ -510,7 +548,7 @@
                                                 @endforeach
                                             </select>
                                             <button type="submit" @disabled($riders->isEmpty())
-                                                class="btn-primary shrink-0 !px-3.5 !py-2 !text-xs disabled:cursor-not-allowed disabled:opacity-50">
+                                                class="btn btn-primary btn-sm shrink-0 disabled:cursor-not-allowed disabled:opacity-50">
                                                 Assign
                                             </button>
                                         </form>
@@ -608,13 +646,19 @@
 
                             @if ($rider && $assignableHere)
                                 <form method="POST" action="{{ route('logistics.sorting.assign-area') }}"
-                                    class="w-full sm:w-auto">
+                                    class="w-full sm:w-auto" data-loading>
                                     @csrf
                                     <input type="hidden" name="rider_id" value="{{ $rider->id }}">
                                     @foreach ($group['orders'] as $groupOrder)
                                         <input type="hidden" name="order_ids[]" value="{{ $groupOrder->id }}">
                                     @endforeach
-                                    <button type="submit" class="btn-soft btn-soft--success w-full sm:w-auto">
+                                    <button type="submit" class="btn btn-secondary w-full sm:w-auto">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                            aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z">
+                                            </path>
+                                        </svg>
                                         Assign all {{ $group['orders']->count() }} to {{ $rider->first_name }}
                                     </button>
                                 </form>
@@ -636,7 +680,7 @@
 
                                     @if ($assignableHere)
                                         <form method="POST" action="{{ route('logistics.sorting.assign', $order) }}"
-                                            class="flex w-full items-center gap-2 sm:w-auto">
+                                            class="flex w-full items-center gap-2 sm:w-auto" data-loading>
                                             @csrf
                                             <select name="rider_id" required aria-label="Select rider"
                                                 class="{{ $field }} min-w-0 flex-1 sm:flex-none">
@@ -650,7 +694,7 @@
                                                 @endforeach
                                             </select>
                                             <button type="submit" @disabled($riders->isEmpty())
-                                                class="btn-primary shrink-0 !px-3.5 !py-2 !text-xs disabled:cursor-not-allowed disabled:opacity-50">
+                                                class="btn btn-primary btn-sm shrink-0 disabled:cursor-not-allowed disabled:opacity-50">
                                                 Assign
                                             </button>
                                         </form>

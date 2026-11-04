@@ -231,7 +231,231 @@ class InboundController extends Controller
     }
 
     /**
-     * Mark one bag item as received and put the parcel back into sorting.
+     * Quick scan from the inbound index: scan any parcel code to mark that
+     * parcel received, or scan a bag code to receive every pending parcel in
+     * the bag and close it at this hub.
+     */
+    public function scanIndex(Request $request, Notifier $notifier)
+    {
+        $hub = HubContext::require($request);
+
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:100'],
+        ]);
+
+        $orderId = ScanCode::orderId($validated['code']);
+
+        if ($orderId !== null) {
+            return $this->receiveScannedParcel($request, $hub->id, $orderId);
+        }
+
+        return $this->receiveScannedBag($request, $hub->id, $validated['code'], $notifier);
+    }
+
+    /**
+     * Receive one parcel found by its order code.
+     */
+    private function receiveScannedParcel(Request $request, int $hubId, int $orderId)
+    {
+        $order = Order::find($orderId);
+
+        if (! $order) {
+            return $this->scanResponse($request, false, "Order #{$orderId} was not found.");
+        }
+
+        if ((int) $order->destination_hub_id !== $hubId) {
+            return $this->scanResponse($request, false, "Order #{$orderId} is addressed to another hub.");
+        }
+
+        $bagItem = ShipmentBagItem::with(['bag.toHub'])
+            ->where('order_id', $order->id)
+            ->whereHas('bag', fn ($query) => $query
+                ->where('to_hub_id', $hubId)
+                ->whereIn('status', $this->receivableStatuses()))
+            ->latest('id')
+            ->first();
+
+        if (! $bagItem) {
+            $alreadyReceived = ShipmentBagItem::where('order_id', $order->id)
+                ->whereNotNull('received_at')
+                ->whereHas('bag', fn ($query) => $query->where('to_hub_id', $hubId))
+                ->exists();
+
+            if ($alreadyReceived) {
+                return $this->scanResponse(
+                    $request,
+                    false,
+                    "Order #{$orderId} was already received at this hub.",
+                    reference: "#{$orderId}",
+                );
+            }
+
+            return $this->scanResponse($request, false, "Order #{$orderId} is not in an incoming bag for this hub.");
+        }
+
+        if ($bagItem->received_at) {
+            return $this->scanResponse(
+                $request,
+                false,
+                "Order #{$orderId} was already received.",
+                $orderId,
+                reference: "#{$orderId}",
+            );
+        }
+
+        $message = $this->receiveItem($bagItem->bag, $bagItem, $hubId, $request->user()->id);
+
+        return $this->scanResponse($request, true, $message, $orderId, reference: "#{$orderId}");
+    }
+
+    /**
+     * Receive every pending parcel in a bag found by its bag code.
+     */
+    private function receiveScannedBag(Request $request, int $hubId, string $rawCode, Notifier $notifier)
+    {
+        $code = ScanCode::bagCode($rawCode);
+
+        if ($code === null) {
+            return $this->scanResponse($request, false, 'That code is not a parcel or bag barcode.');
+        }
+
+        $bag = ShipmentBag::where('code', $code)->first();
+
+        if (! $bag) {
+            return $this->scanResponse(
+                $request,
+                false,
+                "No bag found for code {$code}.",
+                type: 'bag',
+                reference: $code,
+            );
+        }
+
+        if ((int) $bag->to_hub_id !== $hubId) {
+            return $this->scanResponse(
+                $request,
+                false,
+                "Bag {$bag->code} is addressed to another hub.",
+                type: 'bag',
+                reference: $bag->code,
+            );
+        }
+
+        // Lock the bag so two simultaneous scans cannot both receive and
+        // notify the same bag.
+        $result = DB::transaction(function () use ($bag, $hubId, $request) {
+            $lockedBag = ShipmentBag::with(['items.order', 'toHub'])
+                ->whereKey($bag->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $lockedBag) {
+                return ['state' => 'missing'];
+            }
+
+            if ($lockedBag->status === ShipmentBag::STATUS_RECEIVED) {
+                return ['state' => 'received'];
+            }
+
+            if (! in_array($lockedBag->status, $this->receivableStatuses(), true)) {
+                return ['state' => 'not_receivable'];
+            }
+
+            if ($lockedBag->items->isEmpty()) {
+                return ['state' => 'empty'];
+            }
+
+            $pending = $lockedBag->items->whereNull('received_at');
+            $total = $lockedBag->items->count();
+            $pendingCount = $pending->count();
+
+            foreach ($pending as $item) {
+                $this->receiveItem($lockedBag, $item, $hubId, $request->user()->id);
+            }
+
+            // Scanning the bag receives it outright: every parcel is now
+            // accounted for, so there is no discrepancy to close later.
+            $lockedBag->update([
+                'status' => ShipmentBag::STATUS_RECEIVED,
+                'received_by' => $lockedBag->received_by ?? $request->user()->id,
+                'received_at' => $lockedBag->received_at ?? now(),
+            ]);
+
+            $lockedBag->refresh()->load(['fromHub.user', 'toHub.user', 'items.order']);
+
+            return [
+                'state' => 'received_now',
+                'bag' => $lockedBag,
+                'total' => $total,
+                'pending' => $pendingCount,
+            ];
+        });
+
+        return match ($result['state']) {
+            'missing' => $this->scanResponse(
+                $request,
+                false,
+                "No bag found for code {$code}.",
+                type: 'bag',
+                reference: $code,
+            ),
+            'received' => $this->scanResponse(
+                $request,
+                false,
+                "Bag {$bag->code} was already received.",
+                type: 'bag',
+                reference: $bag->code,
+            ),
+            'not_receivable' => $this->scanResponse(
+                $request,
+                false,
+                "Bag {$bag->code} has not been sealed yet.",
+                type: 'bag',
+                reference: $bag->code,
+            ),
+            'empty' => $this->scanResponse(
+                $request,
+                false,
+                "Bag {$bag->code} has no parcels to receive.",
+                type: 'bag',
+                reference: $bag->code,
+            ),
+            default => $this->bagReceivedResponse($request, $notifier, $result),
+        };
+    }
+
+    /**
+     * @param  array{state: string, bag: ShipmentBag, total: int, pending: int}  $result
+     */
+    private function bagReceivedResponse(Request $request, Notifier $notifier, array $result)
+    {
+        $bag = $result['bag'];
+        $total = $result['total'];
+        $pendingCount = $result['pending'];
+        $alreadyReceived = $total - $pendingCount;
+
+        $notifier->bagReceived($bag, $request->user()->id);
+
+        if ($alreadyReceived === 0) {
+            $message = "Bag {$bag->code} received with all {$total} parcel(s).";
+        } elseif ($pendingCount === 0) {
+            $message = "Bag {$bag->code} received. All {$total} parcel(s) were already scanned.";
+        } else {
+            $message = "Bag {$bag->code} received. {$pendingCount} parcel(s) scanned, {$alreadyReceived} already received.";
+        }
+
+        return $this->scanResponse(
+            $request,
+            true,
+            $message,
+            type: 'bag',
+            reference: $bag->code,
+        );
+    }
+
+    /**
+     * Mark one bag item as received and put the parcel back into sorting at
+     * this hub.
      */
     private function receiveItem(ShipmentBag $bag, ShipmentBagItem $item, int $hubId, int $actorId): string
     {
@@ -250,36 +474,73 @@ class InboundController extends Controller
                 return 'Parcel confirmed.';
             }
 
+            $bag->loadMissing('toHub');
+            $hubName = $bag->toHub?->business_name ?? 'this hub';
+
+            $transitioned = false;
+
             if ($order->status === Order::STATUS_AWAITING_TRANSFER) {
-                $this->lifecycle->transition(
+                $transitioned = $this->lifecycle->transition(
                     $order,
                     Order::STATUS_AWAITING_TRANSFER,
                     Order::STATUS_AT_SORTING_CENTER,
                     ['current_hub_id' => $hubId, 'logistics_profile_id' => $hubId],
-                    "Arrived at {$bag->toHub?->business_name} hub.",
+                    "Arrived at {$hubName} hub.",
                     $actorId,
                     $hubId,
                     eventType: ParcelEvent::TYPE_BAG_RECEIVED,
                 );
-            } else {
+            }
+
+            if (! $transitioned) {
+                // The parcel may already be at sorting-center status, or a
+                // previous status change may have won the race. Either way, the
+                // receiving hub now holds it.
+                $order->forceFill([
+                    'current_hub_id' => $hubId,
+                    'logistics_profile_id' => $hubId,
+                ])->save();
+
                 $this->lifecycle->record($order, ParcelEvent::TYPE_BAG_RECEIVED, [
                     'hub_id' => $hubId,
-                    'note' => "Parcel confirmed in bag {$bag->code} at {$bag->toHub?->business_name}.",
+                    'note' => "Parcel confirmed in bag {$bag->code} at {$hubName}.",
                     'actor_user_id' => $actorId,
                 ]);
             }
 
-            return "Order #{$order->id} received at {$bag->toHub?->business_name}.";
+            return "Order #{$order->id} received at {$hubName}.";
         });
     }
 
-    private function scanResponse(Request $request, bool $ok, string $message, ?int $orderId = null)
+    /**
+     * Bag statuses that can still accept parcels.
+     *
+     * @return array<int, string>
+     */
+    private function receivableStatuses(): array
     {
+        return [
+            ShipmentBag::STATUS_SEALED,
+            ShipmentBag::STATUS_IN_TRANSIT,
+            ShipmentBag::STATUS_DISCREPANCY,
+        ];
+    }
+
+    private function scanResponse(
+        Request $request,
+        bool $ok,
+        string $message,
+        ?int $orderId = null,
+        string $type = 'parcel',
+        ?string $reference = null,
+    ) {
         if ($request->expectsJson()) {
             return response()->json([
                 'success' => $ok,
                 'message' => $message,
                 'order_id' => $orderId,
+                'type' => $type,
+                'reference' => $reference ?? ($orderId ? "#{$orderId}" : null),
             ], $ok ? 200 : 422);
         }
 

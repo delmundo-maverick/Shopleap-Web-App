@@ -10,12 +10,26 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'role', 'account_status', 'email_verified_at', 'avatar_path'])]
+#[Fillable([
+    'name',
+    'email',
+    'password',
+    'role',
+    'account_status',
+    'email_verified_at',
+    'avatar_path',
+    'terms_version',
+    'terms_accepted_at',
+    'privacy_version',
+    'privacy_accepted_at',
+])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -31,17 +45,19 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'terms_accepted_at' => 'datetime',
+            'privacy_accepted_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
 
     public function getAvatarUrlAttribute(): ?string
     {
-        if (!$this->avatar_path) {
+        if (! $this->avatar_path) {
             return null;
         }
 
-        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+        /** @var FilesystemAdapter $disk */
         $disk = Storage::disk('r2_public');
 
         return $disk->url($this->avatar_path);
@@ -55,6 +71,16 @@ class User extends Authenticatable
     public function sellerProfile()
     {
         return $this->hasOne(SellerProfile::class);
+    }
+
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(BuyerAddress::class);
+    }
+
+    public function defaultAddress(): HasOne
+    {
+        return $this->hasOne(BuyerAddress::class)->where('is_default', true);
     }
 
     public function buyerProfile()
@@ -113,7 +139,7 @@ class User extends Authenticatable
     {
         return $query->where('role', 'seller')
             ->where('account_status', 'active')
-            ->whereHas('sellerProfile', fn(Builder $profileQuery) => $profileQuery->where('status', 'approved'));
+            ->whereHas('sellerProfile', fn (Builder $profileQuery) => $profileQuery->where('status', 'approved'));
     }
 
     public function shopVouchers()

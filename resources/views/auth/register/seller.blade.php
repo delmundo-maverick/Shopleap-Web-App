@@ -12,7 +12,10 @@
 <body x-data="otpRegistration({
     verifyUrl: '{{ route('register.otp.verify', 'seller') }}',
     resendUrl: '{{ route('register.resend-otp', 'seller') }}',
-    loginUrl: '{{ route('login') }}'
+    loginUrl: '{{ route('login') }}',
+    termsUrl: '{{ route('terms.content') }}',
+    privacyUrl: '{{ route('privacy.content') }}',
+    termsAccepted: @js((bool) old('terms_accepted'))
 })" class="min-h-screen bg-ice-blue text-charcoal">
 
     @php
@@ -40,28 +43,35 @@
     @endphp
 
     <!-- ===================== HEADER ===================== -->
-    <header class="border-b border-light-gray bg-white">
+    <header class="border-b border-white/10 bg-primary">
         <div class="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
+
+            <!-- BRAND -->
             <a href="{{ route('home') }}" class="flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white/10">
-                    <img src="{{ asset('images/Shopleap-Logo.png') }}" alt="Shopleap"
+                <div class="flex h-10 w-10 items-center justify-center overflow-hidden">
+                    <img src="{{ asset('images/Shopleap-Logo-White.png') }}" alt="Shopleap"
                         class="h-full w-full object-contain">
                 </div>
                 <div>
-                    <h1 class="font-logo text-[1.375rem] text-primary font-medium leading-none tracking-tight">
+                    <h1 class="font-logo text-[1.375rem] text-white font-medium leading-none tracking-tight">
                         Shopleap
                     </h1>
-                    <p class="text-xs text-charcoal/60">
+                    <p class="text-xs text-white/80">
                         Shop Smart. Shop Simple.
                     </p>
                 </div>
             </a>
 
+            <!-- LOGIN -->
             <div class="flex items-center gap-2 text-sm">
-                <span class="hidden text-charcoal/60 sm:inline">Already have an account?</span>
-                <a href="{{ route('login') }}" class="font-semibold text-primary transition hover:text-sky-blue">Log
-                    in</a>
+                <span class="hidden text-white/80 sm:inline">
+                    Already have an account?
+                </span>
+                <a href="{{ route('login') }}" class="font-semibold text-white transition hover:text-white/80">
+                    Log in
+                </a>
             </div>
+
         </div>
     </header>
 
@@ -70,7 +80,7 @@
 
         <div class="mx-auto max-w-4xl">
 
-            <form @submit.prevent="submitRegistration($event)" method="POST" action="{{ route('register.seller') }}"
+            <form @submit="guardTermsAgreement($event)" method="POST" action="{{ route('register.seller') }}"
                 enctype="multipart/form-data"
                 class="overflow-hidden rounded-2xl border border-light-gray bg-white shadow-xl shadow-charcoal/5">
 
@@ -209,18 +219,18 @@
                     <div class="grid gap-5 md:grid-cols-3">
 
                         <div>
-                            <label for="first_name" class="{{ $labelClass }}">First Name <span
-                                    class="text-sale-red">*</span></label>
-                            <input type="text" id="first_name" name="first_name" value="{{ old('first_name') }}"
-                                required autocomplete="given-name" placeholder="First name"
-                                class="{{ $inputClass }}">
-                        </div>
-
-                        <div>
                             <label for="last_name" class="{{ $labelClass }}">Last Name <span
                                     class="text-sale-red">*</span></label>
                             <input type="text" id="last_name" name="last_name" value="{{ old('last_name') }}"
                                 required autocomplete="family-name" placeholder="Last name"
+                                class="{{ $inputClass }}">
+                        </div>
+
+                        <div>
+                            <label for="first_name" class="{{ $labelClass }}">First Name <span
+                                    class="text-sale-red">*</span></label>
+                            <input type="text" id="first_name" name="first_name" value="{{ old('first_name') }}"
+                                required autocomplete="given-name" placeholder="First name"
                                 class="{{ $inputClass }}">
                         </div>
 
@@ -486,16 +496,9 @@
                         </div>
                     </div>
 
-                    <div class="mt-6 flex items-start gap-3">
-                        <input type="checkbox" id="terms" name="terms" required
-                            class="mt-0.5 h-4 w-4 shrink-0 rounded border-light-gray accent-primary focus:ring-primary/20">
-                        <label for="terms" class="text-xs leading-5 text-charcoal/65">
-                            I confirm that the information I provided is accurate and complete, and I agree to the
-                            Shopleap terms and policies. <span class="text-sale-red">*</span>
-                        </label>
-                    </div>
+                    <x-terms-consent />
 
-                    <button type="submit" :disabled="submitting"
+                    <button type="submit" :disabled="submitting || !termsAccepted"
                         class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60">
                         <span x-show="!submitting">Submit Registration</span>
                         <span x-show="submitting">Submitting…</span>

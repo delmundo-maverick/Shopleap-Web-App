@@ -95,6 +95,8 @@ class OutboundController extends Controller
 
         $bag->load(['fromHub', 'toHub', 'items.order', 'creator', 'sealer', 'receiver']);
 
+        $destinationProvince = trim((string) ($bag->toHub?->province ?? ''));
+
         $available = Order::with(['items', 'seller.sellerProfile'])
             ->heldBy($hub->id)
             ->where('status', Order::STATUS_AWAITING_TRANSFER)
@@ -102,7 +104,16 @@ class OutboundController extends Controller
             ->whereDoesntHave('shipmentBagItems', fn ($query) => $query
                 ->whereHas('bag', fn ($b) => $b->whereIn('status', ShipmentBag::ACTIVE_STATUSES)))
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->filter(function (Order $order) use ($destinationProvince) {
+                if ($destinationProvince === '') {
+                    return false;
+                }
+
+                $orderProvince = trim((string) ($order->ship_to['province'] ?? ''));
+
+                return $orderProvince !== '' && strcasecmp($orderProvince, $destinationProvince) === 0;
+            });
 
         return view('logistics.outbound.show', compact('hub', 'bag', 'available'));
     }
@@ -161,7 +172,16 @@ class OutboundController extends Controller
                 return null;
             }
 
-            return $lockedBag->items()->where('order_id', $order->id)->delete() > 0;
+            $deleted = $lockedBag->items()->where('order_id', $order->id)->delete() > 0;
+
+            if ($deleted && $lockedBag->manifest_printed_at) {
+                $lockedBag->update([
+                    'manifest_printed_at' => null,
+                    'manifest_printed_by' => null,
+                ]);
+            }
+
+            return $deleted;
         });
 
         if ($removed === null) {
@@ -186,38 +206,60 @@ class OutboundController extends Controller
             return back()->withErrors(['orders' => 'Add at least one parcel before sealing the bag.']);
         }
 
-        $moved = DB::transaction(function () use ($bag, $request) {
-            $updated = ShipmentBag::whereKey($bag->id)
-                ->where('status', ShipmentBag::STATUS_OPEN)
-                ->update([
-                    'status' => ShipmentBag::STATUS_SEALED,
-                    'sealed_by' => $request->user()->id,
-                    'sealed_at' => now(),
-                    'updated_at' => now(),
-                ]);
+        if (! $bag->manifest_printed_at) {
+            return back()->withErrors(['orders' => 'Print the manifest first.']);
+        }
 
-            if (! $updated) {
-                return false;
+        // Re-check everything under a row lock so a parcel cannot be added or
+        // removed, and the manifest cannot be reset, between the checks above.
+        $result = DB::transaction(function () use ($bag, $request) {
+            $lockedBag = ShipmentBag::whereKey($bag->id)->lockForUpdate()->first();
+
+            if (! $lockedBag || ! $lockedBag->isOpen()) {
+                return 'not_open';
             }
 
-            $bag->refresh()->load('items.order', 'toHub');
+            if (! $lockedBag->manifest_printed_at) {
+                return 'not_printed';
+            }
 
-            foreach ($bag->items as $item) {
+            if ($lockedBag->items()->count() === 0) {
+                return 'empty';
+            }
+
+            $lockedBag->update([
+                'status' => ShipmentBag::STATUS_SEALED,
+                'sealed_by' => $request->user()->id,
+                'sealed_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $lockedBag->load('items.order', 'toHub');
+
+            foreach ($lockedBag->items as $item) {
+                if (! $item->order) {
+                    continue;
+                }
+
                 $this->lifecycle->record($item->order, ParcelEvent::TYPE_BAG_SEALED, [
-                    'hub_id' => $bag->from_hub_id,
-                    'note' => "Sealed in bag {$bag->code} for {$bag->toHub?->business_name}.",
+                    'hub_id' => $lockedBag->from_hub_id,
+                    'note' => "Sealed in bag {$lockedBag->code} for {$lockedBag->toHub?->business_name}.",
                     'actor_user_id' => $request->user()->id,
                 ]);
             }
 
-            return true;
+            return $lockedBag;
         });
 
-        if (! $moved) {
-            return back()->withErrors(['orders' => 'Only an open bag can be sealed.']);
+        if (is_string($result)) {
+            return back()->withErrors(['orders' => match ($result) {
+                'not_printed' => 'Print the manifest first.',
+                'empty' => 'Add at least one parcel before sealing the bag.',
+                default => 'Only an open bag can be sealed.',
+            }]);
         }
 
-        return back()->with('status', "Bag {$bag->code} sealed with {$bag->items->count()} parcel(s).");
+        return back()->with('status', "Bag {$result->code} sealed with {$result->items->count()} parcel(s).");
     }
 
     public function dispatch(Request $request, ShipmentBag $bag, Notifier $notifier)
@@ -267,21 +309,44 @@ class OutboundController extends Controller
         $hub = HubContext::require($request);
         $this->authorizeSender($bag, $hub->id);
 
-        $bag->load(['fromHub', 'toHub', 'items.order', 'sealer']);
+        // Hold the bag lock while generating and rendering the manifest. Adding
+        // or removing a parcel resets the print state, so the manifest must not
+        // be marked printed for contents that changed underneath it.
+        $html = DB::transaction(function () use ($bag, $request, $hub) {
+            $lockedBag = ShipmentBag::whereKey($bag->id)->lockForUpdate()->firstOrFail();
 
-        $barcodePng = (new BarcodeGeneratorPNG)->getBarcode(
-            $bag->code,
-            BarcodeGeneratorPNG::TYPE_CODE_128,
-            2,
-            44
-        );
+            $lockedBag->load(['fromHub', 'toHub', 'items.order', 'sealer']);
 
-        $qrWriter = new Writer(new ImageRenderer(new RendererStyle(200, 2), new SvgImageBackEnd));
+            $barcodePng = (new BarcodeGeneratorPNG)->getBarcode(
+                $lockedBag->code,
+                BarcodeGeneratorPNG::TYPE_CODE_128,
+                2,
+                44
+            );
 
-        $barcodeBase64 = base64_encode($barcodePng);
-        $qrBase64 = base64_encode($qrWriter->writeString('SHOPLEAP:BAG:'.$bag->code));
+            $qrWriter = new Writer(new ImageRenderer(new RendererStyle(200, 2), new SvgImageBackEnd));
 
-        return view('logistics.outbound.manifest', compact('hub', 'bag', 'barcodeBase64', 'qrBase64'));
+            $barcodeBase64 = base64_encode($barcodePng);
+            $qrBase64 = base64_encode($qrWriter->writeString('SHOPLEAP:BAG:'.$lockedBag->code));
+
+            // Render before recording the print: if barcode generation or the
+            // view fails, the bag must not look as though its manifest printed.
+            $html = view(
+                'logistics.outbound.manifest',
+                ['hub' => $hub, 'bag' => $lockedBag, 'barcodeBase64' => $barcodeBase64, 'qrBase64' => $qrBase64]
+            )->render();
+
+            if (! $lockedBag->manifest_printed_at) {
+                $lockedBag->update([
+                    'manifest_printed_at' => now(),
+                    'manifest_printed_by' => $request->user()->id,
+                ]);
+            }
+
+            return $html;
+        });
+
+        return response($html);
     }
 
     /**
@@ -307,6 +372,8 @@ class OutboundController extends Controller
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('id');
+
+            $destinationProvince = trim((string) ($lockedBag->toHub?->province ?? ''));
 
             $added = 0;
             $skipped = 0;
@@ -336,6 +403,19 @@ class OutboundController extends Controller
                     continue;
                 }
 
+                $orderProvince = trim((string) ($order->ship_to['province'] ?? ''));
+
+                if (
+                    $destinationProvince === ''
+                    || $orderProvince === ''
+                    || strcasecmp($orderProvince, $destinationProvince) !== 0
+                ) {
+                    $skipped++;
+                    $reason ??= "Order #{$order->id} is addressed to another province.";
+
+                    continue;
+                }
+
                 $inActiveBag = $order->shipmentBagItems()
                     ->whereHas('bag', fn ($query) => $query->whereIn('status', ShipmentBag::ACTIVE_STATUSES))
                     ->exists();
@@ -349,6 +429,13 @@ class OutboundController extends Controller
 
                 $lockedBag->items()->create(['order_id' => $order->id]);
                 $added++;
+            }
+
+            if ($added > 0 && $lockedBag->manifest_printed_at) {
+                $lockedBag->update([
+                    'manifest_printed_at' => null,
+                    'manifest_printed_by' => null,
+                ]);
             }
 
             return ['added' => $added, 'skipped' => $skipped, 'reason' => $reason];
