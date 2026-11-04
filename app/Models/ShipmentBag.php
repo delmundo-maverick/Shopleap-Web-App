@@ -14,9 +14,11 @@ class ShipmentBag extends Model
         'created_by',
         'sealed_by',
         'received_by',
+        'manifest_printed_by',
         'sealed_at',
         'dispatched_at',
         'received_at',
+        'manifest_printed_at',
         'flagged_at',
         'flag_note',
     ];
@@ -27,6 +29,7 @@ class ShipmentBag extends Model
             'sealed_at' => 'datetime',
             'dispatched_at' => 'datetime',
             'received_at' => 'datetime',
+            'manifest_printed_at' => 'datetime',
             'flagged_at' => 'datetime',
         ];
     }
@@ -86,6 +89,11 @@ class ShipmentBag extends Model
     public function receiver()
     {
         return $this->belongsTo(User::class, 'received_by');
+    }
+
+    public function manifestPrinter()
+    {
+        return $this->belongsTo(User::class, 'manifest_printed_by');
     }
 
     public function items()

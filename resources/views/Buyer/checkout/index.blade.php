@@ -43,7 +43,7 @@
         </div>
     </header>
 
-    <main class="mx-auto w-full max-w-7xl flex-1 px-3 py-5 pb-32 md:px-8 md:py-6 md:pb-32">
+    <main x-data="checkoutPage(@js(['quoteUrl' => route('buyer.checkout.index'), 'items' => $itemIds, 'addressId' => $selectedAddress?->id, 'shipping' => $shippingBySeller, 'shippingTotal' => $shippingTotal, 'grandTotal' => $grandTotal, 'blocked' => $blockedSellerIds]))" @buyer-address-selected.window="quote($event.detail.id)" @voucher-applied.window="discount = $event.detail.discount" class="mx-auto w-full max-w-7xl flex-1 px-3 py-5 pb-32 md:px-8 md:py-6 md:pb-32">
 
         {{-- STEP INDICATOR --}}
         <div class="mb-6 flex items-center justify-center gap-3 text-xs font-semibold text-charcoal/40 sm:text-sm">
@@ -96,66 +96,15 @@
 
                 <div class="space-y-5 lg:col-span-2">
 
-                    <!-- DELIVERY ADDRESS -->
-                    <div class="rounded-lg bg-white p-5 shadow-sm shadow-charcoal/5">
-                        <div class="mb-3 flex items-center justify-between">
-                            <h3 class="flex items-center gap-2 text-sm font-bold text-charcoal">
-                                <svg class="h-4.5 w-4.5 text-primary" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
-                                        d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
-                                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                                Delivery Address
-                            </h3>
-
-                            @if (auth()->user()->buyerProfile && Route::has('buyer.profile.edit'))
-                                <a href="{{ route('buyer.profile.edit') }}"
-                                    class="text-xs font-semibold text-primary hover:underline">
-                                    Change
-                                </a>
-                            @endif
-                        </div>
-
-                        @if (auth()->user()->buyerProfile)
-                            <div class="rounded-lg border border-light-gray bg-ice-blue/40 p-4">
-                                <p class="text-sm font-semibold text-charcoal">
-                                    {{ auth()->user()->name }}
-                                    <span class="ml-2 font-normal text-charcoal/50">
-                                        {{ auth()->user()->buyerProfile->contact_no }}
-                                    </span>
-                                </p>
-
-                                <p class="mt-1 text-sm text-charcoal/70">
-                                    {{ auth()->user()->buyerProfile->house_number }}
-                                    {{ auth()->user()->buyerProfile->street }},
-                                    {{ auth()->user()->buyerProfile->barangay }},
-                                    {{ auth()->user()->buyerProfile->municipality }},
-                                    {{ auth()->user()->buyerProfile->province }}
-                                </p>
-                            </div>
-                        @else
-                            <div
-                                class="flex items-center justify-between rounded-lg border border-dashed border-sale-red/30 bg-sale-red/5 p-4">
-                                <p class="text-sm text-sale-red">
-                                    No address on file. Add one before placing your order.
-                                </p>
-
-                                <a href="{{ Route::has('buyer.profile.edit') ? route('buyer.profile.edit') : '#' }}"
-                                    class="shrink-0 rounded-lg bg-sale-red px-3 py-1.5 text-xs font-bold text-white transition hover:brightness-110">
-                                    Add Address
-                                </a>
-                            </div>
-                        @endif
-                    </div>
+                    <x-buyer-addresses :addresses="$addresses" :checkout="true" :selected="$selectedAddress?->id" />
+                    <p x-show="quoting" class="text-sm" role="status">Updating shipping...</p>
+                    <p x-show="quoteError" x-text="quoteError" class="text-sm text-sale-red" role="alert"></p>
 
                     <!-- ITEMS GROUPED BY SELLER -->
                     @foreach ($groupedBySeller as $sellerId => $items)
                         @php
                             $seller = $items->first()->product->seller;
                             $sellerSubtotal = $items->sum('line_total');
-                            $sellerBlocked = in_array($sellerId, $blockedSellerIds ?? []);
                         @endphp
 
                         <div class="rounded-lg bg-white p-5 shadow-sm shadow-charcoal/5">
@@ -172,8 +121,7 @@
                             </p>
 
                             {{-- BLOCKED SELLER NOTICE --}}
-                            @if ($sellerBlocked)
-                                <div
+                            <div x-show="blocked.includes({{ (int) $sellerId }})"
                                     class="mb-3 rounded-lg border border-sale-red/20 bg-sale-red/10 px-3 py-2 text-xs text-sale-red">
                                     This seller can't deliver to your address yet. Remove these items from your cart to
                                     continue.
@@ -181,8 +129,6 @@
                                         Back to cart
                                     </a>
                                 </div>
-                            @endif
-
                             <!-- SELLER PRODUCTS -->
                             <div class="divide-y divide-light-gray">
                                 @foreach ($items as $item)
@@ -236,7 +182,7 @@
                                     <span>Shipping fee</span>
 
                                     <span class="font-semibold text-charcoal">
-                                        ₱{{ number_format($shippingBySeller[$sellerId]['fee'], 2) }}
+                                        ₱<span x-text="Number(shipping[{{ (int) $sellerId }}]?.fee || 0).toFixed(2)">{{ number_format($shippingBySeller[$sellerId]['fee'], 2) }}</span>
                                     </span>
                                 </div>
                             </div>
@@ -305,12 +251,12 @@
                         <h3 class="mb-4 text-sm font-bold text-charcoal">Order Total</h3>
 
                         <!-- Voucher Section -->
-                        <div class="mb-4" x-data="voucherCheckout()" x-init="init()">
+                        <div class="mb-4" x-data="voucherCheckout(@js(route('buyer.vouchers.apply')))">
                             <label class="mb-1.5 block text-xs font-semibold text-charcoal">Shop Voucher</label>
                             <div class="flex gap-2">
                                 <input type="text" x-model="code" placeholder="Enter voucher code"
                                     class="w-full rounded-lg border border-light-gray px-3 py-2 text-sm uppercase outline-none focus:border-primary">
-                                <button type="button" @click="applyVoucher()"
+                                <button type="button" @click="applyVoucher()" :disabled="busy" x-text="busy ? 'Applying...' : 'Apply'"
                                     class="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-sky-blue">Apply</button>
                             </div>
                             <p x-show="message" x-text="message"
@@ -337,7 +283,7 @@
                             </span>
 
                             <span class="shrink-0 font-semibold text-charcoal">
-                                ₱{{ number_format($shippingTotal, 2) }}
+                                ₱<span x-text="shippingTotal.toFixed(2)">{{ number_format($shippingTotal, 2) }}</span>
                             </span>
                         </div>
 
@@ -354,8 +300,7 @@
                             <span class="text-sm font-bold text-charcoal">Total Payment</span>
 
                             <span class="text-xl font-bold text-primary">
-                                ₱<span x-data="{ total: {{ $grandTotal }}, disc: 0 }" @voucher-applied.window="disc = $event.detail.discount"
-                                    x-text="(total - disc).toFixed(2)"></span>
+                                ₱<span x-text="(grandTotal - discount).toFixed(2)"></span>
                             </span>
                         </div>
 
@@ -363,27 +308,15 @@
                             VAT included, where applicable
                         </p>
 
-                        <!-- DISABLE CHECKOUT IF ANY SELLER IS BLOCKED -->
-                        <button type="submit" @disabled(!empty($blockedSellerIds))
-                            class="w-full rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-sky-blue disabled:cursor-not-allowed disabled:opacity-50">
-                            @if (!empty($blockedSellerIds))
-                                Delivery Unavailable
-                            @else
-                                Place Order
-                            @endif
-                        </button>
-
-                        @if (!empty($blockedSellerIds))
-                            <p class="mt-2 text-center text-xs text-sale-red">
-                                Remove items from sellers that cannot deliver to your address before checking out.
-                            </p>
-                        @endif
+                        <button type="submit" :disabled="quoting || !!quoteError || !addressId || blocked.length > 0" @disabled(!$selectedAddress || !empty($blockedSellerIds))
+                            class="btn btn-primary w-full" x-text="quoting ? 'Updating shipping...' : (!addressId ? 'Select a delivery address' : (blocked.length ? 'Delivery unavailable' : 'Place order'))">Place order</button>
+                        <p x-show="blocked.length" class="mt-2 text-center text-xs text-sale-red">One or more sellers cannot deliver to this address. Choose another address or update your cart.</p>
 
                         <p class="mt-3 text-center text-[11px] leading-relaxed text-charcoal/40">
                             By placing your order, you agree to Shopleap's
-                            <a href="#" class="text-primary hover:underline">Terms of Service</a>
+                            <a href="{{ route('terms') }}" class="text-primary hover:underline">Terms and Conditions</a>
                             and
-                            <a href="#" class="text-primary hover:underline">Privacy Policy</a>.
+                            <a href="{{ route('privacy') }}" class="text-primary hover:underline">Privacy Policy</a>.
                         </p>
                     </div>
                 </div>
@@ -395,67 +328,7 @@
 
     <x-Buyer.message-widget />
     <x-footer />
-    <script>
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('voucherCheckout', () => ({
-                code: '',
-                appliedCode: '',
-                message: '',
-                success: false,
-                init() {},
-                async applyVoucher() {
-                    this.message = '';
-                    this.success = false;
-                    if (!this.code) {
-                        this.message = 'Please enter a voucher code.';
-                        this.success = false;
-                        return;
-                    }
-                    try {
-                        const formData = new FormData();
-                        formData.append('code', this.code);
-                        formData.append('_token', document.querySelector('input[name="_token"]')
-                            .value);
-                        const response = await fetch('{{ route('buyer.vouchers.apply') }}', {
-                            method: 'POST',
-                            body: formData,
-                            headers: {
-                                'X-Requested-With': 'XMLHttpRequest'
-                            }
-                        });
-                        const data = await response.json();
-                        if (data.success) {
-                            this.appliedCode = data.voucher_code;
-                            this.success = true;
-                            this.message = data.message || 'Voucher applied successfully.';
-                            window.dispatchEvent(new CustomEvent('voucher-applied', {
-                                detail: {
-                                    discount: parseFloat(data.discount) || 0,
-                                    code: data.voucher_code
-                                }
-                            }));
-                        } else {
-                            this.success = false;
-                            this.message = data.message || 'Failed to apply voucher.';
-                            window.dispatchEvent(new CustomEvent('voucher-applied', {
-                                detail: {
-                                    discount: 0
-                                }
-                            }));
-                        }
-                    } catch (e) {
-                        this.success = false;
-                        this.message = 'An error occurred while applying voucher.';
-                        window.dispatchEvent(new CustomEvent('voucher-applied', {
-                            detail: {
-                                discount: 0
-                            }
-                        }));
-                    }
-                }
-            }));
-        });
-    </script>
+
 </body>
 
 </html>

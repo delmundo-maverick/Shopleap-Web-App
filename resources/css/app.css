@@ -309,3 +309,152 @@
 .variant-value-btn[aria-pressed="true"] {
     @apply border-primary bg-primary/10 font-bold text-primary;
 }
+@layer components {
+    /*
+    | Shared button system
+    |----------------------
+    | Every button gets its layout from this group. Variants below only change
+    | colour, so `btn btn-primary`, `btn btn-outline`, or a bare `btn-primary`
+    | all render the same size, radius, focus ring and disabled behaviour.
+    */
+    .btn,
+    .btn-primary,
+    .btn-secondary,
+    .btn-danger,
+    .btn-danger-outline,
+    .btn-outline {
+        display: inline-flex;
+        min-height: 2.5rem;
+        max-width: 100%;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.625rem 1rem;
+        border: 1px solid transparent;
+        border-radius: var(--radius-lg);
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.2;
+        text-align: center;
+        text-decoration: none;
+        white-space: normal;
+        transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn:focus-visible,
+    .btn-primary:focus-visible,
+    .btn-secondary:focus-visible,
+    .btn-danger:focus-visible,
+    .btn-danger-outline:focus-visible,
+    .btn-outline:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
+
+    .btn:active:not(:disabled),
+    .btn-primary:active:not(:disabled),
+    .btn-secondary:active:not(:disabled),
+    .btn-danger:active:not(:disabled),
+    .btn-danger-outline:active:not(:disabled),
+    .btn-outline:active:not(:disabled) {
+        transform: translateY(1px);
+    }
+
+    .btn:disabled,
+    .btn-primary:disabled,
+    .btn-secondary:disabled,
+    .btn-danger:disabled,
+    .btn-danger-outline:disabled,
+    .btn-outline:disabled,
+    .btn[aria-disabled='true'] {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .btn-primary {
+        border-color: var(--color-primary);
+        background: var(--color-primary);
+        color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        border-color: var(--color-sky-blue);
+        background: var(--color-sky-blue);
+    }
+
+    .btn-primary:active:not(:disabled) {
+        background: color-mix(in srgb, var(--color-primary) 88%, black);
+    }
+
+    .btn-secondary {
+        border-color: var(--color-charcoal);
+        background: var(--color-charcoal);
+        color: #fff;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--color-charcoal) 82%, white);
+    }
+
+    .btn-secondary:active:not(:disabled) {
+        background: color-mix(in srgb, var(--color-charcoal) 90%, black);
+    }
+
+    .btn-danger {
+        border-color: var(--color-sale-red);
+        background: var(--color-sale-red);
+        color: #fff;
+    }
+
+    .btn-danger:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--color-sale-red) 88%, white);
+    }
+
+    .btn-danger:active:not(:disabled) {
+        background: color-mix(in srgb, var(--color-sale-red) 88%, black);
+    }
+
+    .btn-danger-outline {
+        border-color: color-mix(in srgb, var(--color-sale-red) 35%, white);
+        background: #fff;
+        color: var(--color-sale-red);
+    }
+
+    .btn-danger-outline:hover:not(:disabled) {
+        border-color: color-mix(in srgb, var(--color-sale-red) 55%, white);
+        background: color-mix(in srgb, var(--color-sale-red) 6%, white);
+    }
+
+    .btn-outline {
+        border-color: color-mix(in srgb, var(--color-charcoal) 22%, white);
+        background: #fff;
+        color: var(--color-charcoal);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+        border-color: color-mix(in srgb, var(--color-charcoal) 34%, white);
+        background: color-mix(in srgb, var(--color-charcoal) 5%, white);
+    }
+
+    .btn-outline:active:not(:disabled) {
+        background: color-mix(in srgb, var(--color-charcoal) 9%, white);
+    }
+
+    .btn-sm {
+        min-height: 2.5rem;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.75rem;
+    }
+
+    .btn.is-loading,
+    .btn[aria-busy='true'],
+    .btn-primary[aria-busy='true'],
+    .btn-secondary[aria-busy='true'],
+    .btn-danger[aria-busy='true'],
+    .btn-danger-outline[aria-busy='true'],
+    .btn-outline[aria-busy='true'] {
+        cursor: wait;
+        opacity: 0.85;
+    }
+}

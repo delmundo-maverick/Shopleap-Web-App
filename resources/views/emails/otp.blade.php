@@ -29,10 +29,10 @@
                     <tr>
                         <td style="padding:36px 32px 24px 32px;">
                             <p style="margin:0 0 8px 0; font-size:16px; font-weight:700; color:#2E3A46;">
-                                Verify your e-mail
+                                {{ $heading ?? 'Verify your e-mail' }}
                             </p>
                             <p style="margin:0 0 24px 0; font-size:14px; line-height:22px; color:#2E3A46; opacity:0.7;">
-                                Enter this code to finish your registration on Shopleap. It expires in
+                                Enter this code {{ $action ?? 'to finish your registration on Shopleap' }}. It expires in
                                 <strong>10 minutes</strong>.
                             </p>
 
@@ -51,8 +51,7 @@
 
                             <p
                                 style="margin:24px 0 0 0; font-size:13px; line-height:20px; color:#2E3A46; opacity:0.55;">
-                                If you didn't request this code, you can safely ignore this email — no account will be
-                                created without it.
+                                {{ $footer ?? "If you did not request this code, you can safely ignore this email." }}
                             </p>
                         </td>
                     </tr>

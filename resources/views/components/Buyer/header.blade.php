@@ -29,12 +29,18 @@
 @vite('resources/js/components/buyer-header.js')
 
 <header class="sticky top-0 z-50 bg-primary text-white">
+    <a href="{{ route('buyer.account.index') }}#address" data-buyer-header-location class="block truncate border-b border-white/15 px-4 py-2 text-xs md:hidden">
+        {{ $headerUser?->defaultAddress ? (($headerUser->defaultAddress->label ?: 'Deliver to') . ', ' . $headerUser->defaultAddress->city_municipality) : 'Add delivery address' }}
+    </a>
 
     {{-- TOP UTILITY ROW: desktop only --}}
     <div class="hidden border-b border-white/15 md:block">
         <div class="mx-auto flex h-9 max-w-7xl items-center justify-between gap-5 px-8 text-xs text-white/85">
 
             <div class="flex items-center gap-5">
+                <a href="{{ route('buyer.account.index') }}#address" data-buyer-header-location class="max-w-64 truncate hover:text-white">
+                    {{ $headerUser?->defaultAddress ? (($headerUser->defaultAddress->label ?: 'Deliver to') . ', ' . $headerUser->defaultAddress->city_municipality) : 'Add delivery address' }}
+                </a>
                 <a href="{{ route('buyer.orders.index', ['tab' => 'to_deliver']) }}" class="hover:text-white">
                     Track My Order
                 </a>

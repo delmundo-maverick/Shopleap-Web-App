@@ -12,8 +12,10 @@ use App\Http\Controllers\Admin\TransactionController;
 use App\Http\Controllers\Auth\BuyerRegistrationController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogisticsRegistrationController;
+use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\SellerRegistrationController;
 use App\Http\Controllers\Buyer\AccountController as BuyerAccountController;
+use App\Http\Controllers\Buyer\AddressController;
 use App\Http\Controllers\Buyer\CartController;
 use App\Http\Controllers\Buyer\CheckoutController;
 use App\Http\Controllers\Buyer\HomeController as BuyerHomeController;
@@ -63,6 +65,12 @@ use Illuminate\Support\Facades\Schedule;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
 
+Route::get('/terms', [PolicyController::class, 'terms'])->name('terms');
+Route::get('/terms/content', [PolicyController::class, 'termsContent'])->name('terms.content');
+
+Route::get('/privacy', [PolicyController::class, 'privacy'])->name('privacy');
+Route::get('/privacy/content', [PolicyController::class, 'privacyContent'])->name('privacy.content');
+
 Route::get('/policies/{policy}', [PolicyController::class, 'show'])
     ->name('policies.show');
 
@@ -71,6 +79,16 @@ Route::get('/policies/{policy}', [PolicyController::class, 'show'])
 | Authentication
 |--------------------------------------------------------------------------
 */
+
+Route::middleware('guest')->prefix('forgot-password')->group(function () {
+    Route::get('/', [PasswordResetController::class, 'requestForm'])->name('password.request');
+    Route::post('/', [PasswordResetController::class, 'send'])->middleware('throttle:20,60')->name('password.email');
+    Route::get('/verify', [PasswordResetController::class, 'verifyForm'])->name('password.verify');
+    Route::post('/verify', [PasswordResetController::class, 'verify'])->middleware('throttle:20,1')->name('password.verify.store');
+    Route::post('/resend', [PasswordResetController::class, 'resend'])->middleware('throttle:20,60')->name('password.resend');
+    Route::get('/reset', [PasswordResetController::class, 'resetForm'])->name('password.reset');
+    Route::post('/reset', [PasswordResetController::class, 'reset'])->middleware('throttle:10,1')->name('password.update');
+});
 
 Route::controller(LoginController::class)->group(function () {
     Route::get('/login', 'create')->name('login');
@@ -323,6 +341,10 @@ Route::middleware(['auth', 'buyer'])
                 Route::post('/{orderReturn}/ship', 'ship')->name('ship');
                 Route::post('/{orderReturn}/escalate', 'escalate')->name('escalate');
             });
+
+        Route::get('/addresses/locations', [AddressController::class, 'locations'])->name('addresses.locations');
+        Route::resource('addresses', AddressController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::patch('/addresses/{address}/default', [AddressController::class, 'setDefault'])->name('addresses.default');
 
         // Account
         Route::prefix('account')
@@ -614,6 +636,11 @@ Route::middleware(['auth', 'logistics', 'hub.scope'])
                     ->name('scan');
                 Route::post('/bags/{bag}/parcels/{order}', 'confirmParcel')->name('parcels.confirm');
                 Route::post('/bags/{bag}/close', 'close')->name('close');
+
+                // Quick scan from inbound index: scan any parcel code to mark it received
+                Route::post('/scan', 'scanIndex')
+                    ->middleware('throttle:120,1')
+                    ->name('scan.index');
             });
 
         // Reports

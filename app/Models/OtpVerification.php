@@ -13,6 +13,10 @@ class OtpVerification extends Model
         'email',
         'role',
         'otp_hash',
+        'purpose',
+        'used_at',
+        'reset_token_hash',
+        'reset_expires_at',
         'attempts',
         'expires_at',
         'verified_at',
@@ -21,5 +25,7 @@ class OtpVerification extends Model
     protected $casts = [
         'expires_at' => 'datetime',
         'verified_at' => 'datetime',
+        'used_at' => 'datetime',
+        'reset_expires_at' => 'datetime',
     ];
 }

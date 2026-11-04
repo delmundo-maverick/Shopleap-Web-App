@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Services\OtpService;
+use App\Support\PolicyAcceptance;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -34,6 +35,10 @@ class SellerRegistrationController extends Controller
             'id_upload' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'business_permit' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'terms_accepted' => ['required', 'accepted'],
+        ], [
+            'terms_accepted.required' => 'Please read and agree to the Terms and Conditions and Privacy Policy.',
+            'terms_accepted.accepted' => 'Please read and agree to the Terms and Conditions and Privacy Policy.',
         ]);
 
         // Server-side age calculation — never trust client-computed age
@@ -48,11 +53,12 @@ class SellerRegistrationController extends Controller
                 'role' => 'seller',
                 'email' => $validated['email'],
                 'user' => [
-                    'name' => trim($validated['first_name'] . ' ' . $validated['last_name']),
+                    'name' => trim($validated['first_name'].' '.$validated['last_name']),
                     'email' => $validated['email'],
                     'password' => Hash::make($validated['password']),
                     'role' => 'seller',
                     'account_status' => 'active',
+                    ...PolicyAcceptance::attributes(),
                 ],
                 'profile' => [
                     'last_name' => $validated['last_name'],

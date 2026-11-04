@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Http\Controllers\Controller;
 use App\Http\Controllers\Auth\Concerns\HandlesOtpRegistration;
+use App\Http\Controllers\Controller;
 use App\Services\OtpService;
+use App\Support\PolicyAcceptance;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -37,11 +38,13 @@ class BuyerRegistrationController extends Controller
             'street' => ['required', 'string', 'max:150'],
             'additional_address' => ['nullable', 'string', 'max:255'],
             'id_upload' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
-            'terms' => ['required', 'accepted'],
+            'terms_accepted' => ['required', 'accepted'],
         ], [
             'province.not_regex' => 'Please select your province from the list.',
             'municipality.not_regex' => 'Please select your municipality from the list.',
             'barangay.not_regex' => 'Please select your barangay from the list.',
+            'terms_accepted.required' => 'Please read and agree to the Terms and Conditions and Privacy Policy.',
+            'terms_accepted.accepted' => 'Please read and agree to the Terms and Conditions and Privacy Policy.',
         ]);
 
         $age = Carbon::parse($validated['birthday'])->age;
@@ -54,6 +57,7 @@ class BuyerRegistrationController extends Controller
             'password' => Hash::make($validated['password']),
             'role' => 'buyer',
             'account_status' => 'active',
+            ...PolicyAcceptance::attributes(),
         ];
 
         $profileAttributes = [

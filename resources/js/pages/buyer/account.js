@@ -1,4 +1,3 @@
-import { initPsgcCascade } from '../../shared/psgcCascade.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     // PROFILE PHOTO — client-side check + live preview
@@ -59,16 +58,4 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // DELIVERY ADDRESS — PSGC cascade, prefilled with the saved address
-    const addressDataEl = document.getElementById('addressData');
-
-    if (addressDataEl) {
-        initPsgcCascade({
-            province: document.getElementById('province'),
-            municipality: document.getElementById('municipality'),
-            barangay: document.getElementById('barangay'),
-            helpEl: document.getElementById('addressHelp'),
-            initial: JSON.parse(addressDataEl.textContent),
-        });
-    }
 });

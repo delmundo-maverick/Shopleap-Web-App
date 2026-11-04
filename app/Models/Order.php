@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Services\Notifier;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +15,8 @@ class Order extends Model
     protected $fillable = [
         'seller_id',
         'buyer_id',
+        'address_id',
+        'shipping_address',
         'buyer_name',
         'status',
         'total_amount',
@@ -63,6 +66,7 @@ class Order extends Model
     protected function casts(): array
     {
         return [
+            'shipping_address' => 'array',
             'shipping_fee' => 'decimal:2',
             'voucher_discount' => 'decimal:2',
             'pickup_date' => 'date',
@@ -518,12 +522,21 @@ class Order extends Model
         return rtrim(rtrim(number_format($rate, 2), '0'), '.').'%';
     }
 
+    public function address(): BelongsTo
+    {
+        return $this->belongsTo(BuyerAddress::class)->withTrashed();
+    }
+
     /**
      * Delivery destination. Reads the checkout snapshot, falling back to the
      * buyer's live profile for orders placed before snapshots existed.
      */
     public function getShipToAttribute(): array
     {
+        if ($this->shipping_address !== null) {
+            return $this->shipping_address;
+        }
+
         $p = $this->buyer?->buyerProfile;
 
         return [

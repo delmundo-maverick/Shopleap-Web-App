@@ -13,6 +13,7 @@ class AccountController extends Controller
     {
         $user = $request->user();
         $profile = $user->buyerProfile;
+        $addresses = $user->addresses()->orderByDesc('is_default')->latest('id')->get();
 
         $following = $user->followedSellers()
             ->eligibleSellers()
@@ -35,6 +36,7 @@ class AccountController extends Controller
         return view('Buyer.account.index', compact(
             'user',
             'profile',
+            'addresses',
             'following',
             'followingIds',
             'followingCounts',
@@ -56,18 +58,8 @@ class AccountController extends Controller
 
     public function updateAddress(Request $request)
     {
-        $validated = $request->validateWithBag('address', [
-            'province' => ['required', 'string', 'max:100'],
-            'municipality' => ['required', 'string', 'max:100'],
-            'barangay' => ['required', 'string', 'max:100'],
-            'house_number' => ['required', 'string', 'max:100'],
-            'street' => ['required', 'string', 'max:255'],
-            'additional_address' => ['nullable', 'string', 'max:500'],
-        ]);
-
-        $request->user()->buyerProfile->update($validated);
-
-        return back()->with('status', 'Delivery address updated. Shipping fees in your cart may have changed.');
+        return redirect()->to(route('buyer.account.index').'#address')
+            ->with('status', 'Manage your saved addresses in the Addresses section.');
     }
 
     public function updateAvatar(Request $request)

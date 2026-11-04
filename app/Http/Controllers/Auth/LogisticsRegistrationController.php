@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\HubServiceArea;
 use App\Models\LogisticsProfile;
 use App\Services\OtpService;
+use App\Support\PolicyAcceptance;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -39,6 +40,10 @@ class LogisticsRegistrationController extends Controller
             'id_upload' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'business_permit' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'terms_accepted' => ['required', 'accepted'],
+        ], [
+            'terms_accepted.required' => 'Please read and agree to the Terms and Conditions and Privacy Policy.',
+            'terms_accepted.accepted' => 'Please read and agree to the Terms and Conditions and Privacy Policy.',
         ]);
 
         $age = Carbon::parse($validated['birthday'])->age;
@@ -52,6 +57,7 @@ class LogisticsRegistrationController extends Controller
             'password' => Hash::make($validated['password']),
             'role' => 'logistics',
             'account_status' => 'active',
+            ...PolicyAcceptance::attributes(),
         ];
 
         $companyName = preg_replace('/\\s+/', ' ', trim($validated['company_name']));
