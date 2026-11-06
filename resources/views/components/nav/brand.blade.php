@@ -1,0 +1,2 @@
+@props(['href' => null, 'label' => null, 'image' => 'images/Shopleap-Logo.png'])
+<a href="{{ $href ?? route('home') }}" class="flex min-w-0 items-center gap-2 text-primary" aria-label="Shopleap home"><img src="{{ asset($image) }}" alt="" class="size-9 shrink-0 object-contain"><span class="nav-label min-w-0"><span class="block font-logo text-lg font-semibold leading-tight">Shopleap</span>@if ($label)<span class="block truncate text-[10px] text-charcoal/60">{{ $label }}</span>@endif</span></a>

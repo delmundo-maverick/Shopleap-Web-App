@@ -71,9 +71,11 @@ class OrderController extends Controller
 
         $orders = $ordersQuery->paginate(10)->withQueryString();
 
-        return view('Buyer.orders.index', array_merge(
+        $isAccountPanel = $request->header('X-Account-Panel') === 'true';
+
+        return view($isAccountPanel ? 'Buyer.orders._content' : 'Buyer.orders.index', array_merge(
             compact('orders', 'tab', 'counts'),
-            $this->cartSummary($request)
+            $isAccountPanel ? [] : $this->cartSummary($request)
         ));
     }
 

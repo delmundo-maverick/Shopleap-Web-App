@@ -5,6 +5,8 @@ use App\Models\HubServiceArea;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\PsgcBarangay;
+use App\Models\ShopVoucher;
+use App\Models\ShopVoucherRedemption;
 use App\Models\User;
 use App\Services\HubCoverage;
 use App\Services\ParcelLifecycle;
@@ -257,4 +259,58 @@ it('does not accept a soft deleted address at checkout', function () {
     $address = BuyerAddress::factory()->for($buyer)->create();
     $address->delete();
     $this->actingAs($buyer)->postJson(route('buyer.checkout.store'), ['address_id' => $address->id])->assertUnprocessable()->assertJsonValidationErrors('address_id');
+});
+
+it('requires a claimed voucher at order placement and marks it used against the new order', function () {
+    $buyer = addressBuyer();
+    [$seller, $item] = addressCheckoutCart($buyer);
+    $address = BuyerAddress::factory()->for($buyer)->create();
+    foreach (['2026_10_27_152854_create_shop_vouchers_table.php', '2026_10_27_152858_create_shop_voucher_redemptions_table.php', '2026_11_04_194657_create_voucher_claims_table.php', '2026_11_04_194658_add_claim_limit_to_shop_vouchers_table.php'] as $file) {
+        (require database_path('migrations/'.$file))->up();
+    }
+    $voucher = ShopVoucher::factory()->create(['seller_id' => $seller->id, 'total_quantity' => 1]);
+    Cache::forever('platform_setting:commission_rate', 10);
+    $this->mock(ShippingFeeCalculator::class, fn ($mock) => $mock->shouldReceive('calculate')->andReturn(['fee' => 45.0, 'zone' => 'same_municipality']));
+    $this->mock(HubCoverage::class, fn ($mock) => $mock->shouldReceive('routeFor')->andReturn(['origin' => (object) ['id' => 1], 'destination' => (object) ['id' => 2]]));
+    $this->mock(ParcelLifecycle::class, fn ($mock) => $mock->shouldReceive('placed')->once());
+    $payload = ['items' => $item->id, 'address_id' => $address->id, 'voucher_code' => $voucher->code];
+    $this->actingAs($buyer)->post(route('buyer.checkout.store'), $payload)->assertSessionHasErrors('stock');
+    expect(Order::count())->toBe(0);
+    $oldOrder = Order::create(['buyer_id' => $buyer->id, 'seller_id' => $seller->id, 'shop_voucher_id' => $voucher->id]);
+    $claim = $buyer->voucherClaims()->create(['voucher_id' => $voucher->id, 'claimed_at' => now()]);
+    $this->post(route('buyer.checkout.store'), $payload)->assertRedirect(route('buyer.orders.index'));
+    $newOrder = Order::latest('id')->first();
+    expect($claim->fresh()->used_at)->not->toBeNull();
+    expect($claim->fresh()->order_id)->toBe($newOrder->id)->not->toBe($oldOrder->id);
+    expect((float) $newOrder->voucher_discount)->toBe(20.0);
+    expect($voucher->fresh()->used_quantity)->toBe(1);
+    expect(ShopVoucherRedemption::first()->order_id)->toBe($newOrder->id);
+    $next = $buyer->cartItems()->create(['product_id' => $item->product_id, 'quantity' => 1]);
+    $this->post(route('buyer.checkout.store'), array_merge($payload, ['items' => $next->id]))->assertSessionHasErrors('stock');
+    expect(Order::count())->toBe(2);
+});
+
+it('rolls back the used claim and order if redemption recording fails', function () {
+    $buyer = addressBuyer();
+    [$seller, $item] = addressCheckoutCart($buyer);
+    $address = BuyerAddress::factory()->for($buyer)->create();
+    foreach (['2026_10_27_152854_create_shop_vouchers_table.php', '2026_10_27_152858_create_shop_voucher_redemptions_table.php', '2026_11_04_194657_create_voucher_claims_table.php', '2026_11_04_194658_add_claim_limit_to_shop_vouchers_table.php'] as $file) {
+        (require database_path('migrations/'.$file))->up();
+    }
+    $voucher = ShopVoucher::factory()->create(['seller_id' => $seller->id]);
+    $claim = $buyer->voucherClaims()->create(['voucher_id' => $voucher->id, 'claimed_at' => now()]);
+    Cache::forever('platform_setting:commission_rate', 10);
+    $this->mock(ShippingFeeCalculator::class, fn ($mock) => $mock->shouldReceive('calculate')->andReturn(['fee' => 45.0, 'zone' => 'same_municipality']));
+    $this->mock(HubCoverage::class, fn ($mock) => $mock->shouldReceive('routeFor')->andReturn(['origin' => (object) ['id' => 1], 'destination' => (object) ['id' => 2]]));
+    $this->mock(ParcelLifecycle::class, fn ($mock) => $mock->shouldReceive('placed')->once());
+    ShopVoucherRedemption::creating(fn () => throw new RuntimeException('Simulated redemption failure'));
+    try {
+        $this->actingAs($buyer)->postJson(route('buyer.checkout.store'), ['items' => $item->id, 'address_id' => $address->id, 'voucher_code' => $voucher->code])->assertServerError();
+    } finally {
+        ShopVoucherRedemption::flushEventListeners();
+    }
+    expect($claim->fresh()->used_at)->toBeNull();
+    expect($voucher->fresh()->used_quantity)->toBe(0);
+    expect(Order::count())->toBe(0);
+    expect($buyer->cartItems()->count())->toBe(1);
 });

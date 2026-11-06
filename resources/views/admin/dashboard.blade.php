@@ -21,19 +21,13 @@
         <div class="flex min-w-0 flex-1 flex-col">
 
             <!-- TOPBAR -->
-            <header class="frost-panel-solid flex h-20 items-center justify-between border-0 border-b border-line px-6">
+            <header class="workspace-header">
 
-                <div class="flex items-center gap-3">
-                    <button type="button" data-sidebar-toggle
-                        class="frost-btn rounded-lg p-2 text-charcoal/60 hover:bg-ice-blue hover:text-primary lg:hidden">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
+                <div class="min-w-0">
+                    <x-nav.toggle target="workspace-navigation" />
                     <div>
-                        <h2 class="text-page-title">Dashboard Overview</h2>
-                        <p class="text-sm text-charcoal/60">Welcome back, {{ auth()->user()->name ?? 'Admin' }}</p>
+                        <h2 class="workspace-header-title">Dashboard Overview</h2>
+                        <p class="workspace-header-subtitle">Welcome back, {{ auth()->user()->name ?? 'Admin' }}</p>
                     </div>
                 </div>
                 <x-notification-bell />

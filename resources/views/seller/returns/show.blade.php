@@ -111,7 +111,7 @@
                             <section class="frost-panel rounded-2xl p-5">
                                 <h2 class="mb-3 text-section-label">Items</h2>
 
-                                <div class="divide-y divide-white/50">
+                                <div class="app-table-body">
                                     @foreach ($return->items as $line)
                                         <div class="flex items-center gap-3 py-3">
                                             <div class="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-ice-blue">

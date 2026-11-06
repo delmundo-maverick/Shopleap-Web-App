@@ -170,7 +170,7 @@
                     </div>
 
                     {{-- OPTIONS LIST --}}
-                    <div class="mt-3 divide-y divide-line border-y border-line text-sm">
+                    <div class="app-table-body mt-3 border-y border-line text-sm">
 
                         @if ($product->seller_location)
                             <div class="{{ $rowClass }}">
@@ -239,17 +239,9 @@
                                     </div>
                                 @endif
 
-                                @if ($outOfStock)
-                                    <span class="text-xs font-bold uppercase text-sale-red">Out of stock</span>
-                                @elseif ($product->stock_quantity <= 5)
-                                    <span class="text-xs font-bold uppercase text-sale-red">
-                                        Only {{ $product->stock_quantity }} left
-                                    </span>
-                                @else
-                                    <span class="text-xs font-semibold uppercase text-charcoal/60">
-                                        {{ $hasOptions ? 'In stock' : $product->stock_quantity . ' in stock' }}
-                                    </span>
-                                @endif
+                                <span id="productStock" role="status" aria-live="polite" class="text-xs font-semibold text-charcoal/60">
+                                    {{ $product->stock_quantity }} in stock
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -814,6 +806,7 @@
             'productId' => $product->id,
             'basePrice' => (float) $product->display_price,
             'baseStock' => (int) $product->stock_quantity,
+            'stockUrl' => route('buyer.products.stock', $product),
             'primaryImage' => $product->main_image_url,
             'selectedVariantId' => (int) request('variant') ?: null,
             'hasOptions' => $hasOptions,

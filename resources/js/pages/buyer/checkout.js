@@ -25,7 +25,7 @@ export function checkoutPage(config) {
     };
 }
 
-export function voucherCheckout(url) {
+export function voucherCheckout(url, items = '') {
     return {
         code: '', appliedCode: '', message: '', success: false, busy: false,
         async applyVoucher() {
@@ -37,7 +37,7 @@ export function voucherCheckout(url) {
                 const response = await fetch(url, { method: 'POST', headers: {
                     'Content-Type': 'application/json', Accept: 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                }, body: JSON.stringify({ code: this.code }) });
+                }, body: JSON.stringify({ code: this.code, items }) });
                 const data = await response.json();
                 this.success = response.ok && !!data.success;
                 this.appliedCode = this.success ? data.voucher_code : '';

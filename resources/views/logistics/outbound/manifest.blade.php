@@ -86,9 +86,9 @@
                     <p class="text-sm font-semibold">{{ $bag->items->count() }} parcel(s)</p>
                 </div>
 
-                <table class="mt-3 w-full text-left text-sm">
+                <table class="app-table mt-3 w-full text-left text-sm">
                     <thead>
-                        <tr class="border-b border-charcoal/20">
+                        <tr>
                             <th class="py-2 font-semibold text-charcoal/60">Order</th>
                             <th class="py-2 font-semibold text-charcoal/60">Seller</th>
                             <th class="py-2 font-semibold text-charcoal/60">Destination</th>
@@ -97,7 +97,7 @@
                     </thead>
                     <tbody>
                         @foreach ($bag->items as $item)
-                            <tr class="border-b border-charcoal/10">
+                            <tr>
                                 <td class="py-2 font-mono font-bold">#{{ $item->order_id }}</td>
                                 <td class="py-2">
                                     {{ $item->order?->seller?->sellerProfile?->business_name ?? $item->order?->seller?->name ?? '—' }}

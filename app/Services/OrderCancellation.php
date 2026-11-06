@@ -62,6 +62,7 @@ class OrderCancellation
             }
 
             $order->restoreStock();
+            app(ShopVoucherService::class)->restoreForCancelledOrder($order);
 
             return true;
         });

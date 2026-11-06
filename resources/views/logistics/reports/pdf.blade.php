@@ -13,16 +13,18 @@
         .metrics td { border: 1px solid #D1D5DB; padding: 8px 10px; width: 25%; vertical-align: top; }
         .metric-label { font-size: 8px; text-transform: uppercase; color: #6B7280; }
         .metric-value { font-size: 14px; font-weight: bold; margin-top: 3px; }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; }
+        td { overflow-wrap: break-word; }
         .grid th { background: #EAF2FB; text-align: left; padding: 5px 6px; font-size: 9px; border-bottom: 1px solid #2E3A46; }
         .grid td { padding: 5px 6px; border-bottom: 1px solid #E5E7EB; }
+        .grid th.right, .grid td.right { text-align: right; }
         .grid tfoot td { font-weight: bold; border-top: 2px solid #2E3A46; background: #F5F7FA; }
         .note { margin-top: 18px; font-size: 8px; color: #6B7280; line-height: 1.5; }
     </style>
 </head>
 <body>
-    @php
-        $peso = fn($v) => '₱' . number_format((float) $v, 2);
-    @endphp
+
 
     <table>
         <tr>
@@ -38,6 +40,7 @@
         </tr>
     </table>
 
+    <p class="muted">Filters: @foreach (array_diff_key($params, array_flip(['type', 'preset', 'from', 'to'])) as $key => $value) {{ str_replace('_', ' ', $key) }}: {{ $value }}; @endforeach</p>
     @if (! empty($report['summary']))
         <h2>Summary</h2>
         <table class="metrics">
@@ -77,7 +80,8 @@
     @endif
 
     <p class="note">
-        Figures are scoped to the logged-in logistics hub and the selected date range.
+        @foreach ($report['notes'] as $note) {{ $note }}<br> @endforeach
+        All amounts are PHP. Dates use {{ config('app.timezone') }}.
     </p>
 </body>
 </html>

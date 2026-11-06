@@ -11,7 +11,7 @@ trait LoadsCartSummary
         $cartCount = $request->user()->cartItems()->sum('quantity');
 
         $cartPreviewItems = $request->user()->cartItems()
-            ->with('product.images')
+            ->with(['product.images', 'product.variants', 'product.liveDiscount', 'variant'])
             ->latest()
             ->take(3)
             ->get();

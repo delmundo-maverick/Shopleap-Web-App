@@ -78,6 +78,7 @@ class CheckoutController extends Controller
         return view('Buyer.checkout.index', [
             'addresses' => $request->user()->addresses()->orderByDesc('is_default')->latest('id')->get(),
             'selectedAddress' => $address,
+            'claimedVouchers' => app(ShopVoucherService::class)->getAvailableVouchersForBuyer($request->user()),
             'groupedBySeller' => $groupedBySeller,
             'total' => $subtotal,
             'weightBySeller' => $weightBySeller,
@@ -231,13 +232,14 @@ class CheckoutController extends Controller
 
             // 4. Create one order per seller and deduct stock.
             $touchedVariantProducts = [];
+            $voucherOrder = null;
 
             // Handle voucher if applied
             $appliedVoucher = null;
             $voucherDiscountTotal = 0;
             if ($request->filled('voucher_code')) {
                 try {
-                    $appliedVoucher = $voucherService->validateAndApplyForCart($buyer, $request->voucher_code, $cartItems);
+                    $appliedVoucher = $voucherService->validateAndApplyForCart($buyer, $request->voucher_code, $cartItems, lock: true);
                 } catch (\Throwable $e) {
                     $this->fail($e->getMessage());
                 }
@@ -253,7 +255,7 @@ class CheckoutController extends Controller
                     $voucherModel = $appliedVoucher['voucher'];
                     // Re-validate under lock
                     $voucherModel = ShopVoucher::where('id', $voucherModel->id)->lockForUpdate()->first();
-                    if (! $voucherModel || ! $voucherModel->isValidNow() || ! $voucherModel->canBeUsedByBuyer($buyer->id)) {
+                    if (! $voucherModel || ! $voucherModel->isValidNow() || ! $voucherModel->canBeUsedByBuyer($buyer->id) || ! $voucherModel->hasUnusedClaim($buyer)) {
                         $this->fail('Voucher is no longer valid.');
                     }
                     $eligibleSubtotal = $appliedVoucher['eligible_items']->sum('line_total');
@@ -303,6 +305,9 @@ class CheckoutController extends Controller
                     ) ?: null,
                 ]);
 
+                if ($voucherModel) {
+                    $voucherOrder = $order;
+                }
                 $lifecycle->placed($order, $buyer->id);
 
                 // Allocate voucher discount proportionally to eligible items
@@ -364,10 +369,12 @@ class CheckoutController extends Controller
             if (isset($appliedVoucher) && $appliedVoucher['voucher'] && $voucherDiscountTotal > 0) {
                 $voucherModelFinal = ShopVoucher::where('id', $appliedVoucher['voucher']->id)->lockForUpdate()->first();
                 if ($voucherModelFinal && $voucherModelFinal->canBeUsedByBuyer($buyer->id)) {
-                    $orderForRedemption = Order::where('buyer_id', $buyer->id)
-                        ->where('shop_voucher_id', $voucherModelFinal->id)
-                        ->latest()
-                        ->first();
+                    $orderForRedemption = $voucherOrder;
+                    $claim = $voucherModelFinal->claims()->where('user_id', $buyer->id)->lockForUpdate()->first();
+                    if ($voucherModelFinal->isShopVoucher() && (! $claim || $claim->used_at)) {
+                        $this->fail('This voucher has not been claimed or has already been used.');
+                    }
+                    $claim?->update(['used_at' => now(), 'order_id' => $orderForRedemption->id]);
                     ShopVoucherRedemption::create([
                         'shop_voucher_id' => $voucherModelFinal->id,
                         'buyer_id' => $buyer->id,
@@ -384,6 +391,8 @@ class CheckoutController extends Controller
                         $voucherModelFinal->is_active = false;
                         $voucherModelFinal->save();
                     }
+                } else {
+                    $this->fail('Voucher is no longer available.');
                 }
             }
 

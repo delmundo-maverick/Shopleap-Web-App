@@ -13,35 +13,11 @@
 
 <body class="flex min-h-screen flex-col bg-ice-blue text-charcoal">
 
-    <header class="sticky top-0 z-40 border-b border-white/10 bg-primary">
-        <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-3 md:px-8">
-            
-            <a href="{{ route('buyer.home') }}" class="flex shrink-0 items-center gap-2">
-                <span class="flex h-9 w-9 items-center justify-center overflow-hidden">
-                    <img src="{{ asset('images/Shopleap-Logo-White.png') }}" alt="Shopleap"
-                        class="h-full w-full object-contain">
-                </span>
-                <span>
-                    <span class="block text-base font-logo font-bold leading-tight text-white sm:text-lg">
-                        Shopleap
-                    </span>
-                    <span class="hidden text-xs text-white/80 sm:block">
-                        Shop Smart. Shop Simple.
-                    </span>
-                </span>
-            </a>
-
-            <!-- SECURE CHECKOUT LABEL -->
-            <div class="flex items-center gap-2 text-sm font-semibold text-white/80">
-                <svg class="h-4.5 w-4.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
-                        d="M16 8V6a4 4 0 00-8 0v2M5 8h14a1 1 0 011 1v10a1 1 0 01-1 1H5a1 1 0 01-1-1V9a1 1 0 011-1z" />
-                </svg>
-                <span class="hidden text-white sm:inline">Secure Checkout</span>
-            </div>
-
-        </div>
-    </header>
+    <x-nav.shell id="checkout-navigation" label="Checkout navigation">
+        <x-slot:brand><x-nav.brand :href="route('buyer.home')" label="Secure checkout" /></x-slot:brand>
+        <x-slot:desktopLinks><x-nav.link :href="route('buyer.cart.index')">Back to cart</x-nav.link></x-slot:desktopLinks>
+        <x-slot:mobileMenu><x-nav.link :href="route('buyer.home')">Home</x-nav.link><x-nav.link :href="route('buyer.cart.index')">Back to cart</x-nav.link><x-nav.link :href="route('buyer.account.index')">My Account</x-nav.link></x-slot:mobileMenu>
+    </x-nav.shell>
 
     <main x-data="checkoutPage(@js(['quoteUrl' => route('buyer.checkout.index'), 'items' => $itemIds, 'addressId' => $selectedAddress?->id, 'shipping' => $shippingBySeller, 'shippingTotal' => $shippingTotal, 'grandTotal' => $grandTotal, 'blocked' => $blockedSellerIds]))" @buyer-address-selected.window="quote($event.detail.id)" @voucher-applied.window="discount = $event.detail.discount" class="mx-auto w-full max-w-7xl flex-1 px-3 py-5 pb-32 md:px-8 md:py-6 md:pb-32">
 
@@ -130,7 +106,7 @@
                                     </a>
                                 </div>
                             <!-- SELLER PRODUCTS -->
-                            <div class="divide-y divide-light-gray">
+                            <div class="app-table-body">
                                 @foreach ($items as $item)
                                     <div class="flex items-center gap-3 py-3">
                                         <div class="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-ice-blue/60">
@@ -251,8 +227,16 @@
                         <h3 class="mb-4 text-sm font-bold text-charcoal">Order Total</h3>
 
                         <!-- Voucher Section -->
-                        <div class="mb-4" x-data="voucherCheckout(@js(route('buyer.vouchers.apply')))">
+                        <div class="mb-4" x-data="voucherCheckout(@js(route('buyer.vouchers.apply')), @js($itemIds))">
                             <label class="mb-1.5 block text-xs font-semibold text-charcoal">Shop Voucher</label>
+                            <select class="mb-2 w-full rounded border border-line px-3 py-2 text-sm" x-model="code" @change="applyVoucher()" aria-label="Your claimed vouchers">
+                                <option value="">Choose a claimed voucher</option>
+                                @foreach ($claimedVouchers as $voucher)
+                                    @if ($groupedBySeller->has($voucher->seller_id))
+                                        <option value="{{ $voucher->code }}">{{ $voucher->code }} - {{ $voucher->seller?->sellerProfile?->business_name ?? $voucher->seller?->name }}</option>
+                                    @endif
+                                @endforeach
+                            </select>
                             <div class="flex gap-2">
                                 <input type="text" x-model="code" placeholder="Enter voucher code"
                                     class="w-full rounded-lg border border-light-gray px-3 py-2 text-sm uppercase outline-none focus:border-primary">

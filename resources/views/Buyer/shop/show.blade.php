@@ -177,6 +177,18 @@
             </nav>
         </section>
 
+        @if ($vouchers->isNotEmpty())
+            <section id="shop-vouchers" class="mt-4 rounded border border-line bg-white p-4 sm:p-5">
+                <h2 class="text-lg font-bold">Vouchers</h2>
+                <p class="mt-1 text-sm text-charcoal/60">Follow this shop, then claim vouchers to save on your next order.</p>
+                <div class="mt-3 grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    @foreach ($vouchers as $voucher)
+                        <x-voucher-card :voucher="$voucher" :shop="true" :claim="$voucher->claims->first()" />
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
         <!-- PRODUCTS GRID -->
         <section id="all-products"
             class="mt-3 scroll-mt-24 overflow-hidden rounded-xl border border-line bg-white sm:mt-4">

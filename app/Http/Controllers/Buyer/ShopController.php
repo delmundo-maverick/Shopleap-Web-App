@@ -65,8 +65,15 @@ class ShopController extends Controller
                 ])->values(),
             ]);
 
+        $vouchers = $seller->shopVouchers()->with('seller.sellerProfile')->withCount('claims')
+            ->with(['claims' => fn ($query) => $query->where('user_id', $request->user()->id)])
+            ->where('is_active', true)->whereIn('status', ['active', 'scheduled'])
+            ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+            ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->latest()->get();
+
         return view('Buyer.shop.show', array_merge(
-            compact('seller', 'products', 'shopRating', 'latestReviews', 'isFollowing', 'followingCount', 'followersCount'),
+            compact('vouchers', 'seller', 'products', 'shopRating', 'latestReviews', 'isFollowing', 'followingCount', 'followersCount'),
             $this->cartSummary($request)
         ));
     }

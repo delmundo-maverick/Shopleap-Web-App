@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\MessageAttachmentService;
 use App\Services\MessagingPolicy;
 use App\Support\TicketPresenter;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -55,7 +56,12 @@ class MessagingController extends Controller
             default => abort(403),
         };
 
-        $extra = $user->role === 'buyer' ? $this->cartSummary($request) : [];
+        $isAccountPanel = $user->role === 'buyer' && $request->header('X-Account-Panel') === 'true';
+        if ($isAccountPanel) {
+            $viewName = 'Buyer.messages._content';
+        }
+
+        $extra = $user->role === 'buyer' && ! $isAccountPanel ? $this->cartSummary($request) : [];
 
         return view($viewName, array_merge(compact('conversations', 'activeConversation'), $extra));
     }
@@ -82,7 +88,7 @@ class MessagingController extends Controller
         $roleCounts = ['all' => (clone $base)->where('status', $view)->count()];
         foreach (['buyer', 'seller', 'logistics'] as $r) {
             $roleCounts[$r] = (clone $base)->where('status', $view)
-                ->whereHas('participants', fn($q) => $q->where('role', $r)->where('users.id', '!=', $user->id))
+                ->whereHas('participants', fn ($q) => $q->where('role', $r)->where('users.id', '!=', $user->id))
                 ->count();
         }
 
@@ -98,7 +104,7 @@ class MessagingController extends Controller
             ->orderByDesc('last_message_at');
 
         if ($role !== 'all') {
-            $query->whereHas('participants', fn($q) => $q->where('role', $role)->where('users.id', '!=', $user->id));
+            $query->whereHas('participants', fn ($q) => $q->where('role', $role)->where('users.id', '!=', $user->id));
         }
 
         if ($assign === 'mine') {
@@ -140,8 +146,8 @@ class MessagingController extends Controller
             ->where('id', '!=', $user->id)
             ->with(['sellerProfile', 'logisticsProfile', 'courierProfile'])
             ->get()
-            ->filter(fn($u) => MessagingPolicy::canMessage($user, $u))
-            ->map(fn($u) => [
+            ->filter(fn ($u) => MessagingPolicy::canMessage($user, $u))
+            ->map(fn ($u) => [
                 'id' => $u->id,
                 'name' => $u->messaging_name,
                 'role' => $u->role,
@@ -149,7 +155,7 @@ class MessagingController extends Controller
 
         if ($request->filled('search')) {
             $search = strtolower($request->search);
-            $contacts = $contacts->filter(fn($c) => str_contains(strtolower($c['name']), $search))->values();
+            $contacts = $contacts->filter(fn ($c) => str_contains(strtolower($c['name']), $search))->values();
         }
 
         return response()->json($contacts);
@@ -201,7 +207,7 @@ class MessagingController extends Controller
         $rows = $query->get();
         $attachments = MessageAttachmentService::forMessages($rows->pluck('id'));
 
-        $messages = $rows->map(fn($m) => $this->messagePayload($m, $attachments[$m->id] ?? []));
+        $messages = $rows->map(fn ($m) => $this->messagePayload($m, $attachments[$m->id] ?? []));
 
         $conversation->loadMissing('product.images', 'assignedAgent');
 
@@ -259,9 +265,9 @@ class MessagingController extends Controller
             ->get(['id', 'conversation_id', 'sender_id', 'body', 'created_at']);
 
         $first = $messages->first();
-        $isStaff = fn($m) => $m->sender?->role === 'super_admin';
+        $isStaff = fn ($m) => $m->sender?->role === 'super_admin';
         $staffCount = $messages->filter($isStaff)->count();
-        $firstReply = $first ? $messages->first(fn($m) => $isStaff($m) && $m->id > $first->id) : null;
+        $firstReply = $first ? $messages->first(fn ($m) => $isStaff($m) && $m->id > $first->id) : null;
 
         // ── ticket facts ──
         $ticket = null;
@@ -281,7 +287,7 @@ class MessagingController extends Controller
         $people = $conversation->participants
             ->where('id', '!=', $viewer->id)
             ->values()
-            ->map(fn($u) => $this->personPayload($u));
+            ->map(fn ($u) => $this->personPayload($u));
 
         $requester = $conversation->category && $conversation->creator
             ? $this->personPayload($conversation->creator)
@@ -316,16 +322,16 @@ class MessagingController extends Controller
                 'pickup_date' => $order->pickup_date?->format('M d, Y'),
                 'pickup_slot' => Order::PICKUP_SLOTS[$order->pickup_time_slot] ?? $order->pickup_time_slot,
                 'pickup_decline_reason' => $order->pickup_decline_reason,
-                'items' => $order->items->map(fn($i) => [
+                'items' => $order->items->map(fn ($i) => [
                     'name' => $i->product_name,
                     'quantity' => $i->quantity,
                     'price' => (float) $i->price_at_purchase,
                     'subtotal' => (float) $i->subtotal,
                     'options' => collect($i->selected_options ?? [])
-                        ->map(fn($v, $k) => (is_int($k) ? '' : "{$k}: ") . (is_array($v) ? implode('/', $v) : $v))
+                        ->map(fn ($v, $k) => (is_int($k) ? '' : "{$k}: ").(is_array($v) ? implode('/', $v) : $v))
                         ->implode(', '),
                 ])->values(),
-                'events' => $order->events->sortByDesc('id')->take(8)->map(fn($e) => [
+                'events' => $order->events->sortByDesc('id')->take(8)->map(fn ($e) => [
                     'title' => $e->title,
                     'note' => $e->note,
                     'at' => $e->created_at?->format('M d, g:i A'),
@@ -386,7 +392,7 @@ class MessagingController extends Controller
         };
 
         // getAttributes() avoids "missing attribute" errors on profiles that lack a column.
-        $attr = fn($key) => $profile ? ($profile->getAttributes()[$key] ?? null) : null;
+        $attr = fn ($key) => $profile ? ($profile->getAttributes()[$key] ?? null) : null;
 
         return [
             'name' => $u->messaging_name,
@@ -469,7 +475,7 @@ class MessagingController extends Controller
         if ($user->role !== 'super_admin') {
             // A customer reply reopens a resolved ticket.
             $updates['status'] = 'open';
-        } elseif ($conversation->category && !$conversation->assigned_to) {
+        } elseif ($conversation->category && ! $conversation->assigned_to) {
             // First admin reply on an unassigned ticket claims it.
             $updates['assigned_to'] = $user->id;
         }
@@ -493,7 +499,7 @@ class MessagingController extends Controller
         $conversation = Conversation::findOrFail($message->conversation_id);
         $this->authorizeParticipant($request->user(), $conversation);
 
-        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+        /** @var FilesystemAdapter $disk */
         $disk = Storage::disk($attachment->disk);
         abort_unless($disk->exists($attachment->path), 404);
 
@@ -510,7 +516,7 @@ class MessagingController extends Controller
             return redirect()->away(
                 $disk->temporaryUrl($attachment->path, now()->addMinutes(10), [
                     'ResponseContentType' => $attachment->mime,
-                    'ResponseContentDisposition' => 'inline; filename="' . addslashes($attachment->original_name) . '"',
+                    'ResponseContentDisposition' => 'inline; filename="'.addslashes($attachment->original_name).'"',
                 ])
             );
         }
@@ -567,16 +573,17 @@ class MessagingController extends Controller
         // Plain chats only. Tickets are never reused.
         $candidates = Conversation::with('participants')
             ->whereNull('category')
-            ->whereHas('participants', fn($q) => $q->where('users.id', $userA->id))
-            ->whereHas('participants', fn($q) => $q->where('users.id', $userB->id))
+            ->whereHas('participants', fn ($q) => $q->where('users.id', $userA->id))
+            ->whereHas('participants', fn ($q) => $q->where('users.id', $userB->id))
             ->get();
 
-        $conversation = $candidates->first(fn($c) => $c->participants->count() === 2);
+        $conversation = $candidates->first(fn ($c) => $c->participants->count() === 2);
 
         if ($conversation) {
             if ($productId && $conversation->product_id !== $productId) {
                 $conversation->update(['product_id' => $productId]);
             }
+
             return $conversation;
         }
 
@@ -621,16 +628,16 @@ class MessagingController extends Controller
     {
         $user = $request->user();
 
-        $items = OrderItem::whereHas('order', fn($q) => $q->where('buyer_id', $user->id))
+        $items = OrderItem::whereHas('order', fn ($q) => $q->where('buyer_id', $user->id))
             ->with(['product.images', 'product.seller'])
             ->latest()
             ->get()
-            ->filter(fn($item) => $item->product && $item->product->seller)
+            ->filter(fn ($item) => $item->product && $item->product->seller)
             ->unique('product_id')
             ->take(10)
             ->values();
 
-        return response()->json($items->map(fn($item) => [
+        return response()->json($items->map(fn ($item) => [
             'product_id' => $item->product_id,
             'product_name' => $item->product->name,
             'product_image' => $item->product->main_image_url,
@@ -655,7 +662,7 @@ class MessagingController extends Controller
 
         // For attachment-only last messages, find out whether they were videos or photos.
         $lastMessageIds = $rawConversations
-            ->map(fn($c) => $c->messages->last()?->id)
+            ->map(fn ($c) => $c->messages->last()?->id)
             ->filter()
             ->values();
 
@@ -673,7 +680,7 @@ class MessagingController extends Controller
                     $preview = $lastMessage->body;
                 } else {
                     $hasVideo = $attachmentMimes->get($lastMessage->id)
-                        ?->contains(fn($a) => str_starts_with((string) $a->mime, 'video/'));
+                        ?->contains(fn ($a) => str_starts_with((string) $a->mime, 'video/'));
                     $preview = $hasVideo ? '🎥 Video' : '📷 Photo';
                 }
             }
@@ -700,7 +707,7 @@ class MessagingController extends Controller
         $quickStarts = [];
 
         $admin = User::where('role', 'super_admin')->first();
-        if ($admin && !in_array($admin->id, $idsWithConversation, true)) {
+        if ($admin && ! in_array($admin->id, $idsWithConversation, true)) {
             $quickStarts[] = [
                 'recipient_id' => $admin->id,
                 'product_id' => null,
@@ -710,11 +717,11 @@ class MessagingController extends Controller
             ];
         }
 
-        $items = OrderItem::whereHas('order', fn($q) => $q->where('buyer_id', $user->id))
+        $items = OrderItem::whereHas('order', fn ($q) => $q->where('buyer_id', $user->id))
             ->with(['product.images', 'product.seller'])
             ->latest()
             ->get()
-            ->filter(fn($item) => $item->product && $item->product->seller)
+            ->filter(fn ($item) => $item->product && $item->product->seller)
             ->unique('product_id')
             ->take(10);
 
@@ -772,7 +779,7 @@ class MessagingController extends Controller
             ->wherePivotNull('hidden_at')
             ->with('messages')
             ->get()
-            ->sum(fn($c) => $c->unreadCountFor($user->id));
+            ->sum(fn ($c) => $c->unreadCountFor($user->id));
 
         return response()->json(['count' => $count]);
     }

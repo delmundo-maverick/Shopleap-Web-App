@@ -16,21 +16,15 @@
     <div class="flex min-h-screen">
         <x-navbars.logistics active="riders" />
 
-        <div class="flex flex-1 flex-col">
+        <div class="flex min-w-0 flex-1 flex-col">
             <!-- HEADER -->
             <header
-                class="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-gray-200/60 bg-white/80 px-8 backdrop-blur-md">
-                <div class="flex items-center gap-3">
-                    <button type="button" @click="$store.sidebar.open = true"
-                        class="rounded-xl p-2 text-charcoal/60 transition hover:text-primary lg:hidden">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
+                class="workspace-header">
+                <div class="min-w-0">
+                    <x-nav.toggle target="workspace-navigation" />
                     <div>
-                        <h2 class="text-xl font-bold text-charcoal">Rider Applications</h2>
-                        <p class="text-xs text-charcoal/50">{{ $riders->total() }} rider accounts total</p>
+                        <h2 class="workspace-header-title">Rider Applications</h2>
+                        <p class="workspace-header-subtitle">{{ $riders->total() }} rider accounts total</p>
                     </div>
                 </div>
 
@@ -99,10 +93,10 @@
                         </div>
                     @else
                         <div class="overflow-x-auto">
-                            <table class="w-full text-left text-sm">
+                            <table class="app-table w-full text-left text-sm">
                                 <thead>
                                     <tr
-                                        class="border-b border-gray-100 bg-gray-50/50 text-xs font-semibold text-charcoal/50">
+                                        class="bg-gray-50/50 text-xs font-semibold text-charcoal/50">
                                         <th class="px-6 py-4 font-normal">Rider</th>
                                         <th class="px-6 py-4 font-normal">Vehicle</th>
                                         <th class="px-6 py-4 font-normal">Contact no.</th>
@@ -111,7 +105,7 @@
                                         <th class="px-6 py-4 font-normal text-right"></th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-100">
+                                <tbody>
                                     @foreach ($riders as $rider)
                                         <tr class="transition hover:bg-gray-50/50">
                                             <td class="px-6 py-4">

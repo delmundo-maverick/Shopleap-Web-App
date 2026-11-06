@@ -123,7 +123,7 @@
             <!-- At a glance -->
             <section class="frost-panel-solid rounded-2xl p-6">
                 <p class="{{ $sectionTitle }}">Current Configuration</p>
-                <dl class="mt-3 divide-y divide-white/60 text-sm">
+                <dl class="mt-3 app-table-body text-sm">
                     <div class="py-2.5 first:pt-0">
                         <dt class="text-xs text-charcoal/50">Platform name</dt>
                         <dd class="mt-0.5 font-semibold">{{ $settings['platform_name'] }}</dd>

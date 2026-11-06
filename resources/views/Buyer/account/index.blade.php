@@ -61,32 +61,15 @@
     @endphp
 
     <x-Buyer.header />
-    <main class="mx-auto w-full max-w-7xl flex-1 px-3 py-4 sm:px-6 sm:py-6 lg:px-8" x-data="{
-        tab: @js($errorTab ?? 'profile'),
-        forced: @js($errorTab !== null),
-        valid: ['profile', 'address', 'security', 'following'],
-
-        init() {
-            const hash = location.hash.slice(1);
-
-            if (!this.forced && this.valid.includes(hash)) {
-                this.tab = hash;
-            }
-
-            window.addEventListener('hashchange', () => {
-                const currentHash = location.hash.slice(1);
-
-                if (this.valid.includes(currentHash)) {
-                    this.tab = currentHash;
-                }
-            });
-        },
-
-        go(tabName) {
-            this.tab = tabName;
-            history.replaceState(null, '', '#' + tabName);
-        }
-    }">
+    <main class="mx-auto w-full max-w-7xl flex-1 px-3 py-4 sm:px-6 sm:py-6 lg:px-8" x-data="accountTabs(@js([
+        'initialTab' => $errorTab ?? 'profile',
+        'forced' => $errorTab !== null,
+        'urls' => [
+            'purchases' => route('buyer.orders.index'),
+            'wishlist' => route('buyer.wishlist.index'),
+            'messages' => route('messages.index'),
+        ],
+    ]))" @account-open.window="go($event.detail.tab, $event.detail.url)">
 
         @if (session('status'))
             <div role="status"
@@ -176,25 +159,27 @@
 
                         <div class="my-1 hidden h-px bg-line lg:block"></div>
 
-                        <a href="{{ route('buyer.orders.index') }}"
-                            class="flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm text-charcoal/70 transition-colors hover:bg-ice-blue">
+                        <button type="button" @click="go('purchases')" :aria-current="tab === 'purchases' ? 'page' : null"
+                            :class="tab === 'purchases' ? 'bg-primary/10 text-primary font-bold' : 'text-charcoal/70 hover:bg-ice-blue'"
+                            class="flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-left text-sm transition-colors">
                             <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                 aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"
                                     d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                             </svg>
                             My Purchases
-                        </a>
+                        </button>
 
-                        <a href="{{ route('buyer.wishlist.index') }}"
-                            class="flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm text-charcoal/70 transition-colors hover:bg-ice-blue">
+                        <button type="button" @click="go('wishlist')" :aria-current="tab === 'wishlist' ? 'page' : null"
+                            :class="tab === 'wishlist' ? 'bg-primary/10 text-primary font-bold' : 'text-charcoal/70 hover:bg-ice-blue'"
+                            class="flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-left text-sm transition-colors">
                             <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                 aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"
                                     d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                             </svg>
                             My Wishlist
-                        </a>
+                        </button>
 
                         <button type="button" @click="go('following')"
                             :aria-current="tab === 'following' ? 'page' : null"
@@ -213,15 +198,16 @@
                                 class="ml-auto rounded-sm bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">{{ $following->total() }}</span>
                         </button>
 
-                        <a href="{{ route('messages.index') }}"
-                            class="flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm text-charcoal/70 transition-colors hover:bg-ice-blue">
+                        <button type="button" @click="go('messages')" :aria-current="tab === 'messages' ? 'page' : null"
+                            :class="tab === 'messages' ? 'bg-primary/10 text-primary font-bold' : 'text-charcoal/70 hover:bg-ice-blue'"
+                            class="flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-left text-sm transition-colors">
                             <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                 aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"
                                     d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l1.3-3.9A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                             </svg>
                             Messages
-                        </a>
+                        </button>
 
                     </div>
                 </nav>
@@ -229,6 +215,20 @@
 
             {{-- ACCOUNT CONTENT --}}
             <div class="min-w-0">
+
+                @foreach (['purchases', 'wishlist', 'messages'] as $accountTab)
+                    <section x-show="tab === '{{ $accountTab }}'" x-cloak
+                        :aria-busy="loading.{{ $accountTab }}" class="min-w-0 space-y-4">
+                        <p x-show="loading.{{ $accountTab }}" role="status" class="py-8 text-center text-sm text-charcoal/60">Loading...</p>
+                        <div x-show="errors.{{ $accountTab }}" role="alert" class="rounded-xl border border-line bg-white p-4">
+                            <p class="text-sm text-sale-red" x-text="errors.{{ $accountTab }}"></p>
+                            <button type="button" @click="load('{{ $accountTab }}', null, true)" class="mt-2 text-sm font-semibold text-primary">Try again</button>
+                        </div>
+                        <div x-ref="{{ $accountTab }}" data-account-panel="{{ $accountTab }}"
+                            @click="navigate($event, '{{ $accountTab }}')" @submit="submit($event, '{{ $accountTab }}')"
+                            class="min-w-0"></div>
+                    </section>
+                @endforeach
 
                 {{-- PROFILE TAB --}}
                 <div x-show="tab === 'profile'" x-cloak class="min-w-0 space-y-3 sm:space-y-4">

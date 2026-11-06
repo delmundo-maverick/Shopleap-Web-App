@@ -20,7 +20,7 @@
     <!-- =====================================================
          MAIN
     ====================================================== -->
-    <main class="mx-auto max-w-7xl px-4 py-4 sm:px-8 sm:py-6">
+    <main class="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
 
         <x-announcement-banner audience="buyer" variant="flat" />
 
@@ -31,17 +31,14 @@
             $slides = [
                 [
                     'label' => 'Featured promotion 1',
-                    'url' => route('buyer.products.index'),
                     'image' => asset('images/home/header/page-1.jpg'),
                 ],
                 [
                     'label' => 'Featured promotion 2',
-                    'url' => route('buyer.products.index', ['sort' => 'bestseller']),
                     'image' => asset('images/home/header/page-2.jpg'),
                 ],
                 [
                     'label' => 'Featured promotion 3',
-                    'url' => route('buyer.products.index'),
                     'image' => asset('images/home/header/page-3.jpg'),
                 ],
             ];
@@ -49,12 +46,10 @@
             $promoTiles = [
                 [
                     'label' => 'Seller vouchers',
-                    'url' => route('buyer.products.index'),
                     'image' => asset('images/home/header/seller-voucher.jpg'),
                 ],
                 [
                     'label' => 'Promo 2',
-                    'url' => route('buyer.products.index'),
                     'image' => asset('images/home/header/side-2.jpg'),
                 ],
             ];
@@ -64,10 +59,10 @@
         @endphp
 
         <section aria-label="Featured promotions"
-            class="mb-6 grid gap-3 sm:mb-8 lg:h-80 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
+            class="mb-6 grid gap-3 sm:mb-8 lg:h-60 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
 
             {{-- CAROUSEL (behavior in resources/js/pages/buyer/home.js) --}}
-            <div class="relative h-48 overflow-hidden rounded-xl border border-line bg-white sm:h-64 lg:h-full"
+            <div class="relative h-36 overflow-hidden rounded-xl border border-line bg-white sm:h-48 lg:h-full"
                 data-carousel data-autoplay="5000" role="region" aria-roledescription="carousel"
                 aria-label="Promotions">
 
@@ -78,13 +73,11 @@
                             aria-label="{{ $loop->iteration }} of {{ count($slides) }}"
                             class="relative h-full w-full shrink-0 basis-full">
                             @if ($slide['image'])
-                                <a href="{{ $slide['url'] }}" class="block h-full w-full">
-                                    <img src="{{ $slide['image'] }}" alt="{{ $slide['label'] }}"
-                                        @if (!$loop->first) loading="lazy" @endif
-                                        class="h-full w-full object-cover">
-                                </a>
+                                <img src="{{ $slide['image'] }}" alt="{{ $slide['label'] }}"
+                                    @if (!$loop->first) loading="lazy" @endif
+                                    class="h-full w-full object-cover">
                             @else
-                                <a href="{{ $slide['url'] }}"
+                                <div
                                     class="flex h-full w-full flex-col items-center justify-center gap-2 bg-ice-blue text-charcoal/50">
                                     <svg class="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                         aria-hidden="true">
@@ -92,7 +85,7 @@
                                             d="{{ $placeholderIcon }}" />
                                     </svg>
                                     <span class="text-sm font-semibold">{{ $slide['label'] }}</span>
-                                </a>
+                                </div>
                             @endif
                         </div>
                     @endforeach
@@ -116,8 +109,8 @@
             {{-- SIDE IMAGES: stacked on the right on desktop, a row under the carousel on mobile --}}
             <div class="grid grid-cols-2 gap-3 lg:min-h-0 lg:grid-cols-1 lg:grid-rows-2">
                 @foreach ($promoTiles as $tile)
-                    <a href="{{ $tile['url'] }}"
-                        class="group relative flex h-24 min-h-0 items-center justify-center overflow-hidden rounded-xl border bg-ice-blue transition-colors hover:border-primary sm:h-32 lg:h-auto {{ $tile['image'] ? 'border-line' : 'border-dashed border-charcoal/25' }}">
+                    <div
+                        class="relative flex h-20 min-h-0 items-center justify-center overflow-hidden rounded-xl border bg-ice-blue sm:h-24 lg:h-auto {{ $tile['image'] ? 'border-line' : 'border-dashed border-charcoal/25' }}">
                         @if ($tile['image'])
                             <img src="{{ $tile['image'] }}" alt="{{ $tile['label'] }}" loading="lazy"
                                 class="h-full w-full object-cover">
@@ -131,7 +124,7 @@
                                 <span class="text-xs font-semibold">{{ $tile['label'] }}</span>
                             </span>
                         @endif
-                    </a>
+                    </div>
                 @endforeach
             </div>
         </section>
@@ -228,7 +221,7 @@
          FOOTER
     ====================================================== -->
     <footer class="mt-8 border-t border-line bg-white sm:mt-10">
-        <div class="mx-auto max-w-7xl px-4 py-8 sm:px-8 sm:py-10">
+        <div class="mx-auto max-w-7xl px-3 py-8 sm:px-6 sm:py-10 lg:px-8">
 
             <!-- CATEGORY SITEMAP -->
             <div class="mb-8 border-b border-line pb-8 sm:mb-10 sm:pb-10">
@@ -257,4 +250,3 @@
 </body>
 
 </html>
-    

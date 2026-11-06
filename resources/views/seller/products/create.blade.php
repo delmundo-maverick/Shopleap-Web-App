@@ -16,18 +16,12 @@
 
         <x-navbars.seller active="inventory" />
 
-        <div class="flex flex-1 flex-col">
+        <div class="flex min-w-0 flex-1 flex-col">
 
             <!-- TOPBAR -->
             <header class="flex h-20 items-center justify-between border-b border-light-gray bg-white px-6">
                 <div class="flex items-center gap-3">
-                    <button type="button" data-sidebar-toggle
-                        class="rounded-lg p-2 text-charcoal/60 transition hover:bg-ice-blue hover:text-primary lg:hidden">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
+                    <x-nav.toggle target="workspace-navigation" />
                     <div>
                         <h2 class="text-xl font-bold text-charcoal">Add Product</h2>
                         <p class="text-sm text-charcoal/55">List a new item in your store</p>
@@ -151,9 +145,9 @@
                             <p class="mb-3 text-xs font-bold uppercase tracking-wide text-primary">Variant Pricing &amp;
                                 Stock</p>
                             <div class="overflow-x-auto rounded-xl border border-light-gray">
-                                <table class="w-full text-sm">
+                                <table class="app-table w-full text-sm">
                                     <thead
-                                        class="bg-ice-blue/60 text-left text-xs font-semibold uppercase tracking-wide text-charcoal/50">
+                                        class="text-left text-xs font-semibold uppercase tracking-wide text-charcoal/50">
                                         <tr>
                                             <th class="px-4 py-3">Combination</th>
                                             <th class="px-4 py-3">Price (₱) *</th>
@@ -163,7 +157,7 @@
                                             <th class="px-4 py-3">Image</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="variantsBody" class="divide-y divide-light-gray"></tbody>
+                                    <tbody id="variantsBody"></tbody>
                                 </table>
                             </div>
                         </div>

@@ -16,37 +16,7 @@
          HEADER
     ====================================================== -->
 
-    <header class="border-b border-white/10 bg-primary">
-        <div class="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
-
-            <!-- BRAND -->
-            <a href="{{ route('home') }}" class="flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center overflow-hidden">
-                    <img src="{{ asset('images/Shopleap-Logo-White.png') }}" alt="Shopleap"
-                        class="h-full w-full object-contain">
-                </div>
-                <div>
-                    <h1 class="font-logo text-[1.375rem] text-white font-medium leading-none tracking-tight">
-                        Shopleap
-                    </h1>
-                    <p class="text-xs text-white/80">
-                        Shop Smart. Shop Simple.
-                    </p>
-                </div>
-            </a>
-
-            <!-- LOGIN -->
-            <div class="flex items-center gap-2 text-sm">
-                <span class="hidden text-white/80 sm:inline">
-                    Already have an account?
-                </span>
-                <a href="{{ route('login') }}" class="font-semibold text-white transition hover:text-white/80">
-                    Log in
-                </a>
-            </div>
-
-        </div>
-    </header>
+    <x-nav.guest />
 
 
     <!-- =====================================================

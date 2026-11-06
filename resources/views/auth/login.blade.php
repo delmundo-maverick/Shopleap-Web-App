@@ -104,28 +104,7 @@
         <section class="relative flex min-w-0 flex-col bg-ice-blue">
 
         {{-- Mobile Header --}}
-            <header class="border-b border-white/10 bg-primary lg:hidden">
-                <div class="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
-
-                    <!-- BRAND -->
-                    <a href="{{ route('home') }}" class="flex items-center gap-3">
-                        <div class="flex h-10 w-10 items-center justify-center overflow-hidden">
-                            <img src="{{ asset('images/Shopleap-Logo-White.png') }}" alt="Shopleap"
-                                class="h-full w-full object-contain">
-                        </div>
-
-                        <div>
-                            <h1 class="font-logo text-[1.375rem] font-medium leading-none tracking-tight text-white">
-                                Shopleap
-                            </h1>
-                            <p class="text-xs text-white/80">
-                                Shop Smart. Shop Simple.
-                            </p>
-                        </div>
-                    </a>
-
-                </div>
-            </header>
+            <x-nav.guest class="lg:hidden" />
 
             {{-- Centered content; page scrolls naturally on short screens --}}
             <main class="flex flex-1 flex-col justify-center px-4 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-8 xl:px-16">

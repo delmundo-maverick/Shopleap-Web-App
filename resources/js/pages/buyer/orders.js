@@ -1,9 +1,9 @@
-document.addEventListener('DOMContentLoaded', () => {
+export function initializeOrders(root = document) {
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
 
     /* ───────────── Contact Seller → open (or reuse) the chat ───────────── */
 
-    document.querySelectorAll('.contact-seller-btn').forEach(btn => {
+    root.querySelectorAll('.contact-seller-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             if (btn.disabled) return;
 
@@ -28,7 +28,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok || !data.conversation_id) throw new Error('open failed');
 
-                window.location.href = `${btn.dataset.messagesUrl}?conversation=${data.conversation_id}`;
+                const url = `${btn.dataset.messagesUrl}?conversation=${data.conversation_id}`;
+                if (root !== document) {
+                    window.dispatchEvent(new CustomEvent('account-open', { detail: { tab: 'messages', url } }));
+                    btn.disabled = false;
+                    btn.textContent = label;
+                } else {
+                    window.location.href = url;
+                }
             } catch {
                 btn.disabled = false;
                 btn.textContent = label;
@@ -39,13 +46,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* ───────────── Cancel order modal ───────────── */
 
-    const cancelOverlay = document.getElementById('cancelModalOverlay');
+    const cancelOverlay = root.querySelector('#cancelModalOverlay');
 
     if (cancelOverlay) {
-        const cancelForm = document.getElementById('cancelModalForm');
-        const cancelTitle = document.getElementById('cancelModalOrder');
-        const cancelHelp = document.getElementById('cancelModalHelp');
-        const cancelSubmit = document.getElementById('cancelModalSubmit');
+        const cancelForm = root.querySelector('#cancelModalForm');
+        const cancelTitle = root.querySelector('#cancelModalOrder');
+        const cancelHelp = root.querySelector('#cancelModalHelp');
+        const cancelSubmit = root.querySelector('#cancelModalSubmit');
         const hours = cancelOverlay.dataset.hours || '24';
 
         const closeCancel = () => {
@@ -53,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cancelOverlay.classList.remove('flex');
         };
 
-        document.querySelectorAll('.cancel-order-btn').forEach(btn => {
+        root.querySelectorAll('.cancel-order-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const isRequest = btn.dataset.mode === 'request';
 
@@ -71,8 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        document.getElementById('cancelModalCloseBtn')?.addEventListener('click', closeCancel);
-        document.getElementById('cancelModalKeepBtn')?.addEventListener('click', closeCancel);
+        root.querySelector('#cancelModalCloseBtn')?.addEventListener('click', closeCancel);
+        root.querySelector('#cancelModalKeepBtn')?.addEventListener('click', closeCancel);
         cancelOverlay.addEventListener('click', e => {
             if (e.target === cancelOverlay) closeCancel();
         });
@@ -85,17 +92,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* ───────────── Review modal ───────────── */
 
-    const overlay = document.getElementById('reviewModalOverlay');
+    const overlay = root.querySelector('#reviewModalOverlay');
     if (!overlay) return;
 
-    const productName = document.getElementById('reviewModalProductName');
-    const starButtons = document.querySelectorAll('.star-btn');
-    const ratingInput = document.getElementById('reviewRatingInput');
-    const commentInput = document.getElementById('reviewComment');
-    const mediaInput = document.getElementById('reviewMediaInput');
-    const mediaPreview = document.getElementById('reviewMediaPreview');
-    const errorBox = document.getElementById('reviewError');
-    const submitBtn = document.getElementById('reviewSubmitBtn');
+    const productName = root.querySelector('#reviewModalProductName');
+    const starButtons = root.querySelectorAll('.star-btn');
+    const ratingInput = root.querySelector('#reviewRatingInput');
+    const commentInput = root.querySelector('#reviewComment');
+    const mediaInput = root.querySelector('#reviewMediaInput');
+    const mediaPreview = root.querySelector('#reviewMediaPreview');
+    const errorBox = root.querySelector('#reviewError');
+    const submitBtn = root.querySelector('#reviewSubmitBtn');
     const MAX_MEDIA = 5;
 
     let currentRating = 0;
@@ -135,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('mouseleave', () => paintStars(currentRating));
     });
 
-    document.querySelectorAll('.write-review-btn').forEach(btn => {
+    root.querySelectorAll('.write-review-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             currentAction = btn.dataset.action;
             productName.textContent = btn.dataset.productName;
@@ -155,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    document.getElementById('reviewModalCloseBtn')?.addEventListener('click', closeModal);
+    root.querySelector('#reviewModalCloseBtn')?.addEventListener('click', closeModal);
     overlay.addEventListener('click', e => {
         if (e.target === overlay) closeModal();
     });
@@ -216,11 +223,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            window.location.reload(); // the flashed status banner shows "Thanks for your review!"
+            if (root !== document) {
+                closeModal();
+                window.dispatchEvent(new CustomEvent('account-open', { detail: { tab: 'purchases', url: root.dataset.url } }));
+            } else {
+                window.location.reload();
+            }
         } catch {
             showError('Network error. Please try again.');
             submitBtn.disabled = false;
             submitBtn.textContent = 'Submit Review';
         }
     });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (!document.querySelector('[data-account-panel]')) { initializeOrders(); }
 });

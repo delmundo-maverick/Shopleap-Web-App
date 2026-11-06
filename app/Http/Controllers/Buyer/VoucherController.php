@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
+use App\Models\ShopVoucher;
 use App\Services\ShopVoucherService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class VoucherController extends Controller
@@ -13,7 +15,18 @@ class VoucherController extends Controller
         $available = $service->getAvailableVouchersForBuyer($request->user());
         $redeemed = $service->getRedeemedVouchersForBuyer($request->user());
 
-        return view('Buyer.vouchers.index', compact('available', 'redeemed'));
+        $expired = $request->user()->voucherClaims()->with('voucher.seller.sellerProfile')->whereNull('used_at')->whereHas('voucher', fn ($query) => $query->where('expires_at', '<=', now())->orWhere('status', 'expired'))->get();
+
+        return view('Buyer.vouchers.index', compact('available', 'redeemed', 'expired'));
+    }
+
+    public function claim(Request $request, ShopVoucher $shopVoucher, ShopVoucherService $service): JsonResponse
+    {
+        $claim = $service->claim($request->user(), $shopVoucher);
+        $shopVoucher->loadCount('claims');
+
+        return response()->json(['message' => 'Voucher claimed. Find it in My Vouchers.', 'claim_id' => $claim->id,
+            'remaining' => $shopVoucher->claim_limit === null ? null : max(0, $shopVoucher->claim_limit - $shopVoucher->claims_count)]);
     }
 
     public function dropdown(Request $request, ShopVoucherService $service)
@@ -64,6 +77,7 @@ class VoucherController extends Controller
 
         try {
             $result = $service->validateAndApplyForCart($request->user(), $request->code, $cartItems);
+
             return response()->json([
                 'success' => true,
                 'voucher_code' => $result['voucher']->code,

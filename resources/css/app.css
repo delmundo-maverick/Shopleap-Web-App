@@ -1,9 +1,52 @@
 @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600&display=swap');
 @import 'tailwindcss';
+@import './navbar.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
+
+/* Shared dividers for data tables and their flex/grid row equivalents. */
+.app-table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+.app-table > tbody > tr,
+.app-table-body > :where(div, a, article, li) {
+    border-bottom: 1px solid var(--color-line);
+}
+
+.app-table > thead > tr > :is(th, td) {
+    background: var(--color-ice-blue);
+    border-bottom: 2px solid var(--color-line);
+}
+
+/* Keep workspace logo dividers level with the seller dashboard topbar. */
+.workspace-header,
+.workspace-navigation {
+    --workspace-header-height: 4rem;
+}
+
+.workspace-navigation .nav-sidebar-brand {
+    height: var(--workspace-header-height);
+    min-height: var(--workspace-header-height);
+    flex-shrink: 0;
+    padding-block: 0;
+}
+
+@media (min-width: 40rem) {
+    .workspace-header,
+    .workspace-navigation {
+        --workspace-header-height: 5rem;
+    }
+}
+
+@media (min-width: 64rem) {
+    .workspace-navigation[data-collapsed="true"] .nav-sidebar-brand {
+        gap: 0;
+    }
+}
 
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
@@ -11,6 +54,18 @@
 
     /* Logo wordmark (used by <x-logo /> via the font-logo class) */
     --font-logo: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+
+    --nav-bg: var(--color-surface);
+    --nav-text: var(--color-charcoal);
+    --nav-link-hover: var(--color-ice-blue);
+    --nav-active: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+    --nav-border: var(--color-line);
+    --nav-overlay: color-mix(in srgb, var(--color-charcoal) 40%, transparent);
+    --z-nav: 32;
+    --z-nav-overlay: 40;
+    --z-nav-panel: 45;
+    --z-nav-dropdown: 48;
+    --z-modal: 90;
 
     /* Brand palette */
     --color-primary: #1A5FB4;
@@ -20,6 +75,12 @@
     --color-sale-red: #E4572E;
     --color-warning: #F97316;
     --color-light-gray: #F5F7FA;
+    --color-landing-navy: #12345B;
+    --color-landing-blue: #EAF2FC;
+    --color-landing-mint: #E4F2E9;
+    --color-landing-peach: #FFF0E5;
+    --color-landing-cream: #FFFCF6;
+    --color-landing-muted: #607084;
 
     /* Page canvas: an almost-white neutral. Just enough off-white that white
        cards and their borders still read, without any blue tint. */
@@ -75,6 +136,75 @@
 |--------------------------------------------------------------------------
 */
 @layer components {
+    /* Appearance and sizing reference: the seller dashboard notification topbar. */
+    .workspace-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        height: var(--workspace-header-height);
+        padding: 0 1rem;
+    }
+
+    .workspace-header > div:first-child {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .workspace-header > :first-child,
+    .workspace-header > div:first-child > div {
+        min-width: 0;
+    }
+
+    .workspace-header > :is(h1, h2),
+    .workspace-header > div:first-child > div > :is(h1, h2, p) {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .workspace-header > :not(:first-child) {
+        flex-shrink: 0;
+    }
+
+    .workspace-header-title {
+        color: var(--color-charcoal);
+        font-size: 1rem;
+        line-height: 1.5rem;
+        font-weight: 700;
+    }
+
+    .workspace-header-subtitle {
+        color: color-mix(in srgb, var(--color-charcoal) 55%, transparent);
+        font-size: 0.75rem;
+        line-height: 1rem;
+    }
+
+    @media (min-width: 40rem) {
+        .workspace-header {
+            padding-inline: 1.5rem;
+        }
+
+        .workspace-header > div:first-child {
+            gap: 0.75rem;
+        }
+
+        .workspace-header-title {
+            font-size: 1.25rem;
+            line-height: 1.75rem;
+        }
+
+        .workspace-header-subtitle {
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+        }
+    }
+
     .text-page-title {
         @apply text-xl font-bold text-charcoal;
     }
@@ -123,7 +253,8 @@
     }
 
     /* Chrome that floats above content: topbar, sidebar, modals, dropdowns. */
-    .frost-panel-solid {
+    .frost-panel-solid,
+    .workspace-header {
         background: var(--color-surface);
         border: 1px solid var(--color-line);
         box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--color-charcoal) 12%, transparent);
@@ -458,3 +589,17 @@
         opacity: 0.85;
     }
 }
+
+/* Shared full-width content alignment for the storefront and buyer navigation. */
+.site-container {
+    --site-max-width: 100rem;
+    --site-gutter: 1rem;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: var(--site-max-width);
+    min-width: 0;
+    margin-inline: auto;
+    padding-inline: var(--site-gutter);
+}
+@media (min-width: 768px) { .site-container { --site-gutter: 1.5rem; } }
+@media (min-width: 1024px) { .site-container { --site-gutter: 2rem; } }

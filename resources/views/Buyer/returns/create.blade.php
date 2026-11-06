@@ -60,7 +60,7 @@
             <section class="rounded-lg bg-white p-5 shadow-sm shadow-charcoal/5">
                 <h2 class="mb-3 text-sm font-bold text-charcoal">1. Which items have a problem?</h2>
 
-                <div class="divide-y divide-light-gray">
+                <div class="app-table-body">
                     @foreach ($order->items as $item)
                         <label class="flex cursor-pointer items-center gap-3 py-3">
                             <input type="checkbox" name="items[]" value="{{ $item->id }}" x-model="selected"

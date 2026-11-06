@@ -21,10 +21,21 @@ class LoginController extends Controller
         abort_unless(in_array($role, $this->validRoles), 404);
     }
 
-    // ── LOGIN ──────────────────────────────────────────────
+    // â”€â”€ LOGIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    public function create()
+    public function create(Request $request)
     {
+        if ($request->query('continue') === 'landing') {
+            $filters = $request->validate([
+                'search' => ['nullable', 'string', 'max:100'],
+                'category' => ['nullable', 'string', 'max:100'],
+            ]);
+            $request->session()->put('url.intended', route('home', $filters));
+            $request->session()->flash('status', 'Please log in to continue');
+        } elseif ($request->session()->has('url.intended')) {
+            $request->session()->flash('status', 'Please log in to continue');
+        }
+
         return view('auth.login');
     }
 
@@ -120,7 +131,7 @@ class LoginController extends Controller
         return redirect()->route('login');
     }
 
-    // ── REGISTRATION STEP 2: OTP VERIFY ───────────────────────
+    // â”€â”€ REGISTRATION STEP 2: OTP VERIFY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     public function showOtpForm(string $role)
     {
@@ -203,7 +214,7 @@ class LoginController extends Controller
 
         return redirect()->route('login')->with(
             'status',
-            "Email verified and registration submitted! Please wait for the administrator's approval — you'll be notified by email."
+            "Email verified and registration submitted! Please wait for the administrator's approval â€” you'll be notified by email."
         );
     }
 

@@ -276,8 +276,8 @@
             </div>
         @else
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm">
-                    <thead class="border-b border-white/50 bg-primary/5">
+                <table class="app-table w-full text-left text-sm">
+                    <thead>
                         <tr>
                             <th class="px-5 py-3 font-semibold text-charcoal/60">Order</th>
                             <th class="px-5 py-3 font-semibold text-charcoal/60">Seller</th>
@@ -288,7 +288,7 @@
                             @endif
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-white/50">
+                    <tbody>
                         @foreach ($bag->items as $item)
                             <tr class="transition hover:bg-white/40">
                                 <td class="px-5 py-4 font-bold text-charcoal">#{{ $item->order_id }}</td>
