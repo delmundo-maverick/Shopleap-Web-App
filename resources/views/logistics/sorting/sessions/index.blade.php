@@ -48,8 +48,8 @@
         @else
             <div class="frost-panel-solid overflow-hidden rounded-2xl">
                 <div class="overflow-x-auto">
-                    <table class="block w-full text-left text-sm md:table">
-                        <thead class="hidden border-b border-white/50 bg-primary/5 md:table-header-group">
+                    <table class="app-table block w-full text-left text-sm md:table">
+                        <thead class="hidden md:table-header-group">
                             <tr>
                                 <th scope="col" class="px-5 py-3 font-semibold text-charcoal/60">Session</th>
                                 <th scope="col" class="px-5 py-3 font-semibold text-charcoal/60">Started</th>
@@ -59,11 +59,8 @@
                                 <th scope="col" class="px-5 py-3"><span class="sr-only">Actions</span></th>
                             </tr>
                         </thead>
-
-                        {{-- Divider: on md+ every cell of every row except the last gets a bottom line.
-                             Mobile rows are already separate bordered cards. --}}
                         <tbody
-                            class="block space-y-3 p-3 md:table-row-group md:space-y-0 md:p-0 md:[&>tr:not(:last-child)>td]:border-b md:[&>tr:not(:last-child)>td]:border-charcoal/10">
+                            class="block space-y-3 p-3 md:table-row-group md:space-y-0 md:p-0">
                             @foreach ($sessions as $session)
                                 @php
                                     $sorted = $session->sortedCount();

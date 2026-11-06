@@ -11,8 +11,8 @@
     <div class="flex min-h-screen">
         <x-navbars.admin active="dashboard" />
         <div class="flex min-w-0 flex-1 flex-col">
-            <header class="frost-panel-solid flex h-20 items-center justify-between border-0 border-b border-line px-6">
-                <h2 class="text-page-title">Barangays Owned by Hubs</h2>
+            <header class="workspace-header">
+                <h2 class="workspace-header-title">Barangays Owned by Hubs</h2>
             </header>
             <main class="flex-1 overflow-y-auto p-6">
                 @foreach ($hubs as $hub)

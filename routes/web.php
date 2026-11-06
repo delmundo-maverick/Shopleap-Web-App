@@ -236,6 +236,7 @@ Route::middleware(['auth', 'buyer'])
             ->controller(BuyerProductController::class)
             ->group(function () {
                 Route::get('/', 'index')->name('index');
+                Route::get('/{product}/stock', 'stock')->middleware('throttle:30,1')->name('stock');
                 Route::get('/{product}', 'show')->name('show');
             });
 
@@ -287,6 +288,7 @@ Route::middleware(['auth', 'buyer'])
                 Route::get('/', 'index')->name('index');
                 Route::get('/dropdown', 'dropdown')->name('dropdown');
                 Route::post('/apply', 'apply')->name('apply');
+                Route::post('/{shopVoucher}/claim', 'claim')->middleware('throttle:30,1')->name('claim');
             });
 
         // Checkout

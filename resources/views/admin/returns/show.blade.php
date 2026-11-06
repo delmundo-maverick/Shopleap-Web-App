@@ -28,8 +28,8 @@
 
         <div class="flex min-w-0 flex-1 flex-col">
             <header
-                class="frost-panel-solid sticky top-0 z-30 flex min-h-20 flex-wrap items-center justify-between gap-3 border-b border-white/50 px-6 py-3">
-                <div class="flex items-center gap-3">
+                class="workspace-header">
+                <div class="min-w-0">
                     <a href="{{ route('admin.returns.index') }}" aria-label="Back to returns"
                         class="frost-btn rounded-full p-2 text-charcoal/50 transition hover:text-primary">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -37,9 +37,9 @@
                         </svg>
                     </a>
                     <div>
-                        <h1 class="text-xl font-bold text-charcoal">Case #{{ $return->id }} · Order
+                        <h1 class="workspace-header-title">Case #{{ $return->id }} · Order
                             #{{ $return->order_id }}</h1>
-                        <p class="text-sm text-charcoal/55">{{ $return->type_label }} · requested
+                        <p class="workspace-header-subtitle">{{ $return->type_label }} · requested
                             {{ $return->created_at->format('M d, Y g:i A') }}</p>
                     </div>
                 </div>
@@ -213,7 +213,7 @@
                             <section class="frost-panel rounded-2xl p-5">
                                 <h2 class="mb-3 text-section-label">Items in this case</h2>
 
-                                <div class="divide-y divide-white/50">
+                                <div class="app-table-body">
                                     @foreach ($return->items as $line)
                                         <div class="flex items-center gap-3 py-3">
                                             <div class="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-ice-blue">

@@ -141,7 +141,7 @@
                             </button>
                         </div>
 
-                        <ul class="max-h-64 divide-y divide-charcoal/10 overflow-y-auto rounded-xl border border-charcoal/10">
+                        <ul class="max-h-64 app-table-body overflow-y-auto rounded-xl border border-charcoal/10">
                             <template x-for="item in scanned" :key="item.key">
                                 <li class="flex items-start gap-3 px-3 py-2">
                                     <span class="mt-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold"
@@ -229,8 +229,8 @@
                 </div>
             @else
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="border-b border-white/50 bg-primary/5">
+                    <table class="app-table w-full text-left text-sm">
+                        <thead>
                             <tr>
                                 <th class="px-5 py-3 font-semibold text-charcoal/60">Bag</th>
                                 <th class="px-5 py-3 font-semibold text-charcoal/60">From</th>
@@ -240,7 +240,7 @@
                                 <th class="px-5 py-3 font-semibold text-charcoal/60"></th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-white/50">
+                        <tbody>
                             @foreach ($recent as $bag)
                                 <tr class="transition hover:bg-white/40">
                                     <td class="px-5 py-4 font-mono font-bold text-charcoal">{{ $bag->code }}</td>

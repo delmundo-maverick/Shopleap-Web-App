@@ -57,13 +57,7 @@
             <header
                 class="frost-panel-solid sticky top-0 z-30 flex h-20 items-center justify-between border-b border-white/50 px-6">
                 <div class="flex items-center gap-3">
-                    <button type="button" data-sidebar-toggle
-                        class="frost-btn rounded-xl p-2 text-charcoal/60 transition hover:text-primary lg:hidden">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
+                    <x-nav.toggle target="workspace-navigation" />
                     <div>
                         <h2 class="text-xl font-bold text-charcoal">Account Management</h2>
                         <p class="text-sm text-charcoal/55">Your shop profile, pickup address and security</p>
@@ -410,7 +404,7 @@
                                 <p class="mb-4 text-xs text-charcoal/50">Verified against your submitted ID and
                                     business permit.</p>
 
-                                <dl class="divide-y divide-white/60 text-sm">
+                                <dl class="app-table-body text-sm">
                                     <div class="py-2.5 first:pt-0">
                                         <dt class="text-xs text-charcoal/50">Business name</dt>
                                         <dd class="mt-0.5 font-semibold">{{ $profile->business_name }}</dd>

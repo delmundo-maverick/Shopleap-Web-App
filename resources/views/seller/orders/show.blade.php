@@ -119,7 +119,7 @@
                             <section class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5">
                                 <h2 class="mb-3 text-section-label">Items</h2>
 
-                                <div class="divide-y divide-white/50">
+                                <div class="app-table-body">
                                     @foreach ($order->items as $item)
                                         <div
                                             class="flex min-w-0 flex-wrap items-center gap-3 py-3 sm:flex-nowrap sm:gap-4">

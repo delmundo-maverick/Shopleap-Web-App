@@ -1,8 +1,16 @@
 import { loadBuyerContacts, openConversation } from '../shared/buyerContacts.js';
 
-document.addEventListener('DOMContentLoaded', () => {
-    const app = document.getElementById('messagingApp');
+export function initializeMessaging(root = document) {
+    const app = root.querySelector('#messagingApp');
     if (!app) return;
+    const embedded = root !== document;
+    const lifecycle = new AbortController();
+    if (embedded) {
+        root.addEventListener('account-panel-destroy', () => {
+            lifecycle.abort();
+            clearInterval(pollTimer);
+        }, { once: true });
+    }
 
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
     const currentUserId = parseInt(app.dataset.currentUserId, 10);
@@ -21,27 +29,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const MAX_BYTES = 5 * 1024 * 1024;
     const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
-    const conversationList = document.getElementById('conversationList');
-    const threadHeader = document.getElementById('threadHeader');
-    const threadHeaderAvatar = document.getElementById('threadHeaderAvatar');
-    const threadHeaderName = document.getElementById('threadHeaderName');
-    const threadHeaderMeta = document.getElementById('threadHeaderMeta');
-    const threadStatusBadge = document.getElementById('threadStatusBadge');
-    const threadEmptyState = document.getElementById('threadEmptyState');
-    const threadMessages = document.getElementById('threadMessages');
-    const messageForm = document.getElementById('messageForm');
-    const messageInput = document.getElementById('messageInput');
-    const attachBtn = document.getElementById('attachBtn');
-    const attachInput = document.getElementById('attachInput');
-    const attachmentPreview = document.getElementById('attachmentPreview');
-    const threadBackBtn = document.getElementById('threadBackBtn');
-    const threadClaimBtn = document.getElementById('threadClaimBtn');
-    const threadResolveBtn = document.getElementById('threadResolveBtn');
-    const threadHeaderAssigned = document.getElementById('threadHeaderAssigned');
-    const kindTabs = document.querySelectorAll('[data-kind-tab]');
-    const kindEmpty = document.getElementById('kindEmpty');
-    const lightbox = document.getElementById('imageLightbox');
-    const lightboxImg = document.getElementById('lightboxImg');
+    const conversationList = root.querySelector('#conversationList');
+    const threadHeader = root.querySelector('#threadHeader');
+    const threadHeaderAvatar = root.querySelector('#threadHeaderAvatar');
+    const threadHeaderName = root.querySelector('#threadHeaderName');
+    const threadHeaderMeta = root.querySelector('#threadHeaderMeta');
+    const threadStatusBadge = root.querySelector('#threadStatusBadge');
+    const threadEmptyState = root.querySelector('#threadEmptyState');
+    const threadMessages = root.querySelector('#threadMessages');
+    const messageForm = root.querySelector('#messageForm');
+    const messageInput = root.querySelector('#messageInput');
+    const attachBtn = root.querySelector('#attachBtn');
+    const attachInput = root.querySelector('#attachInput');
+    const attachmentPreview = root.querySelector('#attachmentPreview');
+    const threadBackBtn = root.querySelector('#threadBackBtn');
+    const threadClaimBtn = root.querySelector('#threadClaimBtn');
+    const threadResolveBtn = root.querySelector('#threadResolveBtn');
+    const threadHeaderAssigned = root.querySelector('#threadHeaderAssigned');
+    const kindTabs = root.querySelectorAll('[data-kind-tab]');
+    const kindEmpty = root.querySelector('#kindEmpty');
+    const lightbox = root.querySelector('#imageLightbox');
+    const lightboxImg = root.querySelector('#lightboxImg');
 
     function authHeaders() {
         return { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' };
@@ -127,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && !lightbox.classList.contains('hidden')) closeLightbox();
-    });
+    }, { signal: lifecycle.signal });
 
     // ---------------------------------------------------
     // Messages
@@ -230,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function highlightActiveConversation() {
-        document.querySelectorAll('.conversation-item').forEach(item => {
+        root.querySelectorAll('.conversation-item').forEach(item => {
             const isActive = parseInt(item.dataset.conversationId, 10) === activeConversationId;
             item.classList.toggle('bg-primary/10', isActive);
         });
@@ -270,14 +278,14 @@ document.addEventListener('DOMContentLoaded', () => {
         showThreadUI();
         highlightActiveConversation();
 
-        const item = document.querySelector(`.conversation-item[data-conversation-id="${conversationId}"]`);
+        const item = root.querySelector(`.conversation-item[data-conversation-id="${conversationId}"]`);
         const name = (headerName || item?.dataset.title || 'Conversation').trim();
         threadHeaderName.textContent = name;
         const isTicketRow = item?.closest('[data-kind]')?.dataset.kind === 'ticket';
         threadHeaderAvatar.textContent = isTicketRow && !isAdmin ? 'S' : firstLetter(name);
         setHeaderMeta(item?.dataset.meta || '');
 
-        history.replaceState(null, '', `?conversation=${conversationId}`);
+        if (!embedded) { history.replaceState(null, '', `?conversation=${conversationId}`); }
 
         if (isAdmin) {
             paintDetails('<p class="p-4 text-center text-xs text-charcoal/50">Loading details…</p>');
@@ -289,8 +297,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderProductCard(product) {
-        const card = document.getElementById('threadProductCard');
-        const link = document.getElementById('threadProductLink');
+        const card = root.querySelector('#threadProductCard');
+        const link = root.querySelector('#threadProductLink');
         if (!card) return;
 
         if (!product) {
@@ -299,9 +307,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         showFlex(card);
-        document.getElementById('threadProductImage').src = product.image || '';
-        document.getElementById('threadProductName').textContent = product.name;
-        document.getElementById('threadProductPrice').textContent = `₱${Number(product.price).toFixed(2)}`;
+        root.querySelector('#threadProductImage').src = product.image || '';
+        root.querySelector('#threadProductName').textContent = product.name;
+        root.querySelector('#threadProductPrice').textContent = `₱${Number(product.price).toFixed(2)}`;
 
         if (currentUserRole === 'buyer') {
             link.href = `/buyer/products/${product.id}`;
@@ -344,7 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function restartPolling() {
         if (pollTimer) clearInterval(pollTimer);
-        pollTimer = setInterval(() => fetchNewMessages(), 4000);
+        pollTimer = setInterval(() => { if (!embedded || root.getClientRects().length) { fetchNewMessages(); } }, 4000);
     }
 
     // ---------------------------------------------------
@@ -408,26 +416,26 @@ document.addEventListener('DOMContentLoaded', () => {
         hideFlex(messageForm);
         setView('list');
         app.dataset.details = 'off';
-        history.replaceState(null, '', window.location.pathname);
-        applyKindFilter(document.querySelector('[data-kind-tab].text-primary')?.dataset.kindTab || 'all');
+        if (!embedded) { history.replaceState(null, '', window.location.pathname); }
+        applyKindFilter(root.querySelector('[data-kind-tab].text-primary')?.dataset.kindTab || 'all');
     }
 
-    document.querySelectorAll('.delete-conversation-btn').forEach(btn => {
+    root.querySelectorAll('.delete-conversation-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             if (!confirm('Delete this chat?')) return;
             const id = parseInt(btn.dataset.conversationId, 10);
             await deleteConversation(id);
             btn.closest('.group')?.remove();
             if (activeConversationId === id) resetToEmptyState();
-            else applyKindFilter(document.querySelector('[data-kind-tab].text-primary')?.dataset.kindTab || 'all');
+            else applyKindFilter(root.querySelector('[data-kind-tab].text-primary')?.dataset.kindTab || 'all');
         });
     });
 
-    document.getElementById('threadDeleteBtn')?.addEventListener('click', async () => {
+    root.querySelector('#threadDeleteBtn')?.addEventListener('click', async () => {
         if (!activeConversationId || !confirm('Delete this chat?')) return;
         const id = activeConversationId;
         await deleteConversation(id);
-        document.querySelector(`.conversation-item[data-conversation-id="${id}"]`)?.closest('.group')?.remove();
+        root.querySelector(`.conversation-item[data-conversation-id="${id}"]`)?.closest('.group')?.remove();
         resetToEmptyState();
     });
 
@@ -548,20 +556,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------
     // NEW MESSAGE MODAL
     // ---------------------------------------------------
-    const newMessageBtn = document.getElementById('newMessageBtn');
-    const modalOverlay = document.getElementById('newMessageModalOverlay');
-    const closeBtn = document.getElementById('newMessageCloseBtn');
-    const searchInput = document.getElementById('contactSearchInput');
-    const resultsContainer = document.getElementById('contactResults');
-    const composeArea = document.getElementById('newMessageComposeArea');
-    const selectedContactName = document.getElementById('selectedContactName');
-    const newMessageBody = document.getElementById('newMessageBody');
-    const sendBtn = document.getElementById('newMessageSendBtn');
+    const newMessageBtn = root.querySelector('#newMessageBtn');
+    const modalOverlay = root.querySelector('#newMessageModalOverlay');
+    const closeBtn = root.querySelector('#newMessageCloseBtn');
+    const searchInput = root.querySelector('#contactSearchInput');
+    const resultsContainer = root.querySelector('#contactResults');
+    const composeArea = root.querySelector('#newMessageComposeArea');
+    const selectedContactName = root.querySelector('#selectedContactName');
+    const newMessageBody = root.querySelector('#newMessageBody');
+    const sendBtn = root.querySelector('#newMessageSendBtn');
 
     let forwardingMessageId = null;
 
     function setModalTitle(text) {
-        const title = document.getElementById('newMessageModalTitle');
+        const title = root.querySelector('#newMessageModalTitle');
         if (title) title.textContent = text;
     }
 
@@ -605,9 +613,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Buyer picker: recent purchases -> that product's seller.
-    const buyerContactModalOverlay = document.getElementById('buyerContactModalOverlay');
-    const buyerContactModalList = document.getElementById('buyerContactModalList');
-    const buyerContactModalCloseBtn = document.getElementById('buyerContactModalCloseBtn');
+    const buyerContactModalOverlay = root.querySelector('#buyerContactModalOverlay');
+    const buyerContactModalList = root.querySelector('#buyerContactModalList');
+    const buyerContactModalCloseBtn = root.querySelector('#buyerContactModalCloseBtn');
 
     function openBuyerContactModal() {
         buyerContactModalOverlay.classList.remove('hidden');
@@ -616,7 +624,11 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const data = await openConversation(id, product_id);
                 closeBuyerContactModal();
-                window.location.href = `?conversation=${data.conversation_id}`;
+                if (embedded) {
+                    window.dispatchEvent(new CustomEvent('account-open', { detail: { tab: 'messages', url: `/messages?conversation=${data.conversation_id}` } }));
+                } else {
+                    window.location.href = `?conversation=${data.conversation_id}`;
+                }
             } catch (err) {
                 alert('Could not start conversation.');
             }
@@ -686,10 +698,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------
     // Ticket / conversation details (admin only)
     // ---------------------------------------------------
-    const detailsDockedBody = document.getElementById('detailsDockedBody');
-    const detailsModal = document.getElementById('detailsModal');
-    const detailsModalBody = document.getElementById('detailsModalBody');
-    const threadDetailsBtn = document.getElementById('threadDetailsBtn');
+    const detailsDockedBody = root.querySelector('#detailsDockedBody');
+    const detailsModal = root.querySelector('#detailsModal');
+    const detailsModalBody = root.querySelector('#detailsModalBody');
+    const threadDetailsBtn = root.querySelector('#threadDetailsBtn');
     let detailsRequest = 0;
 
     const money = (n) => `₱${Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -860,7 +872,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     threadDetailsBtn?.addEventListener('click', openDetailsModal);
-    document.getElementById('detailsModalClose')?.addEventListener('click', closeDetailsModal);
+    root.querySelector('#detailsModalClose')?.addEventListener('click', closeDetailsModal);
     detailsModal?.addEventListener('click', (e) => {
         if (e.target === detailsModal) closeDetailsModal();
     });
@@ -991,7 +1003,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             closeModal();
-            window.location.href = `?conversation=${data.conversation_id}`;
+            if (embedded) {
+                    window.dispatchEvent(new CustomEvent('account-open', { detail: { tab: 'messages', url: `/messages?conversation=${data.conversation_id}` } }));
+                } else {
+                    window.location.href = `?conversation=${data.conversation_id}`;
+                }
         } catch (err) {
             console.error(err);
         }
@@ -1007,7 +1023,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         openConversation(contactId, productId)
             .then(data => {
-                window.history.replaceState(null, '', '/messages');
+                if (!embedded) { window.history.replaceState(null, '', '/messages'); }
                 loadThread(data.conversation_id);
             })
             .catch(() => alert('Could not open a conversation with this seller.'));
@@ -1019,4 +1035,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeConversationId) {
         loadThread(activeConversationId);
     }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (!document.querySelector('[data-account-panel]')) { initializeMessaging(); }
 });

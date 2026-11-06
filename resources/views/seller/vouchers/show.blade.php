@@ -21,14 +21,7 @@
             <header
                 class="frost-panel-solid sticky top-0 z-10 flex h-16 items-center justify-between gap-3 border-b border-white/50 px-4 sm:h-20 sm:px-6">
                 <div class="flex min-w-0 items-center gap-2 sm:gap-3">
-                    <button type="button" id="sidebarToggle" data-sidebar-toggle aria-label="Open menu"
-                        class="frost-btn shrink-0 rounded-xl p-2 text-charcoal/60 transition hover:text-primary lg:hidden">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
+                    <x-nav.toggle target="workspace-navigation" />
 
                     <div class="min-w-0">
                         <h1 class="text-page-title truncate">Voucher Details</h1>
@@ -74,6 +67,7 @@
 
                     <div class="grid gap-4 md:grid-cols-2">
                         <div class="rounded-lg bg-white p-5 shadow-sm">
+                            <p class="mb-4 text-sm">{{ $shopVoucher->claims_count }} claimed / {{ $shopVoucher->used_claims_count }} used / {{ $shopVoucher->claim_limit === null ? 'Unlimited' : max(0, $shopVoucher->claim_limit - $shopVoucher->claims_count) }} claims remaining</p>
                             <h2 class="mb-4 text-sm font-bold text-charcoal">Voucher Details</h2>
                             <div class="space-y-3 text-sm">
                                 <div class="flex items-center justify-between">

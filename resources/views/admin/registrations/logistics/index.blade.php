@@ -49,19 +49,12 @@
 
             <!-- TOPBAR -->
             <header
-                class="sticky top-0 z-30 flex h-20 shrink-0 items-center justify-between border-b border-white/60 bg-white/70 px-6 backdrop-blur-xl">
-                <div class="flex items-center gap-3">
-                    <button type="button" @click="$store.sidebar.open = true" aria-label="Open sidebar"
-                        class="rounded-lg p-2 text-charcoal/60 transition hover:bg-ice-blue hover:text-primary lg:hidden">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
+                class="workspace-header">
+                <div class="min-w-0">
+                    <x-nav.toggle target="workspace-navigation" />
                     <div>
-                        <h1 class="text-xl font-bold text-charcoal">Logistics management</h1>
-                        <p class="text-sm text-charcoal/55">{{ $logisticsPartners->total() }} sorting center(s) total
+                        <h1 class="workspace-header-title">Logistics management</h1>
+                        <p class="workspace-header-subtitle">{{ $logisticsPartners->total() }} sorting center(s) total
                         </p>
                     </div>
                 </div>
@@ -113,8 +106,8 @@
                             <p class="mt-1 text-xs text-charcoal/50">Try adjusting your search or filters.</p>
                         </div>
                     @else
-                        <table class="w-full text-left text-sm">
-                            <thead class="border-b border-white/60 bg-white/40">
+                        <table class="app-table w-full text-left text-sm">
+                            <thead>
                                 <tr>
                                     @foreach ($columns as $column)
                                         <th scope="col" class="px-5 py-3 font-medium text-charcoal/50">
@@ -123,7 +116,7 @@
                                     <th scope="col" class="px-5 py-3"><span class="sr-only">Actions</span></th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-white/60">
+                            <tbody>
                                 @foreach ($logisticsPartners as $profile)
                                     <tr data-row-id="{{ $profile->id }}" class="transition hover:bg-white/60">
                                         <td class="px-5 py-4">

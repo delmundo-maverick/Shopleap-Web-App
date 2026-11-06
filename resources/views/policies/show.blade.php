@@ -15,22 +15,7 @@
 
 <body class="flex min-h-screen flex-col bg-ice-blue text-charcoal">
 
-    <header class="border-b border-light-gray bg-white">
-        <div class="mx-auto flex h-20 max-w-4xl items-center justify-between gap-4 px-5 sm:px-8">
-            <a href="{{ route('home') }}" class="text-lg font-bold text-primary">Shopleap</a>
-
-            <nav class="flex items-center gap-4 text-xs font-semibold">
-                <a href="{{ route('terms') }}"
-                    class="{{ $policy?->slug === 'terms-of-service' ? 'text-primary' : 'text-charcoal/60 hover:text-primary' }}">
-                    Terms
-                </a>
-                <a href="{{ route('privacy') }}"
-                    class="{{ $policy?->slug === 'privacy-policy' ? 'text-primary' : 'text-charcoal/60 hover:text-primary' }}">
-                    Privacy
-                </a>
-            </nav>
-        </div>
-    </header>
+    <x-nav.guest :links="[['href' => route('terms'), 'label' => 'Terms'], ['href' => route('privacy'), 'label' => 'Privacy']]" />
 
     <main class="mx-auto w-full max-w-4xl flex-1 px-5 py-8 sm:px-8 sm:py-10">
         <a href="{{ $backUrl }}"

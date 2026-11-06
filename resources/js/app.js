@@ -1,17 +1,22 @@
 import Alpine from 'alpinejs';
+import { accountTabs } from './pages/buyer/account-tabs.js';
+import { registerLandingEffects } from './pages/landing/landing.js';
+import { notificationBell } from './shared/notifications.js';
+import { navbar, navToggle } from './shared/navigation.js';
+import { voucherCard } from './pages/buyer/vouchers.js';
 import { addressBook } from './shared/buyer-addresses.js';
 import { checkoutPage, voucherCheckout } from './pages/buyer/checkout.js';
 import { termsAgreementState } from './shared/terms-modal.js';
 
 window.Alpine = Alpine;
+Alpine.data('accountTabs', accountTabs);
+Alpine.data('shopleapBell', notificationBell);
+Alpine.data('navbar', navbar);
+Alpine.data('navToggle', navToggle);
+Alpine.data('voucherCard', voucherCard);
 Alpine.data('addressBook', addressBook);
 Alpine.data('checkoutPage', checkoutPage);
 Alpine.data('voucherCheckout', voucherCheckout);
-
-Alpine.store('sidebar', {
-    open: false,
-    collapsed: false,
-});
 
 Alpine.data('otpRegistration', (config = {}) => ({
     ...termsAgreementState(config),
@@ -434,4 +439,5 @@ Alpine.store('follow', {
     },
 });
 
+registerLandingEffects(Alpine);
 Alpine.start();

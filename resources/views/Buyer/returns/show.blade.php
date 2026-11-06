@@ -78,7 +78,7 @@
                 </div>
             </dl>
 
-            <div class="mt-4 divide-y divide-light-gray rounded-xl border border-light-gray">
+            <div class="mt-4 app-table-body rounded-xl border border-light-gray">
                 @foreach ($return->items as $line)
                     <div class="flex items-center gap-3 px-3 py-2.5 text-sm">
                         <div class="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-ice-blue/60">

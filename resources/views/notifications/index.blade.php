@@ -49,13 +49,7 @@
                     <header
                         class="frost-panel-solid sticky top-0 z-30 flex h-20 items-center justify-between border-b border-white/50 px-6">
                         <div class="flex items-center gap-3">
-                            <button type="button" @click="$store.sidebar.open = true" aria-label="Open menu"
-                                class="frost-btn rounded-xl p-2 text-charcoal/60 transition hover:text-primary lg:hidden">
-                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M4 6h16M4 12h16M4 18h16" />
-                                </svg>
-                            </button>
+                            <x-nav.toggle target="workspace-navigation" />
                             <div>
                                 <h1 class="text-xl font-bold text-charcoal">Notifications</h1>
                                 <p class="text-sm text-charcoal/55">{{ $unread }} unread</p>

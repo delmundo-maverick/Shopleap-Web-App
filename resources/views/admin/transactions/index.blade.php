@@ -32,20 +32,14 @@
     <div class="flex min-h-screen">
         <x-navbars.admin active="transactions" />
 
-        <div class="flex flex-1 flex-col">
+        <div class="flex min-w-0 flex-1 flex-col">
             <header
-                class="frost-panel-solid sticky top-0 z-30 flex h-20 items-center justify-between border-b border-white/50 px-6">
-                <div class="flex items-center gap-3">
-                    <button type="button" data-sidebar-toggle
-                        class="frost-btn rounded-lg p-2 text-charcoal/60 transition hover:bg-ice-blue hover:text-primary lg:hidden">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
+                class="workspace-header">
+                <div class="min-w-0">
+                    <x-nav.toggle target="workspace-navigation" />
                     <div>
-                        <h2 class="text-xl font-bold text-charcoal">All Transactions</h2>
-                        <p class="text-sm text-charcoal/55">{{ $from->format('M d, Y') }} – {{ $to->format('M d, Y') }}
+                        <h2 class="workspace-header-title">All Transactions</h2>
+                        <p class="workspace-header-subtitle">{{ $from->format('M d, Y') }} – {{ $to->format('M d, Y') }}
                         </p>
                     </div>
                 </div>
@@ -175,8 +169,8 @@
                     @if (empty($report['top_sellers']))
                         <p class="p-8 text-center text-sm text-charcoal/50">No completed orders in this range.</p>
                     @else
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-primary/5 text-charcoal/60">
+                        <table class="app-table w-full text-left text-sm">
+                            <thead class="text-charcoal/60">
                                 <tr>
                                     <th class="px-5 py-3 font-semibold">#</th>
                                     <th class="px-5 py-3 font-semibold">Shop</th>
@@ -185,7 +179,7 @@
                                     <th class="px-5 py-3 text-right font-semibold">Commission</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-white/50">
+                            <tbody>
                                 @foreach ($report['top_sellers'] as $i => $seller)
                                     <tr>
                                         <td class="px-5 py-3 text-charcoal/50">{{ $i + 1 }}</td>
@@ -230,8 +224,8 @@
                         </div>
                     @else
                         <div class="overflow-x-auto">
-                            <table class="w-full min-w-[820px] text-left text-sm">
-                                <thead class="border-b border-white/50 bg-primary/5 text-charcoal/60">
+                            <table class="app-table w-full min-w-[820px] text-left text-sm">
+                                <thead class="text-charcoal/60">
                                     <tr>
                                         <th class="px-5 py-3 font-semibold">Order</th>
                                         <th class="px-5 py-3 font-semibold">Buyer</th>
@@ -243,7 +237,7 @@
                                         <th class="px-5 py-3 font-semibold">Date</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-white/50">
+                                <tbody>
                                     @foreach ($orders as $order)
                                         <tr class="transition hover:bg-white/40">
                                             <td class="px-5 py-4 font-semibold">#{{ $order->id }}</td>

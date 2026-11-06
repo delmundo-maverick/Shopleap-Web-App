@@ -1,13 +1,15 @@
 document.addEventListener('DOMContentLoaded', () => {
     const productData = JSON.parse(document.getElementById('productData').textContent);
-    const { productId, basePrice, baseStock, variants, hasOptions, primaryImage, selectedVariantId } = productData;
+    const { productId, basePrice, variants, hasOptions, primaryImage, selectedVariantId } = productData;
 
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
     const checkoutRoute = document.getElementById('productPageData')?.dataset.checkoutRoute;
 
     // Out-of-stock products render their purchase buttons disabled; setBusy()
     // must never re-enable them.
-    const unavailable = baseStock < 1;
+    let baseStock = productData.baseStock;
+    let unavailable = baseStock < 1;
+    let purchaseBusy = false;
 
     let modalIntent = 'cart';
 
@@ -137,6 +139,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const price = selectedVariant ? selectedVariant.price : basePrice;
         const stock = selectedVariant ? selectedVariant.stock_quantity : baseStock;
 
+        const stockLabel = document.getElementById('productStock');
+        if (stockLabel) stockLabel.textContent = `${stock} in stock`;
+        const inlineQuantity = document.getElementById('qtyInput');
+        [inlineQuantity, modalQtyInput].filter(Boolean).forEach(input => {
+            input.max = stock;
+            input.min = stock > 0 ? 1 : 0;
+            input.value = stock > 0 ? Math.min(stock, Math.max(1, Number(input.value) || 1)) : 0;
+            input.disabled = stock < 1;
+        });
+        document.querySelectorAll('#qtyMinus, #qtyPlus, #modalQtyMinus, #modalQtyPlus').forEach(button => {
+            button.disabled = stock < 1;
+        });
+        unavailable = stock < 1;
+        document.querySelectorAll('[data-action="add-to-cart"], [data-action="buy-now"]').forEach(button => {
+            button.disabled = purchaseBusy || unavailable;
+        });
+        if (modalConfirmBtn) modalConfirmBtn.disabled = purchaseBusy || !selectedVariant || stock < 1;
         if (modalPrice) modalPrice.textContent = `₱${price.toFixed(2)}`;
         if (modalStock) modalStock.textContent = `${stock} in stock`;
         if (modalQtyInput) {
@@ -173,6 +192,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     preselectInitialVariant();
+    updateModalPriceStock();
+
+    let refreshingStock = false;
+    async function refreshStock() {
+        if (document.hidden || refreshingStock || !productData.stockUrl) { return; }
+        refreshingStock = true;
+        try {
+            const response = await fetch(productData.stockUrl, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+            if (response.status === 404) {
+                baseStock = 0;
+                variants.forEach(variant => { variant.stock_quantity = 0; });
+                updateModalPriceStock();
+                return;
+            }
+            if (!response.ok) { return; }
+            const snapshot = await response.json();
+            if (!Number.isInteger(snapshot.stock_quantity) || !Array.isArray(snapshot.variants)) { return; }
+            baseStock = Math.max(0, snapshot.stock_quantity);
+            const stocks = new Map(snapshot.variants.map(variant => [Number(variant.id), variant.stock_quantity]));
+            variants.forEach(variant => { variant.stock_quantity = Math.max(0, Number(stocks.get(Number(variant.id))) || 0); });
+            updateModalPriceStock();
+        } catch {
+            // Keep the last known stock when the connection is temporarily unavailable.
+        } finally {
+            refreshingStock = false;
+        }
+    }
+    let stockTimer = setInterval(refreshStock, 10000);
+    document.addEventListener('visibilitychange', refreshStock);
+    window.addEventListener('focus', refreshStock);
+    window.addEventListener('pagehide', () => clearInterval(stockTimer));
+    window.addEventListener('pageshow', event => {
+        if (event.persisted) { stockTimer = setInterval(refreshStock, 10000); refreshStock(); }
+    });
+    refreshStock();
 
     document.getElementById('modalQtyMinus')?.addEventListener('click', () => {
         modalQtyInput.value = Math.max(1, parseInt(modalQtyInput.value || 1) - 1);
@@ -218,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const buyButtons = document.querySelectorAll('[data-action="buy-now"]');
 
     function setBusy(busy) {
+        purchaseBusy = busy;
         [...addButtons, ...buyButtons].forEach(btn => {
             btn.disabled = busy || unavailable;
         });

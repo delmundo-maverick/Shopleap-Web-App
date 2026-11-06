@@ -58,8 +58,8 @@
             </div>
         @else
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[720px] text-left text-sm">
-                    <thead class="bg-primary/5 text-xs uppercase tracking-wide text-charcoal/55">
+                <table class="app-table w-full min-w-[720px] text-left text-sm">
+                    <thead class="text-xs uppercase tracking-wide text-charcoal/55">
                         <tr>
                             <th class="px-6 py-3 font-semibold">Announcement</th>
                             <th class="px-6 py-3 font-semibold">Audience</th>
@@ -68,7 +68,7 @@
                             <th class="px-6 py-3"></th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-white/50">
+                    <tbody>
                         @foreach ($announcements as $a)
                             <tr class="transition hover:bg-white/40">
                                 <td class="max-w-md px-6 py-4">

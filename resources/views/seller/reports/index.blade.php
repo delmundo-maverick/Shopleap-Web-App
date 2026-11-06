@@ -35,18 +35,12 @@
     <div class="flex min-h-screen">
         <x-navbars.seller active="reports" />
 
-        <div class="flex flex-1 flex-col">
+        <div class="flex min-w-0 flex-1 flex-col">
 
             <header
                 class="frost-panel-solid sticky top-0 z-30 flex h-20 items-center justify-between border-b border-white/50 px-6">
                 <div class="flex items-center gap-3">
-                    <button type="button" data-sidebar-toggle
-                        class="frost-btn rounded-xl p-2 text-charcoal/60 transition hover:text-primary lg:hidden">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
+                    <x-nav.toggle target="workspace-navigation" />
                     <div>
                         <h2 class="text-xl font-bold text-charcoal">Reports</h2>
                         <p class="text-sm text-charcoal/55">{{ $from->format('M d, Y') }} – {{ $to->format('M d, Y') }}
@@ -197,8 +191,8 @@
                             <h3 class="text-sm font-bold text-charcoal">Earnings by Period</h3>
                         </div>
                         <div class="max-h-96 overflow-auto">
-                            <table class="w-full text-left text-sm">
-                                <thead class="sticky top-0 bg-primary/5 text-charcoal/60">
+                            <table class="app-table w-full text-left text-sm">
+                                <thead class="sticky top-0 text-charcoal/60">
                                     <tr>
                                         <th class="px-5 py-3 font-semibold">Period</th>
                                         <th class="px-5 py-3 text-right font-semibold">Completed Orders</th>
@@ -207,7 +201,7 @@
                                         <th class="px-5 py-3 text-right font-semibold">Net Earnings</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-white/50">
+                                <tbody>
                                     @foreach ($report['series'] as $row)
                                         <tr class="{{ $row['earned_orders'] === 0 ? 'text-charcoal/35' : '' }}">
                                             <td class="px-5 py-3">{{ $row['label'] }}</td>
@@ -314,8 +308,8 @@
                         @if (empty($report['top_products']))
                             <p class="p-8 text-center text-sm text-charcoal/50">No product sales in this range.</p>
                         @else
-                            <table class="w-full text-left text-sm">
-                                <thead class="bg-primary/5 text-charcoal/60">
+                            <table class="app-table w-full text-left text-sm">
+                                <thead class="text-charcoal/60">
                                     <tr>
                                         <th class="px-5 py-3 font-semibold">#</th>
                                         <th class="px-5 py-3 font-semibold">Product</th>
@@ -325,7 +319,7 @@
                                         <th class="px-5 py-3 font-semibold">Share</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-white/50">
+                                <tbody>
                                     @foreach ($report['top_products'] as $i => $product)
                                         @php $share = $sales['gross_sales'] > 0 ? round($product['revenue'] / $sales['gross_sales'] * 100) : 0; @endphp
                                         <tr>

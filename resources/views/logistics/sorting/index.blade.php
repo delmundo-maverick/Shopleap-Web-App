@@ -4,7 +4,6 @@
     $cell =
         'flex items-center justify-between gap-3 px-1 py-1.5 before:text-xs before:font-medium before:text-charcoal/50 before:content-[attr(data-label)] md:table-cell md:px-5 md:py-4 md:before:hidden';
 
-    $rowDividers = 'md:[&>tr:not(:last-child)>td]:border-b md:[&>tr:not(:last-child)>td]:border-charcoal/10';
 @endphp
 <x-logistics.layout title="Sort & Assign" subtitle="Sort parcels by destination, then assign a delivery rider"
     active="sorting" :scripts="['resources/js/pages/logistics/sorting.js']">
@@ -383,8 +382,8 @@
 
             <div class="frost-panel-solid overflow-hidden rounded-2xl">
                 <div class="overflow-x-auto">
-                    <table class="block w-full text-left text-sm md:table">
-                        <thead class="hidden border-b border-white/50 bg-primary/5 md:table-header-group">
+                    <table class="app-table block w-full text-left text-sm md:table">
+                        <thead class="hidden md:table-header-group">
                             <tr>
                                 <th scope="col" class="px-5 py-3 font-semibold text-charcoal/60">Order</th>
                                 <th scope="col" class="px-5 py-3 font-semibold text-charcoal/60">Destination</th>
@@ -393,7 +392,7 @@
                             </tr>
                         </thead>
 
-                        <tbody class="block space-y-3 p-3 md:table-row-group md:space-y-0 md:p-0 {{ $rowDividers }}">
+                        <tbody class="block space-y-3 p-3 md:table-row-group md:space-y-0 md:p-0">
                             @foreach ($orders as $order)
                                 @php
                                     $dest = $order->ship_to;
@@ -500,7 +499,7 @@
                             </p>
                         </div>
 
-                        <div class="divide-y divide-orange-600/10">
+                        <div class="app-table-body">
                             @foreach ($needsReviewOrders as $order)
                                 @php
                                     $dest = $order->ship_to;
@@ -665,7 +664,7 @@
                             @endif
                         </div>
 
-                        <div class="divide-y divide-charcoal/10">
+                        <div class="app-table-body">
                             @foreach ($group['orders'] as $order)
                                 <div
                                     class="flex flex-wrap items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">

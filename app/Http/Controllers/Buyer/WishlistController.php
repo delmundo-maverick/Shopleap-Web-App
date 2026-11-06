@@ -26,9 +26,11 @@ class WishlistController extends Controller
             ->orderByDesc('wishlist_items.created_at')
             ->paginate(24);
 
-        return view('Buyer.wishlist.index', array_merge(
+        $isAccountPanel = $request->header('X-Account-Panel') === 'true';
+
+        return view($isAccountPanel ? 'Buyer.wishlist._content' : 'Buyer.wishlist.index', array_merge(
             compact('products'),
-            $this->cartSummary($request)
+            $isAccountPanel ? [] : $this->cartSummary($request)
         ));
     }
 

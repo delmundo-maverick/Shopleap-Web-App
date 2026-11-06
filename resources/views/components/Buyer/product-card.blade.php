@@ -8,7 +8,9 @@
         : null;
 
     $reviewCount = (int) ($product->reviews_count ?? 0);
-    $isNew = $product->created_at?->gt(now()->subDays(14));
+    $currentTime = now();
+    $isNew = $product->created_at?->gt($currentTime->copy()->subDay())
+        && $product->created_at->lte($currentTime);
 @endphp
 
 <div
@@ -19,7 +21,7 @@
         <!-- IMAGE -->
         <div class="relative aspect-[5/4] w-full overflow-hidden bg-ice-blue">
             @if ($product->main_image_url)
-                <img src="{{ $product->main_image_url }}" alt="{{ $product->name }}" loading="lazy"
+                <img src="{{ $product->main_image_url }}" alt="{{ $product->name }}" loading="lazy" width="400" height="320"
                     class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105">
             @else
                 <div class="flex h-full w-full items-center justify-center text-charcoal/25">
@@ -45,11 +47,11 @@
 
             <div class="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                 <span class="text-[15px] font-bold tabular-nums text-primary sm:text-base">
-                    ₱{{ number_format($product->display_price) }}
+                    &#8369;{{ number_format($product->display_price) }}
                 </span>
                 @if ($hasDiscount)
                     <span class="text-[11px] tabular-nums text-charcoal/50 line-through">
-                        ₱{{ number_format($product->was_price) }}
+                        &#8369;{{ number_format($product->was_price) }}
                     </span>
                 @endif
             </div>
@@ -57,7 +59,7 @@
             {{-- Rating when the query provides it; otherwise a "New" tag for recent listings. --}}
             @if ($reviewCount > 0)
                 <p class="mt-1.5 flex items-center gap-1 text-[11px] text-charcoal/60">
-                    <span class="text-amber-400">★</span>
+                    <span class="text-amber-400">â˜…</span>
                     <span
                         class="font-semibold text-charcoal/80">{{ number_format($product->reviews_avg_rating, 1) }}</span>
                     <span>({{ number_format($reviewCount) }})</span>
@@ -87,8 +89,16 @@
         </div>
     </a>
 
+    @isset($actions)
+        <div class="px-2.5 pb-2.5 sm:px-3 sm:pb-3">
+            {{ $actions }}
+        </div>
+    @endisset
+
     {{-- Sibling of the link, not a child: valid HTML and independently focusable. --}}
     @if (auth()->user()?->role === 'buyer')
         <x-Buyer.wishlist-button :product="$product" class="absolute right-2 top-2 z-10" />
+    @elseif (auth()->guest())
+        <a href="{{ route('login', array_merge(['continue' => 'landing'], request()->only(['search', 'category']))) }}" aria-label="Log in to save {{ $product->name }}" class="absolute right-2 top-2 z-10 flex size-10 items-center justify-center rounded border border-line bg-white text-primary"><span aria-hidden="true">?</span></a>
     @endif
 </div>

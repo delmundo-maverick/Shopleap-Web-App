@@ -142,6 +142,11 @@ class User extends Authenticatable
             ->whereHas('sellerProfile', fn (Builder $profileQuery) => $profileQuery->where('status', 'approved'));
     }
 
+    public function voucherClaims(): HasMany
+    {
+        return $this->hasMany(VoucherClaim::class);
+    }
+
     public function shopVouchers()
     {
         return $this->hasMany(ShopVoucher::class, 'seller_id');

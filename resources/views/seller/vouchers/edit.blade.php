@@ -21,14 +21,7 @@
             <header
                 class="frost-panel-solid sticky top-0 z-10 flex h-16 items-center justify-between gap-3 border-b border-white/50 px-4 sm:h-20 sm:px-6">
                 <div class="flex min-w-0 items-center gap-2 sm:gap-3">
-                    <button type="button" id="sidebarToggle" data-sidebar-toggle aria-label="Open menu"
-                        class="frost-btn shrink-0 rounded-xl p-2 text-charcoal/60 transition hover:text-primary lg:hidden">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
+                    <x-nav.toggle target="workspace-navigation" />
 
                     <div class="min-w-0">
                         <h1 class="text-page-title truncate">Edit Voucher</h1>
@@ -116,6 +109,12 @@
                                 @enderror
                             </div>
 
+                            <div class="mb-4">
+                                <label class="mb-1 block text-sm font-semibold" for="claim_limit">Claim limit (optional)</label>
+                                <input id="claim_limit" type="number" name="claim_limit" min="1" value="{{ old('claim_limit', $shopVoucher->claim_limit) }}" class="w-full rounded border border-line px-3 py-2 text-sm">
+                                <p class="mt-1 text-xs text-charcoal/60">Maximum buyers who can claim. Leave empty for unlimited. Each claim is usable once.</p>
+                                @error('claim_limit') <p class="mt-1 text-xs text-sale-red">{{ $message }}</p> @enderror
+                            </div>
                             <div>
                                 <label class="mb-1.5 block text-sm font-semibold text-charcoal">Total Quantity</label>
                                 <input type="number" name="total_quantity" min="1"

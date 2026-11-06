@@ -3,26 +3,18 @@
 namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Controller;
-use App\Models\Product;
+use App\Services\PublicCatalog;
 use Illuminate\Http\Request;
 
 class HomeController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, PublicCatalog $catalog)
     {
         $categories = config('shopleap_categories.list');
 
-        $bestSellers = Product::with(['images', 'seller.sellerProfile', 'liveDiscount'])
-            ->where('status', 'active')
-            ->latest()
-            ->take(8)
-            ->get();
+        $bestSellers = $catalog->featured();
 
-        $recommended = Product::with(['images', 'seller.sellerProfile', 'liveDiscount'])
-            ->where('status', 'active')
-            ->latest()
-            ->paginate(16)
-            ->withQueryString();
+        $recommended = $catalog->query()->paginate(16)->withQueryString();
 
         $cartItems = $request->user()->cartItems()
             ->with(['product.images', 'product.liveDiscount', 'variant'])

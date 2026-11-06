@@ -9,10 +9,13 @@
     // Compute cart data only when the page didn't pass it in.
     if ($cartCount === null || $cartPreviewItems === null) {
         $cartPreviewItems = $headerUser
-            ? $headerUser->cartItems()->with('product')->latest()->take(5)->get()
+            ? $headerUser->cartItems()->with(['product.images', 'product.variants', 'product.liveDiscount', 'variant'])->latest()->take(5)->get()
             : collect();
-        $cartCount = $headerUser ? $headerUser->cartItems()->count() : 0;
+        $cartCount = $headerUser ? $headerUser->cartItems()->sum('quantity') : 0;
     }
+
+    $cartPreviewItems = new \Illuminate\Database\Eloquent\Collection($cartPreviewItems->all());
+    $cartPreviewItems->loadMissing(['product.images', 'product.variants', 'product.liveDiscount', 'variant']);
 
     // One query per request, shared with the wishlist hearts on the page.
     $wishlistIds = app(\App\Support\WishlistIds::class);
@@ -28,30 +31,19 @@
 
 @vite('resources/js/components/buyer-header.js')
 
-<header class="sticky top-0 z-50 bg-primary text-white">
-    <a href="{{ route('buyer.account.index') }}#address" data-buyer-header-location class="block truncate border-b border-white/15 px-4 py-2 text-xs md:hidden">
-        {{ $headerUser?->defaultAddress ? (($headerUser->defaultAddress->label ?: 'Deliver to') . ', ' . $headerUser->defaultAddress->city_municipality) : 'Add delivery address' }}
+<x-nav.shell id="buyer-navigation" variant="buyer" label="Buyer navigation" class="buyer-storefront-navigation">
+    <x-slot:brand><x-logo /></x-slot:brand>
+    <x-slot:location>    <a href="{{ route('buyer.account.index') }}#address" data-buyer-header-location
+        class="block truncate py-2 text-xs md:hidden">
+        {{ $headerUser?->defaultAddress ? ($headerUser->defaultAddress->label ?: 'Deliver to') . ', ' . $headerUser->defaultAddress->city_municipality : 'Add delivery address' }}
     </a>
 
-    {{-- TOP UTILITY ROW: desktop only --}}
-    <div class="hidden border-b border-white/15 md:block">
-        <div class="mx-auto flex h-9 max-w-7xl items-center justify-between gap-5 px-8 text-xs text-white/85">
-
-            <div class="flex items-center gap-5">
-                <a href="{{ route('buyer.account.index') }}#address" data-buyer-header-location class="max-w-64 truncate hover:text-white">
-                    {{ $headerUser?->defaultAddress ? (($headerUser->defaultAddress->label ?: 'Deliver to') . ', ' . $headerUser->defaultAddress->city_municipality) : 'Add delivery address' }}
-                </a>
-                <a href="{{ route('buyer.orders.index', ['tab' => 'to_deliver']) }}" class="hover:text-white">
-                    Track My Order
-                </a>
-            </div>
-
-            <div class="flex items-center gap-2">
-
-                {{-- Notifications --}}
+</x-slot:location>
+    <x-slot:desktopLinks><x-nav.link class="buyer-header-top-link" :active="request()->routeIs('buyer.account.*')" :href="route('buyer.account.index').'#address'">Delivery address</x-nav.link><x-nav.link class="buyer-header-top-link" :active="request()->routeIs('buyer.orders.*')" :href="route('buyer.orders.index', ['tab' => 'to_deliver'])">Track My Order</x-nav.link></x-slot:desktopLinks>
+    <x-slot:utilityActions>                {{-- Notifications --}}
                 <x-notification-bell-script />
 
-                <div class="relative" @click.outside="open = false" @keydown.escape.window="open = false"
+                <div id="buyer-notification-feed" class="relative" @click.outside="open = false" @keydown.escape.window="open = false"
                     x-data="shopleapBell({
                         unread: {{ (int) ($headerUser?->unreadNotifications()->count() ?? 0) }},
                         feedUrl: @js(route('notifications.feed', [], false)),
@@ -61,7 +53,7 @@
                         csrf: @js(csrf_token()),
                     })">
                     <button type="button" @click="toggle()"
-                        class="relative flex items-center gap-1.5 rounded-lg py-1.5 pl-2 pr-3 transition-colors hover:bg-white/10">
+                        class="buyer-header-top-link relative flex items-center rounded-lg transition-colors">
                         <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                             aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
@@ -103,7 +95,7 @@
                                     d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                             </svg>
                             <p class="mt-2 text-xs text-charcoal/60"
-                                x-text="loading ? 'Loading…' : (failed ? 'Could not load notifications' : 'No notifications yet')">
+                                x-text="loading ? 'LoadingÃ¢â‚¬Â¦' : (failed ? 'Could not load notifications' : 'No notifications yet')">
                                 No notifications yet</p>
                         </div>
 
@@ -121,7 +113,7 @@
 
                 {{-- Help --}}
                 <a href="{{ route('messages.support') }}" title="Help"
-                    class="flex items-center gap-1.5 rounded-lg py-1.5 pl-2 pr-3 transition-colors hover:bg-white/10">
+                    class="buyer-header-top-link flex items-center rounded-lg transition-colors">
                     <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                         aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
@@ -131,10 +123,10 @@
                 </a>
 
                 {{-- Profile dropdown --}}
-                <div class="relative" x-data="{ open: false }" @click.outside="open = false"
+                <div id="buyer-desktop-profile" class="relative" x-data="{ open: false }" @click.outside="open = false"
                     :class="{ 'z-[100]': open, 'z-10': !open }">
                     <button type="button" @click="open = !open" :aria-expanded="open"
-                        class="relative flex items-center gap-2 rounded-lg py-1 pl-1 pr-2.5 transition-colors hover:bg-white/10">
+                        class="buyer-header-top-link relative flex items-center rounded-lg transition-colors">
                         <div
                             class="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-white text-xs font-bold text-primary">
                             @if ($headerUser?->avatar_url)
@@ -144,7 +136,7 @@
                                 {{ strtoupper(substr($headerUser->name ?? 'B', 0, 1)) }}
                             @endif
                         </div>
-                        <span class="max-w-[100px] truncate text-xs font-medium">
+                        <span class="max-w-[100px] truncate">
                             {{ $headerUser->name ?? 'Buyer' }}
                         </span>
                     </button>
@@ -164,70 +156,19 @@
 
                         <div class="my-1 h-px bg-line"></div>
 
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit"
-                                class="block w-full px-4 py-2.5 text-left text-sm text-sale-red transition-colors hover:bg-sale-red/10">
-                                Logout
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- MAIN ROW: mobile = search + wishlist + cart, desktop = logo + search + cart --}}
-    <div class="mx-auto flex h-[60px] max-w-7xl items-center gap-2 px-3 md:h-[68px] md:gap-6 md:px-8">
-
-        {{-- LOGO: desktop only --}}
-        <div class="hidden shrink-0 md:block">
-            <x-logo />
-        </div>
-
-        {{-- SEARCH --}}
-        <div class="relative min-w-0 flex-1" x-data="{ open: false }" @click.outside="open = false">
-            <form id="buyerSearchForm" action="{{ route('buyer.products.index') }}" method="GET"
-                class="flex overflow-hidden rounded-lg bg-white">
-                <input type="text" id="buyerSearchInput" name="search" autocomplete="off" @focus="open = true"
-                    value="{{ request('search') }}" placeholder="Search products, brands, and categories"
-                    aria-label="Search products"
-                    class="w-full min-w-0 px-3 py-2.5 text-sm text-charcoal outline-none placeholder:text-charcoal/50 md:px-4">
-                <button type="submit" aria-label="Search"
-                    class="flex shrink-0 items-center justify-center bg-sky-blue px-4 text-white transition-colors hover:bg-sky-blue/90 md:px-5">
-                    <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                        aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                </button>
-            </form>
-
-            <div x-show="open" x-cloak x-transition
-                class="absolute left-0 right-0 top-full mt-1.5 rounded-xl border border-line bg-white p-3 text-charcoal shadow-lg">
-
-                <div id="recentSearchesSection" class="mb-3 hidden">
-                    <div class="mb-2 flex items-center justify-between">
-                        <p class="text-card-label">Recent Searches</p>
-                        <button type="button" id="clearRecentSearchesBtn"
-                            class="text-[11px] font-semibold text-primary hover:underline">Clear</button>
-                    </div>
-                    <div id="recentSearchesList" class="flex flex-wrap gap-2"></div>
-                </div>
-
-                <p class="text-card-label mb-2">Trending</p>
-                <div class="flex flex-wrap gap-2">
-                    @foreach (['skincare set', 'mechanical keyboard', 'yoga mat', 'power bank'] as $trend)
-                        <button type="button"
-                            class="trending-search-chip rounded-lg border border-line bg-white px-3 py-1.5 text-xs text-charcoal/75 transition-colors hover:border-primary hover:text-primary">
-                            {{ $trend }}
+                        <button type="button" aria-label="Log out"
+                            class="flex min-h-11 w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-normal text-sale-red transition-colors hover:bg-ice-blue focus-visible:outline-2 focus-visible:outline-primary"
+                            @click="$dispatch('open-logout-modal', { navigationId: 'buyer-navigation', trigger: $el })">
+                            <svg class="size-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 5H5v14h4m5-14 7 7-7 7m7-7H9" />
+                            </svg>
+                            Log out
                         </button>
-                    @endforeach
+                    </div>
                 </div>
-            </div>
-        </div>
-
-        {{-- WISHLIST: mobile only (desktop uses the profile dropdown). Delete this block to remove it. --}}
+</x-slot:utilityActions>
+    <x-slot:search><x-nav.search :buyer="true" /></x-slot:search>
+    <x-slot:actions>        {{-- WISHLIST: mobile only (desktop uses the profile dropdown). Delete this block to remove it. --}}
         <a href="{{ route('buyer.wishlist.index') }}" aria-label="Wishlist"
             class="relative block shrink-0 rounded-lg p-2.5 transition-colors hover:bg-white/10 md:hidden">
             <svg class="h-5.5 w-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6"
@@ -266,18 +207,26 @@
                 @else
                     <div class="max-h-64 overflow-y-auto">
                         @foreach ($cartPreviewItems as $item)
+                            @continue(!$item->product)
+                            @php
+                                $previewImage = $item->variant?->image_url ?? $item->product->main_image_url;
+                                $previewOptions = $item->variant?->options ?: $item->selected_options;
+                            @endphp
                             <div class="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0">
                                 <div
                                     class="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-line bg-ice-blue">
-                                    @if ($item->product->main_image_url)
-                                        <img src="{{ $item->product->main_image_url }}"
-                                            alt="{{ $item->product->name }}" class="h-full w-full object-cover">
+                                    @if ($previewImage)
+                                        <img src="{{ $previewImage }}"
+                                            alt="{{ $item->product->name }}" width="48" height="48" class="h-full w-full object-cover">
                                     @endif
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <p class="truncate text-xs text-charcoal">{{ $item->product->name }}</p>
+                                    @if ($previewOptions)
+                                        <p class="mt-0.5 text-xs text-charcoal/60">{{ collect($previewOptions)->map(fn ($value, $name) => "{$name}: {$value}")->implode(', ') }}</p>
+                                    @endif
                                     <p class="text-xs font-bold tabular-nums text-primary">
-                                        {{ $item->quantity }} × ₱{{ number_format($item->product->display_price, 2) }}
+                                        {{ $item->quantity }} &times; &#8369;{{ number_format($item->unit_price, 2) }}
                                     </p>
                                 </div>
                             </div>
@@ -294,8 +243,19 @@
             </div>
         </div>
 
-    </div>
-</header>
+</x-slot:actions>
+    <x-slot:mobileUser><div id="buyer-mobile-profile"><x-nav.user-menu id="buyer-mobile-profile-menu" /></div></x-slot:mobileUser>
+    <x-slot:mobileMenu>
+        <x-nav.link :href="route('buyer.home')">Home</x-nav.link>
+        <x-nav.link :href="route('buyer.products.index')">Browse products</x-nav.link>
+        <x-nav.link :href="route('buyer.account.index')">My Account</x-nav.link>
+        <x-nav.link :href="route('buyer.orders.index')">Purchases</x-nav.link>
+        <x-nav.link :href="route('buyer.wishlist.index')">Wishlist</x-nav.link>
+        <x-nav.link :href="route('buyer.vouchers.index')">Vouchers</x-nav.link>
+        <x-nav.link :href="route('messages.index')">Messages</x-nav.link>
+        <x-nav.link :href="route('notifications.index')">Notifications</x-nav.link>
+    </x-slot:mobileMenu>
+</x-nav.shell>
 
 {{-- WISHLIST: seed data for the Alpine store (must stay after </header>) --}}
 <script id="wishlistData" type="application/json">@json($wishlistPayload)</script>

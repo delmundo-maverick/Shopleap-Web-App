@@ -28,13 +28,7 @@
             <header
                 class="frost-panel-solid sticky top-0 z-10 flex h-16 items-center justify-between gap-3 border-b border-white/50 px-4 sm:h-20 sm:px-6">
                 <div class="flex min-w-0 items-center gap-2 sm:gap-3">
-                    <button type="button" data-sidebar-toggle aria-label="Open menu"
-                        class="frost-btn shrink-0 rounded-xl p-2 text-charcoal/60 transition hover:text-primary lg:hidden">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
+                    <x-nav.toggle target="workspace-navigation" />
                     <div class="min-w-0">
                         <h1 class="truncate text-base font-bold text-charcoal sm:text-xl">Returns &amp; Refunds</h1>
                         <p class="truncate text-xs text-charcoal/55 sm:text-sm">{{ $returns->total() }} request(s) in
@@ -84,8 +78,8 @@
                         </div>
                     @else
                         <div class="overflow-x-auto">
-                            <table class="block w-full text-left text-sm md:table">
-                                <thead class="hidden border-b border-white/50 bg-primary/5 md:table-header-group">
+                            <table class="app-table block w-full text-left text-sm md:table">
+                                <thead class="hidden md:table-header-group">
                                     <tr>
                                         <th scope="col" class="px-5 py-3 font-semibold text-charcoal/60">Order</th>
                                         <th scope="col" class="px-5 py-3 font-semibold text-charcoal/60">Reason</th>
@@ -98,7 +92,7 @@
                                     </tr>
                                 </thead>
                                 <tbody
-                                    class="block space-y-3 p-3 md:table-row-group md:space-y-0 md:divide-y md:divide-white/50 md:p-0">
+                                    class="block space-y-3 p-3 md:table-row-group md:space-y-0 md:p-0">
                                     @foreach ($returns as $return)
                                         <tr
                                             class="block rounded-xl border border-white/50 bg-white/30 p-3 transition hover:bg-white/40 md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0">

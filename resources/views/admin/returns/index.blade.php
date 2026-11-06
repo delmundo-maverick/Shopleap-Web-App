@@ -27,18 +27,12 @@
 
             <div class="flex min-w-0 flex-1 flex-col">
                 <header
-                    class="frost-panel-solid sticky top-0 z-30 flex h-20 items-center justify-between border-b border-white/50 px-6">
-                    <div class="flex items-center gap-3">
-                        <button type="button" @click="$store.sidebar.open = true" aria-label="Open menu"
-                            class="frost-btn rounded-xl p-2 text-charcoal/60 transition hover:text-primary lg:hidden">
-                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M4 6h16M4 12h16M4 18h16" />
-                            </svg>
-                        </button>
+                    class="workspace-header">
+                    <div class="min-w-0">
+                        <x-nav.toggle target="workspace-navigation" />
                         <div>
-                            <h1 class="text-xl font-bold text-charcoal">Returns &amp; Refunds</h1>
-                            <p class="text-sm text-charcoal/55">{{ $returns->total() }} case(s) in this view</p>
+                            <h1 class="workspace-header-title">Returns &amp; Refunds</h1>
+                            <p class="workspace-header-subtitle">{{ $returns->total() }} case(s) in this view</p>
                         </div>
                     </div>
                     <x-notification-bell />
@@ -89,8 +83,8 @@
                             </div>
                         @else
                             <div class="overflow-x-auto">
-                                <table class="w-full text-left text-sm">
-                                    <thead class="border-b border-white/50 bg-primary/5">
+                                <table class="app-table w-full text-left text-sm">
+                                    <thead>
                                         <tr>
                                             <th class="px-5 py-3 font-semibold text-charcoal/60">Case</th>
                                             <th class="px-5 py-3 font-semibold text-charcoal/60">Order</th>
@@ -103,7 +97,7 @@
                                             <th class="px-5 py-3"></th>
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-white/50">
+                                    <tbody>
                                         @foreach ($returns as $return)
                                             <tr class="transition hover:bg-white/40">
                                                 <td class="px-5 py-4 font-semibold">#{{ $return->id }}</td>

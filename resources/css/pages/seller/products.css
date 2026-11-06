@@ -60,16 +60,8 @@
         @apply w-full text-left text-sm;
     }
 
-    .products-table thead {
-        @apply border-b border-white/50 bg-primary/5;
-    }
-
     .products-table th {
         @apply px-5 py-3 font-semibold text-charcoal/60;
-    }
-
-    .products-table tbody {
-        @apply divide-y divide-white/50;
     }
 
     .products-table tbody tr {
@@ -108,10 +100,6 @@
 
     .variant-table td {
         @apply px-2 py-1.5 align-top;
-    }
-
-    .variant-table tbody tr {
-        @apply border-t border-white/50;
     }
 
     /* Archived variant: dimmed, still editable so it can be re-activated */

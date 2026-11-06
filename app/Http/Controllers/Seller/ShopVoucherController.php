@@ -7,17 +7,19 @@ use App\Models\ShopVoucher;
 use App\Services\ShopVoucherService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ShopVoucherController extends Controller
 {
     use AuthorizesRequests;
+
     public function index(Request $request)
     {
         $vouchers = $request->user()
             ->shopVouchers()
-            ->withCount('redemptions')
+            ->withCount(['redemptions', 'claims', 'usedClaims'])
             ->latest()
             ->paginate(20);
 
@@ -40,6 +42,7 @@ class ShopVoucherController extends Controller
             'min_purchase_amount' => ['nullable', 'numeric', 'min:0'],
             'max_discount_amount' => ['nullable', 'numeric', 'min:0'],
             'total_quantity' => ['nullable', 'integer', 'min:1'],
+            'claim_limit' => ['nullable', 'integer', 'min:1'],
             'per_buyer_limit' => ['nullable', 'integer', 'min:1'],
             'starts_at' => ['nullable', 'date'],
             'expires_at' => ['nullable', 'date', 'after:starts_at'],
@@ -81,7 +84,7 @@ class ShopVoucherController extends Controller
     public function show(Request $request, ShopVoucher $shopVoucher)
     {
         $this->authorize('view', $shopVoucher);
-        $shopVoucher->load(['redemptions.buyer', 'redemptions.order']);
+        $shopVoucher->load(['redemptions.buyer', 'redemptions.order'])->loadCount(['claims', 'usedClaims']);
         $stats = [
             'total_redemptions' => $shopVoucher->redemptions()->whereIn('status', ['applied', 'used'])->count(),
             'total_discount' => $shopVoucher->redemptions()->whereIn('status', ['applied', 'used'])->sum('discount_amount'),
@@ -109,7 +112,8 @@ class ShopVoucherController extends Controller
             'discount_value' => ['required', 'numeric', 'min:0.01'],
             'min_purchase_amount' => ['nullable', 'numeric', 'min:0'],
             'max_discount_amount' => ['nullable', 'numeric', 'min:0'],
-            'total_quantity' => ['nullable', 'integer', 'min:' . $shopVoucher->used_quantity],
+            'total_quantity' => ['nullable', 'integer', 'min:'.$shopVoucher->used_quantity],
+            'claim_limit' => ['nullable', 'integer', 'min:1'],
             'per_buyer_limit' => ['nullable', 'integer', 'min:1'],
             'starts_at' => ['nullable', 'date'],
             'expires_at' => ['nullable', 'date', 'after:starts_at'],
@@ -137,7 +141,16 @@ class ShopVoucherController extends Controller
         $data['per_buyer_limit'] = $data['per_buyer_limit'] ?? 1;
         $data['min_purchase_amount'] = $data['min_purchase_amount'] ?? 0;
 
-        $shopVoucher->update($data);
+        DB::transaction(function () use ($shopVoucher, $data): void {
+            $locked = ShopVoucher::whereKey($shopVoucher->id)->lockForUpdate()->firstOrFail();
+            if (($data['claim_limit'] ?? null) !== null && $data['claim_limit'] < $locked->claims()->count()) {
+                throw ValidationException::withMessages(['claim_limit' => 'The claim limit cannot be below the number already claimed.']);
+            }
+            if (($data['total_quantity'] ?? null) !== null && $data['total_quantity'] < $locked->used_quantity) {
+                throw ValidationException::withMessages(['total_quantity' => 'The quantity cannot be below the number already used.']);
+            }
+            $locked->update($data);
+        });
 
         return redirect()->route('seller.vouchers.index')->with('status', 'Voucher updated successfully.');
     }

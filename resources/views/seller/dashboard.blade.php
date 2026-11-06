@@ -25,13 +25,7 @@
                 class="frost-panel-solid sticky top-0 z-10 flex h-16 items-center justify-between gap-3 px-4 sm:h-20 sm:px-6">
 
                 <div class="flex min-w-0 items-center gap-2 sm:gap-3">
-                    <button type="button" data-sidebar-toggle aria-label="Open menu"
-                        class="shrink-0 rounded-xl p-2 text-charcoal/60 transition hover:bg-white/70 hover:text-primary lg:hidden">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
+                    <x-nav.toggle target="workspace-navigation" />
 
                     <div class="min-w-0">
                         <h2 class="truncate text-base font-bold text-charcoal sm:text-xl">
@@ -350,7 +344,7 @@
                             No orders yet — new orders will appear here once buyers start purchasing.
                         </div>
                     @else
-                        <div class="divide-y divide-white/60">
+                        <div class="app-table-body">
                             @foreach ($recentOrders as $order)
                                 <a href="{{ route('seller.orders.show', $order) }}"
                                     class="flex flex-col gap-2 rounded-xl px-2 py-3 transition hover:bg-white/50 sm:flex-row sm:items-center sm:justify-between sm:gap-4">

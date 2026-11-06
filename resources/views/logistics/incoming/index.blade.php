@@ -28,8 +28,8 @@
             </div>
         @else
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm">
-                    <thead class="border-b border-white/50 bg-primary/5">
+                <table class="app-table w-full text-left text-sm">
+                    <thead>
                         <tr>
                             <th class="px-5 py-3 font-semibold text-charcoal/60">Order</th>
                             <th class="px-5 py-3 font-semibold text-charcoal/60">Seller</th>
@@ -38,7 +38,7 @@
                             <th class="px-5 py-3 font-semibold text-charcoal/60"></th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-white/50">
+                    <tbody>
                         @foreach ($orders as $order)
                             <tr class="transition hover:bg-white/40">
                                 <td class="px-5 py-4 font-semibold text-charcoal">#{{ $order->id }}</td>

@@ -1,0 +1,2642 @@
+LANDING FOLLOW-UP ? CURRENT FULL FILES
+Hero removed; categories restored with existing images; shared wide container and scroll reveals.
+Deleted follow-up asset: public/images/hero/landing-shopping.webp
+Earlier deletions are recorded in landing-link-audit.md.
+
+
+================================================================================
+app/Http/Controllers/LandingController.php
+================================================================================
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Services\PublicCatalog;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+class LandingController extends Controller
+{
+    public function index(Request $request, PublicCatalog $catalog): View
+    {
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'category' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        return view('landing.index', [
+            'categories' => config('shopleap_categories.list', []),
+            'bestSellers' => $catalog->featured(),
+            'recommended' => $catalog->discover($filters['search'] ?? '', $filters['category'] ?? ''),
+        ]);
+    }
+}
+
+
+================================================================================
+app/Http/Controllers/Buyer/HomeController.php
+================================================================================
+<?php
+
+namespace App\Http\Controllers\Buyer;
+
+use App\Http\Controllers\Controller;
+use App\Services\PublicCatalog;
+use Illuminate\Http\Request;
+
+class HomeController extends Controller
+{
+    public function index(Request $request, PublicCatalog $catalog)
+    {
+        $categories = config('shopleap_categories.list');
+
+        $bestSellers = $catalog->featured();
+
+        $recommended = $catalog->query()->paginate(16)->withQueryString();
+
+        $cartItems = $request->user()->cartItems()
+            ->with(['product.images', 'product.liveDiscount', 'variant'])
+            ->latest()
+            ->get();
+
+        $cartCount = $cartItems->sum('quantity');
+        $cartPreviewItems = $cartItems->take(3);
+
+        return view('Buyer.home', compact(
+            'categories',
+            'bestSellers',
+            'recommended',
+            'cartCount',
+            'cartPreviewItems'
+        ));
+    }
+}
+
+
+================================================================================
+app/Http/Controllers/Auth/LoginController.php
+================================================================================
+<?php
+
+namespace App\Http\Controllers\Auth;
+
+use App\Http\Controllers\Controller;
+use App\Models\BuyerProfile;
+use App\Models\LogisticsProfile;
+use App\Models\SellerProfile;
+use App\Models\User;
+use App\Services\OtpService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+
+class LoginController extends Controller
+{
+    protected array $validRoles = ['buyer', 'seller', 'logistics'];
+
+    protected function checkRole(string $role): void
+    {
+        abort_unless(in_array($role, $this->validRoles), 404);
+    }
+
+    // â”€â”€ LOGIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    public function create(Request $request)
+    {
+        if ($request->query('continue') === 'landing') {
+            $filters = $request->validate([
+                'search' => ['nullable', 'string', 'max:100'],
+                'category' => ['nullable', 'string', 'max:100'],
+            ]);
+            $request->session()->put('url.intended', route('home', $filters));
+            $request->session()->flash('status', 'Please log in to continue');
+        } elseif ($request->session()->has('url.intended')) {
+            $request->session()->flash('status', 'Please log in to continue');
+        }
+
+        return view('auth.login');
+    }
+
+    public function store(Request $request)
+    {
+        $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required'],
+        ]);
+
+        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+            return back()->withErrors([
+                'email' => 'These credentials do not match our records.',
+            ])->onlyInput('email');
+        }
+
+        $user = Auth::user();
+
+        if (is_null($user->email_verified_at)) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()->withErrors([
+                'email' => 'Please verify your email before logging in.',
+            ])->onlyInput('email');
+        }
+
+        // Couriers must sign in through the Shopleap Rider app.
+        if ($user->role === 'courier') {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()->withErrors([
+                'email' => 'Riders sign in through the Shopleap Rider app.',
+            ])->onlyInput('email');
+        }
+
+        $profile = match ($user->role) {
+            'seller' => $user->sellerProfile,
+            'buyer' => $user->buyerProfile,
+            'logistics' => $user->logisticsProfile,
+            default => null,
+        };
+
+        if ($profile && $profile->status !== 'approved') {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            $message = $profile->status === 'rejected'
+                ? 'Your registration was not approved. Please contact support for details.'
+                : "Your registration is still pending administrator approval. You'll be notified by email once reviewed.";
+
+            return back()->withErrors([
+                'email' => $message,
+            ])->onlyInput('email');
+        }
+
+        if ($user->account_status !== 'active') {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            $message = $user->account_status === 'suspended'
+                ? 'Your account has been suspended. Please contact support.'
+                : 'Your account has been deactivated.';
+
+            return back()->withErrors([
+                'email' => $message,
+            ])->onlyInput('email');
+        }
+
+        $request->session()->regenerate();
+
+        return match ($user->role) {
+            'super_admin' => redirect()->intended(route('admin.dashboard')),
+            'seller' => redirect()->intended(route('seller.dashboard')),
+            'buyer' => redirect()->intended(route('buyer.home')),
+            'logistics' => redirect()->intended(route('logistics.dashboard')),
+            default => redirect()->intended(route('home')),
+        };
+    }
+
+    public function destroy(Request $request)
+    {
+        Auth::guard('web')->logout();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->route('login');
+    }
+
+    // â”€â”€ REGISTRATION STEP 2: OTP VERIFY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    public function showOtpForm(string $role)
+    {
+        $this->checkRole($role);
+
+        $pending = session('pending_registration');
+
+        abort_if(
+            ! $pending || $pending['role'] !== $role,
+            403,
+            'Please start registration again.'
+        );
+
+        return view('auth.verify-otp', [
+            'role' => $role,
+            'email' => $pending['email'],
+        ]);
+    }
+
+    public function verifyOtp(
+        Request $request,
+        string $role,
+        OtpService $otpService
+    ) {
+        $this->checkRole($role);
+
+        $request->validate([
+            'otp' => 'required|digits:6',
+        ]);
+
+        $pending = session('pending_registration');
+
+        abort_if(
+            ! $pending || $pending['role'] !== $role,
+            403,
+            'Please start registration again.'
+        );
+
+        [$ok, $message] = $otpService->verify(
+            $pending['email'],
+            $role,
+            $request->otp
+        );
+
+        if (! $ok) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => $message,
+                ], 422);
+            }
+
+            return back()->withErrors([
+                'otp' => $message,
+            ]);
+        }
+
+        DB::transaction(function () use ($pending, $role) {
+            $user = User::create(
+                $pending['user'] + ['email_verified_at' => now()]
+            );
+
+            $profileData = $pending['profile'] + [
+                'user_id' => $user->id,
+            ];
+
+            match ($role) {
+                'buyer' => BuyerProfile::create($profileData),
+                'seller' => SellerProfile::create($profileData),
+                'logistics' => LogisticsProfile::create($profileData),
+            };
+        });
+
+        session()->forget('pending_registration');
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => 'verified',
+            ]);
+        }
+
+        return redirect()->route('login')->with(
+            'status',
+            "Email verified and registration submitted! Please wait for the administrator's approval â€” you'll be notified by email."
+        );
+    }
+
+    public function resendOtp(
+        Request $request,
+        string $role,
+        OtpService $otpService
+    ) {
+        $this->checkRole($role);
+
+        $pending = session('pending_registration');
+
+        abort_if(
+            ! $pending || $pending['role'] !== $role,
+            403,
+            'Please start registration again.'
+        );
+
+        $otpService->generateAndSend($pending['email'], $role);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => 'A new code has been sent.',
+            ]);
+        }
+
+        return back()->with('status', 'A new code has been sent.');
+    }
+}
+
+
+================================================================================
+app/Services/PublicCatalog.php
+================================================================================
+<?php
+
+namespace App\Services;
+
+use App\Models\Product;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Cache;
+
+class PublicCatalog
+{
+    public function query(): Builder
+    {
+        return Product::active()->with(['images', 'seller.sellerProfile', 'liveDiscount', 'variants'])->latest();
+    }
+
+    public function featured(): Collection
+    {
+        return Cache::remember('public-catalog.featured.v1', 60, fn (): Collection => $this->query()->take(8)->get());
+    }
+
+    public function discover(string $search, string $category): Collection
+    {
+        $key = 'public-catalog.discover.v1.'.hash('sha256', json_encode([$search, $category]));
+
+        return Cache::remember($key, 60, fn (): Collection => $this->query()
+            ->when($search !== '', fn (Builder $query): Builder => $query->where('name', 'like', '%'.$search.'%'))
+            ->when($category !== '', fn (Builder $query): Builder => $query->where('category', $category))
+            ->take(16)->get());
+    }
+}
+
+
+================================================================================
+config/landing.php
+================================================================================
+<?php
+
+return [
+    'nav' => [
+        ['label' => 'Home', 'href' => '#home'],
+        ['label' => 'Categories', 'href' => '#categories'],
+        ['label' => 'Products', 'href' => '#deals'],
+        ['label' => 'How it works', 'href' => '#how-it-works'],
+    ],
+];
+
+
+================================================================================
+resources/views/landing/index.blade.php
+================================================================================
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopleap | Browse Categories &amp; Products</title>
+    <meta name="description" content="Discover products from Shopleap sellers. Browse categories, shop with Cash on Delivery, or start selling on Shopleap.">
+    <link rel="canonical" href="{{ route('home') }}">
+    <meta property="og:title" content="Shopleap | Browse Categories &amp; Products">
+    <meta property="og:description" content="Browse categories and discover products from Shopleap sellers.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ route('home') }}">
+    <meta property="og:image" content="{{ asset('images/Shopleap-Logo.png') }}">
+    <link rel="icon" href="{{ asset('images/Shopleap-Logo.png') }}">
+    @vite(['resources/css/app.css', 'resources/css/landing.css', 'resources/js/app.js'])
+</head>
+<body x-data class="landing-page bg-white font-sans text-charcoal">
+    <x-nav.guest :landing="true" class="landing-navigation" />
+    <main id="home">
+        <div class="site-container space-y-8 py-5 sm:space-y-10 sm:py-6">
+            <section id="categories" aria-labelledby="categories-heading">
+                <h1 id="categories-heading" class="mb-4 text-xl font-bold sm:text-2xl">Categories</h1>
+                <div class="landing-grid">
+                    @forelse ($categories as $category)
+                        <x-landing.category-tile :category="$category" :index="$loop->index" />
+                    @empty
+                        <p class="col-span-full text-sm text-charcoal/70">Categories will appear here soon.</p>
+                    @endforelse
+                </div>
+            </section>
+            <section x-reveal id="deals" aria-labelledby="products-heading">
+                <h2 id="products-heading" class="mb-4 text-lg font-bold">Featured products</h2>
+                <x-landing.product-grid :products="$bestSellers" />
+            </section>
+            <section x-reveal id="discover" aria-labelledby="discover-heading">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 id="discover-heading" class="text-lg font-bold">Daily Discover</h2><a href="{{ route('home') }}#deals" class="btn btn-outline">Clear filters</a></div>
+                @if (request()->filled('search') || request()->filled('category'))<p class="mb-4 text-sm">Results for {{ request('search') ?: request('category') }}</p>@endif
+                <x-landing.product-grid :products="$recommended" />
+            </section>
+            <section x-reveal id="how-it-works" aria-labelledby="how-heading">
+                <h2 id="how-heading" class="mb-4 text-lg font-bold">How it works</h2>
+                <ol class="grid gap-4 sm:grid-cols-3">
+                    @foreach (['Browse products and find something you love.', 'Create an account and order with Cash on Delivery.', 'Track delivery from your account.'] as $step)
+                        <li class="rounded border border-line p-5"><span class="mb-3 block text-lg font-bold text-primary">0{{ $loop->iteration }}</span>{{ $step }}</li>
+                    @endforeach
+                </ol>
+            </section>
+            <section x-reveal class="flex flex-wrap items-center justify-between gap-5 rounded border border-line bg-ice-blue p-6"><div><h2 class="text-xl font-bold">Make room for your next chapter.</h2><p class="mt-2 max-w-prose text-sm text-charcoal/75">Bring your products to Shopleap. Apply for a seller account.</p></div><a href="{{ route('register.seller') }}" class="btn btn-primary">Sell on Shopleap</a></section>
+        </div>
+    </main>
+    <footer class="border-t border-line bg-white"><div class="site-container py-7"><nav aria-label="Footer" class="flex flex-wrap gap-4"><a class="btn btn-outline" href="{{ route('terms') }}">Terms and Conditions</a><a class="btn btn-outline" href="{{ route('privacy') }}">Privacy Policy</a><a class="btn btn-outline" href="{{ route('register.seller') }}">Become a seller</a><a class="btn btn-outline" href="{{ route('register.logistics') }}">Logistics partner</a></nav><p class="mt-5 text-xs text-charcoal/70">&copy; {{ now()->year }} Shopleap. All rights reserved.</p></div></footer>
+</body>
+</html>
+
+
+================================================================================
+resources/views/components/Buyer/header.blade.php
+================================================================================
+@props([
+    'cartCount' => null,
+    'cartPreviewItems' => null,
+])
+
+@php
+    $headerUser = auth()->user();
+
+    // Compute cart data only when the page didn't pass it in.
+    if ($cartCount === null || $cartPreviewItems === null) {
+        $cartPreviewItems = $headerUser
+            ? $headerUser->cartItems()->with('product')->latest()->take(5)->get()
+            : collect();
+        $cartCount = $headerUser ? $headerUser->cartItems()->count() : 0;
+    }
+
+    // One query per request, shared with the wishlist hearts on the page.
+    $wishlistIds = app(\App\Support\WishlistIds::class);
+    $wishlistCount = $wishlistIds->count();
+
+    $wishlistPayload = [
+        'ids' => $wishlistIds->all(),
+        'count' => $wishlistCount,
+        'url' => route('buyer.wishlist.store', '__ID__'),
+        'loginUrl' => route('login'),
+    ];
+@endphp
+
+@vite('resources/js/components/buyer-header.js')
+
+<x-nav.shell id="buyer-navigation" variant="buyer" label="Buyer navigation">
+    <x-slot:brand><x-nav.brand :href="route('buyer.home')" /></x-slot:brand>
+    <x-slot:location>    <a href="{{ route('buyer.account.index') }}#address" data-buyer-header-location
+        class="block truncate border-b border-white/15 px-4 py-2 text-xs md:hidden">
+        {{ $headerUser?->defaultAddress ? ($headerUser->defaultAddress->label ?: 'Deliver to') . ', ' . $headerUser->defaultAddress->city_municipality : 'Add delivery address' }}
+    </a>
+
+</x-slot:location>
+    <x-slot:desktopLinks><x-nav.link :href="route('buyer.account.index').'#address'">Delivery address</x-nav.link><x-nav.link :href="route('buyer.orders.index', ['tab' => 'to_deliver'])">Track My Order</x-nav.link></x-slot:desktopLinks>
+    <x-slot:utilityActions>                {{-- Notifications --}}
+                <x-notification-bell-script />
+
+                <div id="buyer-notification-feed" class="relative" @click.outside="open = false" @keydown.escape.window="open = false"
+                    x-data="shopleapBell({
+                        unread: {{ (int) ($headerUser?->unreadNotifications()->count() ?? 0) }},
+                        feedUrl: @js(route('notifications.feed', [], false)),
+                        readUrl: @js(route('notifications.read', ['id' => '__ID__'], false)),
+                        readAllUrl: @js(route('notifications.read-all', [], false)),
+                        allUrl: @js(route('notifications.index', [], false)),
+                        csrf: @js(csrf_token()),
+                    })">
+                    <button type="button" @click="toggle()"
+                        class="relative flex items-center gap-1.5 rounded-lg py-1.5 pl-2 pr-3 transition-colors hover:bg-white/10">
+                        <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
+                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                        <span>Notifications</span>
+                    </button>
+
+                    <div x-show="open" x-cloak x-transition
+                        class="absolute right-0 mt-2 w-80 overflow-hidden rounded-xl border border-line bg-white p-4 text-charcoal shadow-lg">
+                        <p class="mb-1 text-sm font-bold text-charcoal">Notifications</p>
+
+                        {{-- The notifications: click one to open the page it is about --}}
+                        <div class="-mx-4 max-h-80 divide-y divide-line overflow-y-auto">
+                            <template x-for="item in items" :key="item.id">
+                                <button type="button" @click="go(item)"
+                                    class="flex w-full items-start gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-ice-blue"
+                                    :class="item.read ? '' : 'bg-primary/5'">
+                                    <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                                        :class="item.read ? 'bg-transparent' : 'bg-primary'"></span>
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block text-xs"
+                                            :class="item.read ? 'font-semibold text-charcoal/80' : 'font-bold text-charcoal'"
+                                            x-text="item.title"></span>
+                                        <span class="mt-0.5 line-clamp-2 block text-xs text-charcoal/70"
+                                            x-text="item.body"></span>
+                                        <span class="mt-0.5 block text-[11px] text-charcoal/60"
+                                            x-text="item.time"></span>
+                                    </span>
+                                </button>
+                            </template>
+                        </div>
+
+                        {{-- Empty state --}}
+                        <div x-show="!items.length" class="flex flex-col items-center py-6 text-center">
+                            <svg class="h-9 w-9 text-charcoal/20" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            </svg>
+                            <p class="mt-2 text-xs text-charcoal/60"
+                                x-text="loading ? 'LoadingÃ¢â‚¬Â¦' : (failed ? 'Could not load notifications' : 'No notifications yet')">
+                                No notifications yet</p>
+                        </div>
+
+                        <div x-show="items.length" x-cloak
+                            class="-mx-4 -mb-4 mt-1 flex items-center justify-between border-t border-line bg-ice-blue px-4 py-2.5 text-xs font-semibold">
+                            <button type="button" x-show="unread > 0" @click="markAll()"
+                                class="text-primary hover:underline">Mark all as read</button>
+                            <a href="{{ route('notifications.index') }}"
+                                class="ml-auto text-primary hover:underline">View all</a>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Vouchers removed from header; available in profile dropdown --}}
+
+                {{-- Help --}}
+                <a href="{{ route('messages.support') }}" title="Help"
+                    class="flex items-center gap-1.5 rounded-lg py-1.5 pl-2 pr-3 transition-colors hover:bg-white/10">
+                    <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
+                            d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Help</span>
+                </a>
+
+                {{-- Profile dropdown --}}
+                <div id="buyer-desktop-profile" class="relative" x-data="{ open: false }" @click.outside="open = false"
+                    :class="{ 'z-[100]': open, 'z-10': !open }">
+                    <button type="button" @click="open = !open" :aria-expanded="open"
+                        class="relative flex items-center gap-2 rounded-lg py-1 pl-1 pr-2.5 transition-colors hover:bg-white/10">
+                        <div
+                            class="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-white text-xs font-bold text-primary">
+                            @if ($headerUser?->avatar_url)
+                                <img src="{{ $headerUser->avatar_url }}" alt=""
+                                    class="h-full w-full object-cover">
+                            @else
+                                {{ strtoupper(substr($headerUser->name ?? 'B', 0, 1)) }}
+                            @endif
+                        </div>
+                        <span class="max-w-[100px] truncate text-xs font-medium">
+                            {{ $headerUser->name ?? 'Buyer' }}
+                        </span>
+                    </button>
+
+                    <div x-show="open" x-cloak x-transition
+                        class="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-line bg-white py-1.5 text-charcoal shadow-lg">
+                        <a href="{{ route('buyer.account.index') }}"
+                            class="block px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue">My Account</a>
+                        <a href="{{ route('buyer.orders.index') }}"
+                            class="block px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue">Purchases</a>
+                        <a href="{{ route('buyer.wishlist.index') }}"
+                            class="block px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue">Wishlist</a>
+                        <a href="{{ route('buyer.vouchers.index') }}"
+                            class="block px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue">Vouchers</a>
+                        <a href="{{ route('messages.index') }}"
+                            class="block px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue">Chat / Messages</a>
+
+                        <div class="my-1 h-px bg-line"></div>
+
+                        <button type="button" aria-label="Log out" class="nav-item w-full" @click="$dispatch('open-logout-modal', { navigationId: 'buyer-navigation', trigger: $el })">Log out</button>
+                    </div>
+                </div>
+</x-slot:utilityActions>
+    <x-slot:search><x-nav.search :buyer="true" /></x-slot:search>
+    <x-slot:actions>        {{-- WISHLIST: mobile only (desktop uses the profile dropdown). Delete this block to remove it. --}}
+        <a href="{{ route('buyer.wishlist.index') }}" aria-label="Wishlist"
+            class="relative block shrink-0 rounded-lg p-2.5 transition-colors hover:bg-white/10 md:hidden">
+            <svg class="h-5.5 w-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path
+                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+            <span x-show="$store.wishlist.count > 0" x-cloak x-text="$store.wishlist.count"
+                class="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-sm bg-white px-1 text-[10px] font-bold text-primary">{{ $wishlistCount }}</span>
+        </a>
+
+        {{-- CART --}}
+        <div class="group relative shrink-0">
+            <a href="{{ route('buyer.cart.index') }}" aria-label="Cart"
+                class="relative block rounded-lg p-2.5 transition-colors hover:bg-white/10">
+                <svg class="h-5.5 w-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6"
+                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span id="buyerCartBadge"
+                    class="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-sm bg-white px-1 text-[10px] font-bold text-primary">
+                    {{ $cartCount }}
+                </span>
+            </a>
+
+            {{-- Hover preview: desktop only --}}
+            <div
+                class="invisible absolute right-0 top-full z-50 hidden w-80 -translate-y-1 overflow-hidden rounded-xl border border-line bg-white text-charcoal opacity-0 shadow-lg transition-all duration-150 md:block md:group-hover:visible md:group-hover:translate-y-0 md:group-hover:opacity-100">
+                <p class="border-b border-line px-4 py-3 text-sm font-bold">
+                    {{ $cartCount }} {{ $cartCount === 1 ? 'item' : 'items' }} in your cart
+                </p>
+
+                @if ($cartPreviewItems->isEmpty())
+                    <p class="px-4 py-6 text-center text-xs text-charcoal/60">Your cart is empty.</p>
+                @else
+                    <div class="max-h-64 overflow-y-auto">
+                        @foreach ($cartPreviewItems as $item)
+                            <div class="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0">
+                                <div
+                                    class="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-line bg-ice-blue">
+                                    @if ($item->product->main_image_url)
+                                        <img src="{{ $item->product->main_image_url }}"
+                                            alt="{{ $item->product->name }}" class="h-full w-full object-cover">
+                                    @endif
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-xs text-charcoal">{{ $item->product->name }}</p>
+                                    <p class="text-xs font-bold tabular-nums text-primary">
+                                        {{ $item->quantity }} Ãƒâ€” Ã¢â€šÂ±{{ number_format($item->product->display_price, 2) }}
+                                    </p>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                <div class="border-t border-line bg-ice-blue p-3">
+                    <a href="{{ route('buyer.cart.index') }}"
+                        class="block w-full rounded-lg bg-primary px-4 py-2.5 text-center text-xs font-bold text-white transition-colors hover:bg-primary/90">
+                        View Cart
+                    </a>
+                </div>
+            </div>
+        </div>
+
+</x-slot:actions>
+    <x-slot:mobileUser><div id="buyer-mobile-profile"><x-nav.user-menu id="buyer-mobile-profile-menu" /></div></x-slot:mobileUser>
+    <x-slot:mobileMenu>
+        <x-nav.link :href="route('buyer.home')">Home</x-nav.link>
+        <x-nav.link :href="route('buyer.products.index')">Browse products</x-nav.link>
+        <x-nav.link :href="route('buyer.account.index')">My Account</x-nav.link>
+        <x-nav.link :href="route('buyer.orders.index')">Purchases</x-nav.link>
+        <x-nav.link :href="route('buyer.wishlist.index')">Wishlist</x-nav.link>
+        <x-nav.link :href="route('buyer.vouchers.index')">Vouchers</x-nav.link>
+        <x-nav.link :href="route('messages.index')">Messages</x-nav.link>
+        <x-nav.link :href="route('notifications.index')">Notifications</x-nav.link>
+    </x-slot:mobileMenu>
+</x-nav.shell>
+
+{{-- WISHLIST: seed data for the Alpine store (must stay after </header>) --}}
+<script id="wishlistData" type="application/json">@json($wishlistPayload)</script>
+
+{{-- WISHLIST / FOLLOW: shared toast for page-level action feedback --}}
+<div x-data="{
+    show: false,
+    message: '',
+    error: false,
+    timer: null,
+    notify(detail) {
+        this.message = detail.message;
+        this.error = detail.error;
+        this.show = true;
+        clearTimeout(this.timer);
+        this.timer = setTimeout(() => (this.show = false), 3000);
+    },
+}" @wishlist-toast.window="notify($event.detail)"
+    @seller-follow-toast.window="notify($event.detail)" x-show="show" x-cloak x-transition role="status"
+    aria-live="polite" :class="error ? 'bg-sale-red' : 'bg-charcoal'"
+    class="fixed bottom-20 right-3 z-[80] max-w-[calc(100vw-1.5rem)] rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg sm:bottom-6 sm:right-6 sm:max-w-sm">
+    <span x-text="message"></span>
+</div>
+
+
+================================================================================
+resources/views/components/Buyer/product-card.blade.php
+================================================================================
+@props(['product'])
+
+@php
+    // Only a real markdown counts: was_price must be higher than what the buyer pays.
+    $hasDiscount = $product->was_price && $product->was_price > $product->display_price;
+    $discountPct = $hasDiscount
+        ? round((($product->was_price - $product->display_price) / $product->was_price) * 100)
+        : null;
+
+    $reviewCount = (int) ($product->reviews_count ?? 0);
+    $currentTime = now();
+    $isNew = $product->created_at?->gt($currentTime->copy()->subDay())
+        && $product->created_at->lte($currentTime);
+@endphp
+
+<div
+    class="group relative flex h-full flex-col overflow-hidden rounded-xl border border-line bg-white transition-colors hover:border-primary">
+
+    <a href="{{ route('buyer.products.show', $product) }}" class="flex flex-1 flex-col">
+
+        <!-- IMAGE -->
+        <div class="relative aspect-[5/4] w-full overflow-hidden bg-ice-blue">
+            @if ($product->main_image_url)
+                <img src="{{ $product->main_image_url }}" alt="{{ $product->name }}" loading="lazy" width="400" height="320"
+                    class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105">
+            @else
+                <div class="flex h-full w-full items-center justify-center text-charcoal/25">
+                    <svg class="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16v14H4V6z" />
+                    </svg>
+                </div>
+            @endif
+
+            @if ($hasDiscount)
+                <span
+                    class="absolute left-2 top-2 rounded-sm bg-sale-red px-1.5 py-1 text-[11px] font-bold leading-none text-white">
+                    -{{ $discountPct }}%
+                </span>
+            @endif
+        </div>
+
+        <!-- DETAILS -->
+        <div class="flex flex-1 flex-col p-2.5 sm:p-3">
+
+            <p class="line-clamp-2 min-h-[2.4rem] text-[13px] leading-snug text-charcoal">{{ $product->name }}</p>
+
+            <div class="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span class="text-[15px] font-bold tabular-nums text-primary sm:text-base">
+                    â‚±{{ number_format($product->display_price) }}
+                </span>
+                @if ($hasDiscount)
+                    <span class="text-[11px] tabular-nums text-charcoal/50 line-through">
+                        â‚±{{ number_format($product->was_price) }}
+                    </span>
+                @endif
+            </div>
+
+            {{-- Rating when the query provides it; otherwise a "New" tag for recent listings. --}}
+            @if ($reviewCount > 0)
+                <p class="mt-1.5 flex items-center gap-1 text-[11px] text-charcoal/60">
+                    <span class="text-amber-400">â˜…</span>
+                    <span
+                        class="font-semibold text-charcoal/80">{{ number_format($product->reviews_avg_rating, 1) }}</span>
+                    <span>({{ number_format($reviewCount) }})</span>
+                </p>
+            @elseif ($isNew)
+                <p class="mt-1.5">
+                    <span
+                        class="inline-block rounded-sm border border-leaf-green/40 bg-leaf-green/10 px-1.5 py-0.5 text-[10px] font-semibold text-charcoal">
+                        New Arrival
+                    </span>
+                </p>
+            @endif
+
+            @if ($product->seller_location)
+                <p class="mt-auto flex items-center gap-1 pt-2 text-[11px] text-charcoal/60">
+                    <svg class="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span class="truncate">{{ $product->seller_location }}</span>
+                </p>
+            @endif
+
+        </div>
+    </a>
+
+    @isset($actions)
+        <div class="px-2.5 pb-2.5 sm:px-3 sm:pb-3">
+            {{ $actions }}
+        </div>
+    @endisset
+
+    {{-- Sibling of the link, not a child: valid HTML and independently focusable. --}}
+    @if (auth()->user()?->role === 'buyer')
+        <x-Buyer.wishlist-button :product="$product" class="absolute right-2 top-2 z-10" />
+    @elseif (auth()->guest())
+        <a href="{{ route('login', array_merge(['continue' => 'landing'], request()->only(['search', 'category']))) }}" aria-label="Log in to save {{ $product->name }}" class="absolute right-2 top-2 z-10 flex size-10 items-center justify-center rounded border border-line bg-white text-primary"><span aria-hidden="true">?</span></a>
+    @endif
+</div>
+
+
+================================================================================
+resources/views/components/landing/product-grid.blade.php
+================================================================================
+@props(['products'])
+<div class="landing-grid">
+    @forelse ($products as $product)
+        <div x-reveal="{{ $loop->index }}" class="landing-product landing-card min-w-0"><x-Buyer.product-card :product="$product" /></div>
+    @empty
+        <p class="col-span-full rounded border border-line bg-ice-blue p-6 text-sm text-charcoal/70">No products found. Try another category or check back as sellers add products.</p>
+    @endforelse
+</div>
+
+
+================================================================================
+resources/views/components/nav/guest.blade.php
+================================================================================
+@props(['landing' => false, 'links' => null])
+@php
+    $links = $links ?? array_merge(config('landing.nav', []), [
+        ['href' => route('register.seller'), 'label' => 'Become a seller'],
+        ['href' => route('register.logistics'), 'label' => 'Logistics partner'],
+        ['href' => route('terms'), 'label' => 'Terms'],
+        ['href' => route('privacy'), 'label' => 'Privacy'],
+    ]);
+    $links = array_map(fn ($link) => array_merge($link, ['href' => !$landing && str_starts_with($link['href'], '#') ? route('home').$link['href'] : $link['href']]), $links);
+@endphp
+<x-nav.shell id="guest-navigation" variant="buyer" label="Main navigation" {{ $attributes }}>
+    <x-slot:brand><x-nav.brand /></x-slot:brand>
+    <x-slot:desktopLinks><x-nav.dropdown id="guest-explore" label="Explore Shopleap">@foreach ($links as $link)<x-nav.link :href="$link['href']">{{ $link['label'] }}</x-nav.link>@endforeach</x-nav.dropdown></x-slot:desktopLinks>
+    <x-slot:utilityActions><a href="{{ route('register.seller') }}" class="text-xs text-white">Become a seller</a><a href="{{ route('register.logistics') }}" class="ml-4 text-xs text-white">Logistics partner</a></x-slot:utilityActions>
+    <x-slot:search><x-nav.search /></x-slot:search>
+    <x-slot:actions><x-nav.link :href="route('login')">Login</x-nav.link><x-nav.link :href="route('register.buyer')">Register</x-nav.link></x-slot:actions>
+    <x-slot:mobileMenu>@foreach ($links as $link)<x-nav.link :href="$link['href']">{{ $link['label'] }}</x-nav.link>@endforeach<x-nav.link :href="route('login')">Login</x-nav.link><x-nav.link :href="route('register.buyer')">Register</x-nav.link></x-slot:mobileMenu>
+</x-nav.shell>
+
+
+================================================================================
+resources/views/components/nav/search.blade.php
+================================================================================
+@props(['buyer' => false])
+<div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
+<form id="{{ $buyer ? 'buyerSearchForm' : 'guestSearchForm' }}" action="{{ route($buyer ? 'buyer.products.index' : 'home') }}" method="GET" class="flex min-h-11 overflow-hidden rounded-lg bg-white">
+    <input type="search" @focus="open = true" id="{{ $buyer ? 'buyerSearchInput' : 'guestSearchInput' }}" name="search" value="{{ request('search') }}" maxlength="100" placeholder="Search products" aria-label="Search products" class="min-w-0 w-full px-3 py-2.5 text-sm text-charcoal outline-none">
+    <button type="submit" aria-label="Search" class="min-h-10 shrink-0 bg-sky-blue px-3 text-white"><svg class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-width="2" d="m21 21-5-5M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0" /></svg></button>
+</form>
+@if ($buyer)
+    <div x-show="open" x-cloak class="absolute inset-x-0 top-full z-50 mt-2 rounded border border-line bg-white p-3 text-charcoal">
+        <div id="recentSearchesSection" class="hidden"><div class="mb-2 flex justify-between"><p class="text-xs font-semibold">Recent searches</p><button id="clearRecentSearchesBtn" type="button" class="min-h-10 px-3 text-xs text-primary">Clear</button></div><div id="recentSearchesList" class="flex flex-wrap gap-2"></div></div>
+        <p class="text-xs text-charcoal/70">Search by product name to find your next everyday essential.</p>
+    </div>
+@endif
+</div>
+
+
+================================================================================
+resources/css/landing.css
+================================================================================
+.landing-navigation .nav-brand a { color: var(--color-surface); }
+.landing-navigation .nav-bar .nav-actions > .nav-item { color: var(--color-surface); }
+.landing-navigation .nav-bar .nav-actions > .nav-item:hover { background: var(--color-sky-blue); }
+.landing-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+@media (min-width: 640px) { .landing-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 768px) { .landing-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .landing-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .landing-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.landing-page { overflow-wrap: anywhere; }
+.landing-page main section { scroll-margin-top: 10rem; }
+.landing-category { color: var(--color-charcoal); }
+.landing-card { border-radius: var(--radius-lg); }
+.landing-product > div { border-radius: var(--radius-lg); }
+.landing-card:focus-within { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.landing-navigation.is-scrolled .nav-bar { box-shadow: 0 3px 10px color-mix(in srgb, var(--color-charcoal) 12%, transparent); }
+@media (prefers-reduced-motion: no-preference) {
+    html:has(.landing-page) { scroll-behavior: smooth; }
+    .landing-card { transition: transform 250ms ease-out, box-shadow 250ms ease-out; }
+    .landing-category, .landing-page .btn { transition: color 250ms ease-out, background-color 250ms ease-out, border-color 250ms ease-out; }
+    .landing-category { transition: transform 250ms ease-out, box-shadow 250ms ease-out, border-color 250ms ease-out, color 250ms ease-out; }
+    .landing-card img { transition: transform 250ms ease-out; }
+    .landing-page .reveal-animating { transition: opacity 300ms ease-out, transform 300ms ease-out; transition-delay: var(--reveal-delay, 0ms); will-change: opacity, transform; }
+    .js-ready .landing-page .reveal-pending { opacity: 0; transform: translateY(20px); }
+    .js-ready .landing-page .reveal-pending:focus-within { opacity: 1; transform: none; }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .landing-card:hover { transform: translateY(-3px); box-shadow: 0 5px 14px color-mix(in srgb, var(--color-charcoal) 10%, transparent); }
+    .landing-category:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .landing-card:hover img { transform: scale(1.035); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .landing-page *, .landing-page *::before, .landing-page *::after { transition: none !important; animation: none !important; }
+    .landing-page .reveal-pending { opacity: 1; transform: none; }
+}
+
+
+================================================================================
+resources/css/navbar.css
+================================================================================
+/* Navigation layering: page headers <= 30; nav 32; scrim 40; drawer 45;
+   dropdown 48; existing page modals >= 50; logout dialog 90. */
+.nav-shell, .nav-panel { --nav-control-font-size: .9375rem; }
+.nav-shell { color: var(--nav-text); }
+.nav-shell-top { position: sticky; top: 0; z-index: var(--z-nav); }
+.nav-bar { background: var(--nav-bg); border-bottom: 1px solid var(--nav-border); padding-top: env(safe-area-inset-top); }
+.nav-bar-row { display: flex; align-items: center; gap: .75rem; min-height: 4rem; max-width: 80rem; padding: .5rem 1rem; margin: auto; }
+.nav-brand { min-width: 0; flex-shrink: 1; }
+.nav-actions { display: flex; align-items: center; gap: .375rem; margin-left: auto; flex-shrink: 0; }
+.nav-toggle { align-items: center; justify-content: center; min-width: 40px; min-height: 40px; padding: .5rem; }
+.nav-desktop-links { display: none; }
+.nav-item { display: flex; align-items: center; gap: .625rem; min-height: 40px; border-radius: var(--radius-sm); padding: .625rem .75rem; color: var(--nav-text); font-size: var(--nav-control-font-size); font-weight: 400; line-height: 1.5; text-decoration: none; }
+.nav-item:hover, .nav-dropdown-toggle:hover { background: var(--nav-link-hover); }
+.nav-item.is-active { background: var(--nav-active); color: var(--color-primary); font-weight: 400; }
+.nav-item:focus-visible, .nav-shell button:focus-visible, .nav-panel button:focus-visible, .nav-panel a:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.nav-badge { flex-shrink: 0; border-radius: var(--radius-sm); background: var(--color-sale-red); color: var(--color-surface); padding: .125rem .375rem; font-size: .625rem; }
+.nav-overlay { position: fixed; inset: 0; z-index: var(--z-nav-overlay); background: var(--nav-overlay); }
+.nav-panel { position: fixed; inset: 0 auto 0 0; z-index: var(--z-nav-panel); display: flex; flex-direction: column; width: min(18rem, calc(100vw - 1.5rem)); height: 100dvh; padding-top: env(safe-area-inset-top); padding-bottom: max(.75rem, env(safe-area-inset-bottom)); background: var(--nav-bg); color: var(--nav-text); border-right: 1px solid var(--nav-border); overflow-y: auto; overscroll-behavior: contain; }
+.nav-panel-sidebar { transform: translateX(-100%); transition: transform .2s ease; }
+.nav-panel-sidebar[data-open="true"] { transform: translateX(0); }
+.nav-mobile-heading, .nav-sidebar-brand { display: flex; align-items: center; justify-content: space-between; gap: .5rem; min-height: 4rem; padding: .75rem; border-bottom: 1px solid var(--nav-border); }
+.nav-mobile-links, .nav-sidebar-links { flex: 1; overflow-y: auto; padding: .75rem; }
+.nav-sidebar-actions { border-top: 1px solid var(--nav-border); padding: .75rem; }
+.nav-search-row { max-width: 80rem; margin: auto; padding: 0 1rem .75rem; }
+.nav-dropdown { position: relative; min-width: 0; }
+.nav-dropdown-toggle { display: flex; align-items: center; gap: .5rem; min-height: 40px; max-width: 100%; font-size: var(--nav-control-font-size); font-weight: 400; }
+.nav-dropdown-menu { position: static; width: 100%; min-width: 0; border: 1px solid var(--nav-border); border-radius: var(--radius-sm); background: var(--nav-bg); padding: .375rem; color: var(--nav-text); }
+.nav-avatar { display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; overflow: hidden; border-radius: 50%; background: var(--nav-active); color: var(--color-primary); font-size: .75rem; flex-shrink: 0; }
+.nav-logout-overlay { position: fixed; inset: 0; z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); overflow-y: auto; background: var(--nav-overlay); }
+.nav-logout-overlay > section { max-height: calc(100dvh - 2rem); overflow-y: auto; }
+.nav-user-section { display: flex; align-items: center; gap: .375rem; min-width: 0; }
+.nav-user-identity { display: flex; flex: 1; align-items: center; gap: .5rem; min-width: 0; max-width: 13rem; min-height: 40px; border-radius: var(--radius-sm); }
+.nav-user-logout { display: flex; align-items: center; flex: 1; min-width: 0; min-height: 40px; gap: .75rem; padding: .375rem; border-radius: var(--radius-sm); text-align: left; color: inherit; font-size: var(--nav-control-font-size); font-weight: 400; line-height: 1.5; cursor: pointer; }
+.nav-user-logout { border: 1px solid var(--nav-border); }
+.nav-user-logout:hover { background: var(--nav-link-hover); }
+.nav-user-logout:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.nav-user-role { display: block; font-size: .6875rem; opacity: .65; }
+.nav-logout-icon { color: var(--color-sale-red); }
+.nav-user-section > .nav-dropdown { flex-shrink: 0; width: auto; }
+.nav-user-section .nav-dropdown-toggle { justify-content: center; min-width: 40px; padding: .5rem; }
+.nav-user-section .nav-dropdown-menu { position: absolute; right: 0; bottom: calc(100% + .5rem); width: 15rem; max-width: calc(100vw - 3rem); z-index: var(--z-nav-dropdown); }
+.nav-shell-top .buyer-header-utility .nav-user-section .nav-dropdown-menu { top: calc(100% + .5rem); bottom: auto; }
+@media (min-width: 1024px) {
+    .nav-shell-sidebar[data-collapsed="true"] .nav-user-section { flex-wrap: wrap; justify-content: center; }
+    .nav-shell-sidebar[data-collapsed="true"] .nav-user-logout { flex-direction: column; gap: .375rem; }
+    .nav-shell-sidebar[data-collapsed="true"] .nav-user-identity > .min-w-0 { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .nav-logout-overlay { transition: none !important; } }
+.nav-panel .nav-dropdown { width: 100%; }
+.nav-panel .nav-user-section > .nav-dropdown { width: auto; }
+.nav-panel .nav-dropdown-toggle { width: 100%; justify-content: space-between; }
+@media (min-width: 1024px) {
+    .nav-shell .nav-toggle.lg\:hidden { display: none; }
+    .nav-desktop-links { display: flex; align-items: center; gap: .25rem; }
+    .nav-shell-sidebar { position: sticky; top: 0; width: 16rem; height: 100dvh; flex-shrink: 0; }
+    .nav-panel-sidebar { position: sticky; top: 0; width: 100%; transform: none; z-index: 20; }
+    .nav-shell-sidebar[data-collapsed="true"] { width: 5rem; }
+    .nav-shell-sidebar[data-collapsed="true"] .nav-label, .nav-shell-sidebar[data-collapsed="true"] .nav-section { display: none; }
+    .nav-shell-sidebar[data-collapsed="true"] .nav-sidebar-brand { flex-wrap: wrap; justify-content: center; }
+    .nav-shell-sidebar[data-collapsed="true"] .nav-item { justify-content: center; }
+    .nav-shell-top .nav-dropdown-menu { position: absolute; right: 0; top: calc(100% + .375rem); z-index: var(--z-nav-dropdown); width: 16rem; max-width: calc(100vw - 2rem); box-shadow: 0 4px 16px color-mix(in srgb, var(--color-charcoal) 8%, transparent); }
+}
+@media (max-width: 1023px) { .nav-actions .nav-label { display: none; } .nav-panel .nav-label { display: initial; } }
+@media (max-width: 374px) { .nav-bar-row { gap: .375rem; padding-inline: .5rem; } .nav-brand .nav-label { display: none; } }
+@media (prefers-reduced-motion: reduce) { .nav-panel { transition: none; } }
+
+@media (max-width: 1023px) {
+    .nav-shell-top .nav-actions .nav-dropdown-menu { position: fixed; inset: calc(4rem + env(safe-area-inset-top)) .75rem auto; width: auto; max-height: 65dvh; overflow-y: auto; z-index: var(--z-nav-dropdown); }
+}
+
+/* Buyer storefront: restore its branded utility row and inline product search.
+   Overrides stay inside the header; teleported mobile drawers retain white surfaces. */
+.buyer-header .nav-bar {
+    --nav-bg: var(--color-primary);
+    --nav-text: var(--color-surface);
+    --nav-border: color-mix(in srgb, var(--color-surface) 15%, transparent);
+    --nav-link-hover: color-mix(in srgb, var(--color-surface) 10%, transparent);
+    color: var(--nav-text);
+}
+.buyer-header-utility { display: none; }
+.buyer-header-location { max-width: 80rem; margin: auto; padding: .5rem 1rem; font-size: .6875rem; line-height: 1rem; color: var(--color-surface); }
+.buyer-header { --nav-control-font-size: .8125rem; }
+.buyer-header .nav-bar-row { min-height: 3.5rem; gap: .5rem; }
+.buyer-header .nav-brand .font-logo { font-size: 1.375rem; font-weight: 400; }
+.buyer-header .nav-brand img { width: 1.75rem; height: 1.75rem; }
+.buyer-header .nav-brand { display: block; flex-shrink: 0; }
+.buyer-header-search { min-width: 0; flex: 1; }
+.buyer-header #buyerSearchForm { min-height: 44px; border: 1px solid var(--color-line); }
+.buyer-header #buyerSearchForm:focus-within { outline: 2px solid var(--color-surface); outline-offset: 3px; }
+.buyer-header #buyerSearchForm > button { background: var(--color-primary); border-color: transparent; margin: .25rem; border-radius: var(--radius-md); }
+.buyer-header #buyerSearchForm > button:hover { background: var(--color-sky-blue); }
+.buyer-search-suggestions { z-index: var(--z-nav-dropdown); }
+.buyer-cart-label { display: none; font-size: .8125rem; font-weight: 400; }
+.buyer-header #buyer-cart-preview { padding: 0; overflow: visible; border-radius: var(--radius-xl); box-shadow: 0 12px 32px color-mix(in srgb, var(--color-charcoal) 14%, transparent); }
+.buyer-header #buyer-cart-preview > :first-child { border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
+.buyer-header #buyer-cart-preview > :last-child { border-radius: 0 0 var(--radius-xl) var(--radius-xl); }
+.buyer-header .nav-bar .nav-toggle,
+.buyer-header .nav-bar .nav-dropdown-toggle { border-color: transparent; background: transparent; color: var(--color-surface); box-shadow: none; }
+.buyer-header .nav-bar .nav-toggle:hover,
+.buyer-header .nav-bar .nav-dropdown-toggle:hover { background: var(--nav-link-hover); }
+.buyer-header .nav-actions { gap: .125rem; }
+.buyer-header .nav-actions .nav-item,
+.buyer-header .nav-actions .nav-dropdown-toggle { position: relative; justify-content: center; min-width: 40px; min-height: 40px; padding: .625rem; }
+.buyer-header .nav-actions .nav-dropdown-toggle > svg:last-child { display: none; }
+.buyer-header .nav-bar .nav-badge { background: var(--color-surface); color: var(--color-primary); font-size: .5625rem; line-height: 1rem; padding: 0 .25rem; }
+.buyer-header .nav-bar .nav-avatar { background: var(--color-surface); color: var(--color-primary); }
+.buyer-header .nav-bar .nav-item.is-active { background: var(--nav-link-hover); color: var(--color-surface); }
+.buyer-header .nav-dropdown-menu {
+    --nav-bg: var(--color-surface);
+    --nav-text: var(--color-charcoal);
+    --nav-border: var(--color-line);
+    --nav-link-hover: var(--color-ice-blue);
+    padding: .375rem;
+}
+.buyer-header .nav-dropdown-menu .nav-item.is-active { color: var(--color-primary); background: var(--nav-active); }
+.buyer-header .nav-bar button:focus-visible,
+.buyer-header .nav-bar > .nav-bar-row > .nav-actions a:focus-visible { outline-color: var(--color-surface); }
+.buyer-header .nav-dropdown-menu button:focus-visible,
+.buyer-header .nav-dropdown-menu a:focus-visible { outline-color: var(--color-primary); }
+@media (min-width: 1024px) {
+    .buyer-header-utility { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 2.5rem; max-width: 80rem; margin: auto; padding: 0 2rem; }
+    .buyer-header-utility .nav-item { padding: .375rem .5rem; }
+    .buyer-header-utility .nav-dropdown-toggle { padding: .25rem .5rem; }
+    .buyer-header-utility .nav-avatar { width: 1.5rem; height: 1.5rem; }
+    .buyer-header-location { display: none; }
+    .buyer-header .nav-brand { display: block; flex-shrink: 0; margin-right: 1rem; }
+    .buyer-header .nav-bar-row { min-height: 4rem; padding: .5rem 2rem; gap: 1rem; }
+    .buyer-header .nav-actions { margin-left: .25rem; gap: .375rem; }
+    .buyer-header .nav-actions .nav-dropdown-menu { width: 20rem; }
+    .buyer-header .buyer-cart-label { display: inline; }
+    .buyer-header .nav-actions .nav-dropdown-toggle { gap: .625rem; padding-inline: 1rem; border: 1px solid var(--nav-border); }
+    .buyer-header .buyer-header-utility { border-bottom: 1px solid var(--nav-border); }
+    .buyer-header-utility .nav-user-role { display: none; }
+    .buyer-header-utility .nav-user-logout { border-color: transparent; }
+    .buyer-header-utility .nav-logout-icon { color: var(--color-surface); opacity: .8; }
+}
+@media (max-width: 1023px) {
+    .buyer-header .nav-bar-row { flex-wrap: wrap; gap: .5rem; padding: .5rem 1rem .75rem; }
+    .buyer-header .nav-brand { flex: 1; }
+    .buyer-header .nav-brand .font-logo { font-size: 1.25rem; }
+    .buyer-header-search { flex-basis: 100%; order: 4; }
+    .buyer-header .nav-actions { margin-left: 0; }
+    .buyer-header-location { padding-block: .5rem; border-bottom: 1px solid var(--nav-border); }
+    .buyer-header .nav-actions .nav-dropdown-menu { top: calc(7rem + env(safe-area-inset-top)); max-height: calc(100dvh - 8rem); }
+}
+
+.buyer-header [data-nav-dropdown]:has(#buyer-notification-feed) > .nav-dropdown-toggle { position: relative; justify-content: center; min-width: 40px; padding: .5rem; }
+.buyer-header [data-nav-dropdown]:has(#buyer-notification-feed) > .nav-dropdown-toggle > svg:last-child { display: none; }
+
+/* Keep buyer controls compact, including menus teleported outside the header. */
+:is(#buyer-desktop-profile, #buyer-mobile-profile, #buyer-cart-preview, #buyer-notification-feed) {
+    --nav-control-font-size: .8125rem;
+    font-size: .8125rem;
+    font-weight: 400;
+}
+.buyer-header [data-nav-dropdown]:has(#buyer-desktop-profile) > .nav-dropdown-toggle {
+    font-size: var(--nav-control-font-size);
+    font-weight: 400;
+}
+:is(#buyer-desktop-profile, #buyer-mobile-profile, #buyer-cart-preview, #buyer-notification-feed) :is(.nav-item, button) {
+    min-height: 44px;
+    font-size: var(--nav-control-font-size);
+    line-height: 1.5;
+    font-weight: 400;
+}
+
+/* Bridge the small visual gap so the cart preview stays open as the pointer enters it. */
+.buyer-header #buyer-cart-preview::before { content: ''; position: absolute; inset: -.5rem 0 100%; }
+
+.buyer-header .nav-brand a { color: var(--color-surface); }
+
+.buyer-header :is(.nav-bar-row, .buyer-header-utility, .buyer-header-location).site-container {
+    max-width: var(--site-max-width);
+    padding-inline: var(--site-gutter);
+}
+
+
+================================================================================
+resources/js/pages/landing/landing.js
+================================================================================
+let registered = false;
+
+export function registerLandingEffects(Alpine) {
+    if (registered || !document.body.classList.contains('landing-page')) { return; }
+    registered = true;
+
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const pending = new Set();
+    const timers = new Map();
+    let observer;
+
+    function finish(element) {
+        pending.delete(element);
+        observer?.unobserve(element);
+        clearTimeout(timers.get(element));
+        timers.delete(element);
+        element.classList.remove('reveal-pending', 'reveal-animating');
+        element.style.removeProperty('--reveal-delay');
+    }
+
+    function show(element) {
+        element.classList.add('reveal-animating');
+        element.classList.remove('reveal-pending');
+        observer?.unobserve(element);
+        timers.set(element, setTimeout(() => finish(element), 650));
+    }
+
+    try {
+        if ('IntersectionObserver' in window) {
+            observer = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) { show(entry.target); }
+                });
+            }, { threshold: 0.05 });
+            document.documentElement.classList.add('js-ready');
+        }
+    } catch {
+        // Progressive enhancement: unsupported observers leave all content visible.
+    }
+
+    Alpine.directive('reveal', (element, { expression }, { cleanup }) => {
+        if (!observer || motion.matches) { return; }
+        const bounds = element.getBoundingClientRect();
+        if (bounds.top < window.innerHeight && bounds.bottom > 0) { return; }
+
+        const columns = getComputedStyle(element.parentElement).gridTemplateColumns.split(' ').length;
+        const delay = (Number(expression) || 0) % Math.max(1, columns) * 60;
+        element.style.setProperty('--reveal-delay', `${delay}ms`);
+        observer.observe(element);
+        pending.add(element);
+        element.classList.add('reveal-pending');
+        const focus = () => finish(element);
+        element.addEventListener('focusin', focus, { once: true });
+        cleanup(() => {
+            finish(element);
+            element.removeEventListener('focusin', focus);
+        });
+    });
+
+    motion.addEventListener('change', () => {
+        if (motion.matches) { [...pending].forEach(finish); }
+    });
+
+    const header = document.querySelector('.landing-navigation');
+    if (header) {
+        let scheduled = false;
+        const updateHeader = () => {
+            header.classList.toggle('is-scrolled', window.scrollY > 8);
+            scheduled = false;
+        };
+        updateHeader();
+        window.addEventListener('scroll', () => {
+            if (!scheduled) { scheduled = true; requestAnimationFrame(updateHeader); }
+        }, { passive: true });
+    }
+}
+
+
+================================================================================
+tests/Feature/LandingPageTest.php
+================================================================================
+<?php
+
+use App\Models\Product;
+use App\Services\PublicCatalog;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Str;
+
+beforeEach(function () {
+    $this->withoutVite();
+});
+
+it('renders the public landing page with empty states and real guest destinations', function () {
+    $this->mock(PublicCatalog::class, function ($mock) {
+        $mock->shouldReceive('featured')->once()->andReturn(new Collection);
+        $mock->shouldReceive('discover')->with('', '')->once()->andReturn(new Collection);
+    });
+    config(['shopleap_categories.list' => []]);
+
+    $response = $this->get(route('home'))->assertOk()
+        ->assertSee('Categories will appear here soon.')
+        ->assertSee('No products found.')
+        ->assertSee(route('register.buyer'), false)
+        ->assertSee(route('register.seller'), false)
+        ->assertSee(route('register.logistics'), false)
+        ->assertSee(route('terms'), false)
+        ->assertSee(route('privacy'), false)
+        ->assertDontSee('Rider')->assertDontSee('rider')
+        ->assertDontSee('href="#"', false);
+
+    expect(substr_count($response->getContent(), '<h1'))->toBe(1);
+});
+
+it('allows guests to search and filter the public catalog', function () {
+    $this->mock(PublicCatalog::class, function ($mock) {
+        $mock->shouldReceive('featured')->andReturn(new Collection);
+        $mock->shouldReceive('discover')->with('lamp', 'Home and Garden')->once()->andReturn(new Collection);
+    });
+
+    $this->get(route('home', ['search' => 'lamp', 'category' => 'Home and Garden']))
+        ->assertOk()->assertSee('Results for lamp');
+});
+
+it('renders public product cards without querying private buyer data', function () {
+    $product = new Product(['name' => 'Public lamp', 'price' => 350, 'status' => 'active']);
+    $product->id = 99;
+    $product->setRelation('images', new Collection);
+    $product->setRelation('variants', new Collection);
+    $product->setRelation('seller', null);
+    $product->setRelation('liveDiscount', null);
+    $this->mock(PublicCatalog::class, function ($mock) use ($product) {
+        $mock->shouldReceive('featured')->andReturn(new Collection([$product]));
+        $mock->shouldReceive('discover')->andReturn(new Collection);
+    });
+
+    $this->get(route('home'))->assertOk()->assertSee('Public lamp')
+        ->assertSee(route('buyer.products.show', 99), false)
+        ->assertSee(route('login', ['continue' => 'landing']), false);
+});
+
+it('stores a safe return destination and a login message for guest save actions', function () {
+    $this->get(route('login', ['continue' => 'landing']))->assertOk()
+        ->assertSessionHas('url.intended', route('home'))
+        ->assertSee('Please log in to continue');
+});
+
+it('keeps existing buyer product and shop detail routes protected', function () {
+    $this->get(route('buyer.products.show', 99))->assertRedirect(route('login'));
+    $this->get(route('buyer.shop.show', 99))->assertRedirect(route('login'));
+});
+
+it('rejects malformed public filters before querying the catalog', function () {
+    $this->getJson(route('home', ['search' => ['bad']]))->assertUnprocessable();
+});
+
+it('preserves landing search filters in the safe intended URL', function () {
+    $filters = ['search' => 'lamp', 'category' => 'Home and Garden'];
+    $this->get(route('login', array_merge(['continue' => 'landing'], $filters)))
+        ->assertOk()->assertSessionHas('url.intended', route('home', $filters));
+});
+
+it('starts with image categories and removes the former hero', function () {
+    $this->mock(PublicCatalog::class, function ($mock) {
+        $mock->shouldReceive('featured')->andReturn(new Collection);
+        $mock->shouldReceive('discover')->andReturn(new Collection);
+    });
+
+    $response = $this->get(route('home'))->assertOk()
+        ->assertDontSee('Start shopping')->assertDontSee('landing-shopping.webp')
+        ->assertSee('class="site-container', false)->assertSee('x-reveal', false);
+    $html = $response->getContent();
+    foreach (config('shopleap_categories.list') as $category) {
+        $slug = Str::slug(str_replace(['&', "'"], ['and', ''], $category['name']));
+        $response->assertSee(asset('images/categories/'.$slug.'.png'), false);
+        expect(file_exists(public_path('images/categories/'.$slug.'.png')))->toBeTrue();
+    }
+    expect(substr_count($html, 'width="96" height="96"'))->toBe(14);
+    expect(substr_count($html, 'loading="eager"'))->toBe(6);
+    expect(substr_count($html, 'loading="lazy"'))->toBe(8);
+    expect(strpos($html, 'id="categories"'))->toBeLessThan(strpos($html, 'id="deals"'));
+});
+
+
+================================================================================
+resources/css/app.css
+================================================================================
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600&display=swap');
+@import 'tailwindcss';
+@import './navbar.css';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Logo wordmark (used by <x-logo /> via the font-logo class) */
+    --font-logo: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+
+    --nav-bg: var(--color-surface);
+    --nav-text: var(--color-charcoal);
+    --nav-link-hover: var(--color-ice-blue);
+    --nav-active: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+    --nav-border: var(--color-line);
+    --nav-overlay: color-mix(in srgb, var(--color-charcoal) 40%, transparent);
+    --z-nav: 32;
+    --z-nav-overlay: 40;
+    --z-nav-panel: 45;
+    --z-nav-dropdown: 48;
+    --z-modal: 90;
+
+    /* Brand palette */
+    --color-primary: #1A5FB4;
+    --color-sky-blue: #4A90D9;
+    --color-charcoal: #2E3A46;
+    --color-leaf-green: #4CAF7D;
+    --color-sale-red: #E4572E;
+    --color-warning: #F97316;
+    --color-light-gray: #F5F7FA;
+
+    /* Page canvas: an almost-white neutral. Just enough off-white that white
+       cards and their borders still read, without any blue tint. */
+    --color-ice-blue: #F8FAFC;
+
+    /* Surfaces and lines */
+    --color-surface: #FFFFFF;
+    --color-line: #DDE3EA;
+
+    /* Semantic aliases: use these for UI states, not the brand names above */
+    --color-success: var(--color-leaf-green);
+    --color-danger: var(--color-sale-red);
+
+    /*
+    | Radius scale
+    | Overriding Tailwind's defaults means every existing rounded-* class in
+    | every Blade file gets squarer automatically, with no markup changes.
+    |
+    |   rounded-sm        4px   badges, tags
+    |   rounded-md/lg   5-6px   buttons, inputs, dropdowns
+    |   rounded-xl/2xl    8px   cards, panels
+    |   rounded-3xl      12px   modals, large containers
+    |   rounded-full            avatars, dots, switches (unchanged)
+    */
+    --radius-xs: 0.125rem;
+    --radius-sm: 0.25rem;
+    --radius-md: 0.3125rem;
+    --radius-lg: 0.375rem;
+    --radius-xl: 0.5rem;
+    --radius-2xl: 0.5rem;
+    --radius-3xl: 0.75rem;
+    --radius-4xl: 1rem;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Base
+|--------------------------------------------------------------------------
+*/
+@layer base {
+    [x-cloak] {
+        display: none !important;
+    }
+
+    body {
+        background-color: var(--color-ice-blue);
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Typography helpers
+|--------------------------------------------------------------------------
+*/
+@layer components {
+    .text-page-title {
+        @apply text-xl font-bold text-charcoal;
+    }
+
+    .text-section-label {
+        @apply text-xs font-bold uppercase tracking-wide text-primary;
+    }
+
+    /* Raised from /45 to /60 so small labels stay readable on white. */
+    .text-card-label {
+        @apply text-xs font-semibold uppercase tracking-wide text-charcoal/60;
+    }
+
+    .text-card-title {
+        @apply text-sm font-semibold text-charcoal;
+    }
+
+    .text-card-hint {
+        @apply text-xs text-charcoal/60;
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Surface system (formerly "frosted")
+|--------------------------------------------------------------------------
+| Class names are kept so existing pages keep working. Everything is now a
+| flat, solid surface: no gradients, no blur, no translucency.
+*/
+@layer components {
+
+    /* Fixed page background. Plain solid color. Safe to leave the
+       <div class="frost-surface"></div> in layouts until they are cleaned up. */
+    .frost-surface {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        background: var(--color-ice-blue);
+    }
+
+    /* Standard card: dashboard cards, content panels. */
+    .frost-panel {
+        background: var(--color-surface);
+        border: 1px solid var(--color-line);
+        box-shadow: 0 1px 2px color-mix(in srgb, var(--color-charcoal) 5%, transparent);
+    }
+
+    /* Chrome that floats above content: topbar, sidebar, modals, dropdowns. */
+    .frost-panel-solid {
+        background: var(--color-surface);
+        border: 1px solid var(--color-line);
+        box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--color-charcoal) 12%, transparent);
+    }
+
+    /* Small buttons: icon toggles, collapse controls. */
+    .frost-btn {
+        background: var(--color-surface);
+        border: 1px solid var(--color-line);
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    /* Tinted pill: badges, active chips, avatar wells. */
+    .frost-chip {
+        background: color-mix(in srgb, var(--color-primary) 8%, white);
+        border: 1px solid color-mix(in srgb, var(--color-primary) 18%, white);
+    }
+
+    /* Form fields: inputs, textareas, selects. */
+    .frost-input {
+        background: var(--color-surface);
+        border: 1px solid color-mix(in srgb, var(--color-charcoal) 22%, white);
+        color: var(--color-charcoal);
+        box-shadow: 0 1px 2px color-mix(in srgb, var(--color-charcoal) 4%, transparent);
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .frost-input::placeholder {
+        color: color-mix(in srgb, var(--color-charcoal) 55%, transparent);
+    }
+
+    .frost-input:focus-visible {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+        outline: none;
+    }
+
+    /* Validation error. In Blade: aria-invalid="{{ $errors->has('email') ? 'true' : 'false' }}" */
+    .frost-input[aria-invalid="true"] {
+        border-color: var(--color-danger);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger) 15%, transparent);
+    }
+
+    .frost-input:disabled {
+        background: var(--color-light-gray);
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    /* Inner block used for grouped details inside modals and cards. */
+    .modal-section {
+        @apply rounded-xl border border-line bg-ice-blue p-4;
+    }
+
+    .modal-section__title {
+        @apply text-xs font-semibold;
+        color: var(--color-primary);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .frost-input,
+    .frost-btn {
+        transition: none;
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Status badges
+|--------------------------------------------------------------------------
+| One base class + four semantic variants. Map each model status to a
+| variant in PHP (e.g. an enum method badgeVariant()), so a new status
+| never needs new CSS. The dot is drawn by ::before; markup is just text.
+|
+| Usage:  <span class="status-badge badge--success">Approved</span>
+*/
+@layer components {
+
+    .status-badge {
+        --badge-color: var(--color-charcoal);
+
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.25rem 0.625rem;
+        border: 1px solid color-mix(in srgb, var(--badge-color) 28%, white);
+        border-radius: var(--radius-sm);
+        background: color-mix(in srgb, var(--badge-color) 10%, white);
+        color: color-mix(in srgb, var(--badge-color) 80%, black);
+        font-size: 0.75rem;
+        line-height: 1rem;
+        font-weight: 500;
+        text-transform: capitalize;
+    }
+
+    .status-badge::before {
+        content: "";
+        width: 0.375rem;
+        height: 0.375rem;
+        border-radius: 9999px;
+        background: currentColor;
+    }
+
+    .badge--success {
+        --badge-color: var(--color-success);
+    }
+
+    .badge--warning {
+        --badge-color: var(--color-warning);
+    }
+
+    .badge--danger {
+        --badge-color: var(--color-danger);
+    }
+
+    .badge--neutral {
+        --badge-color: var(--color-charcoal);
+    }
+
+    /*
+    | LEGACY ALIASES: keep only until your Blade files are migrated to
+    | badge--* above, then delete this block.
+    */
+    .reg-badge--approved,
+    .acc-badge--active {
+        --badge-color: var(--color-success);
+    }
+
+    .reg-badge--pending,
+    .acc-badge--suspended {
+        --badge-color: var(--color-warning);
+    }
+
+    .reg-badge--rejected {
+        --badge-color: var(--color-danger);
+    }
+
+    .acc-badge--deactivated,
+    .acc-badge--inactive {
+        --badge-color: var(--color-charcoal);
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Pagination
+|--------------------------------------------------------------------------
+*/
+.pagination-frost nav {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.pagination-frost a,
+.pagination-frost span[aria-disabled="true"]>span,
+.pagination-frost span[aria-current="page"]>span {
+    border-radius: var(--radius-lg);
+    border-color: var(--color-line);
+    background: var(--color-surface);
+    color: var(--color-charcoal);
+}
+
+.pagination-frost a:hover {
+    background: color-mix(in srgb, var(--color-primary) 8%, white);
+    color: var(--color-primary);
+}
+
+.pagination-frost a:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.pagination-frost span[aria-current="page"]>span {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+}
+
+
+.variant-value-btn[aria-pressed="true"] {
+    @apply border-primary bg-primary/10 font-bold text-primary;
+}
+@layer components {
+    /*
+    | Shared button system
+    |----------------------
+    | Every button gets its layout from this group. Variants below only change
+    | colour, so `btn btn-primary`, `btn btn-outline`, or a bare `btn-primary`
+    | all render the same size, radius, focus ring and disabled behaviour.
+    */
+    .btn,
+    .btn-primary,
+    .btn-secondary,
+    .btn-danger,
+    .btn-danger-outline,
+    .btn-outline {
+        display: inline-flex;
+        min-height: 2.5rem;
+        max-width: 100%;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.625rem 1rem;
+        border: 1px solid transparent;
+        border-radius: var(--radius-lg);
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.2;
+        text-align: center;
+        text-decoration: none;
+        white-space: normal;
+        transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn:focus-visible,
+    .btn-primary:focus-visible,
+    .btn-secondary:focus-visible,
+    .btn-danger:focus-visible,
+    .btn-danger-outline:focus-visible,
+    .btn-outline:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
+
+    .btn:active:not(:disabled),
+    .btn-primary:active:not(:disabled),
+    .btn-secondary:active:not(:disabled),
+    .btn-danger:active:not(:disabled),
+    .btn-danger-outline:active:not(:disabled),
+    .btn-outline:active:not(:disabled) {
+        transform: translateY(1px);
+    }
+
+    .btn:disabled,
+    .btn-primary:disabled,
+    .btn-secondary:disabled,
+    .btn-danger:disabled,
+    .btn-danger-outline:disabled,
+    .btn-outline:disabled,
+    .btn[aria-disabled='true'] {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .btn-primary {
+        border-color: var(--color-primary);
+        background: var(--color-primary);
+        color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        border-color: var(--color-sky-blue);
+        background: var(--color-sky-blue);
+    }
+
+    .btn-primary:active:not(:disabled) {
+        background: color-mix(in srgb, var(--color-primary) 88%, black);
+    }
+
+    .btn-secondary {
+        border-color: var(--color-charcoal);
+        background: var(--color-charcoal);
+        color: #fff;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--color-charcoal) 82%, white);
+    }
+
+    .btn-secondary:active:not(:disabled) {
+        background: color-mix(in srgb, var(--color-charcoal) 90%, black);
+    }
+
+    .btn-danger {
+        border-color: var(--color-sale-red);
+        background: var(--color-sale-red);
+        color: #fff;
+    }
+
+    .btn-danger:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--color-sale-red) 88%, white);
+    }
+
+    .btn-danger:active:not(:disabled) {
+        background: color-mix(in srgb, var(--color-sale-red) 88%, black);
+    }
+
+    .btn-danger-outline {
+        border-color: color-mix(in srgb, var(--color-sale-red) 35%, white);
+        background: #fff;
+        color: var(--color-sale-red);
+    }
+
+    .btn-danger-outline:hover:not(:disabled) {
+        border-color: color-mix(in srgb, var(--color-sale-red) 55%, white);
+        background: color-mix(in srgb, var(--color-sale-red) 6%, white);
+    }
+
+    .btn-outline {
+        border-color: color-mix(in srgb, var(--color-charcoal) 22%, white);
+        background: #fff;
+        color: var(--color-charcoal);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+        border-color: color-mix(in srgb, var(--color-charcoal) 34%, white);
+        background: color-mix(in srgb, var(--color-charcoal) 5%, white);
+    }
+
+    .btn-outline:active:not(:disabled) {
+        background: color-mix(in srgb, var(--color-charcoal) 9%, white);
+    }
+
+    .btn-sm {
+        min-height: 2.5rem;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.75rem;
+    }
+
+    .btn.is-loading,
+    .btn[aria-busy='true'],
+    .btn-primary[aria-busy='true'],
+    .btn-secondary[aria-busy='true'],
+    .btn-danger[aria-busy='true'],
+    .btn-danger-outline[aria-busy='true'],
+    .btn-outline[aria-busy='true'] {
+        cursor: wait;
+        opacity: 0.85;
+    }
+}
+
+/* Shared full-width content alignment for the storefront and buyer navigation. */
+.site-container {
+    --site-max-width: 100rem;
+    --site-gutter: 1rem;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: var(--site-max-width);
+    min-width: 0;
+    margin-inline: auto;
+    padding-inline: var(--site-gutter);
+}
+@media (min-width: 768px) { .site-container { --site-gutter: 1.5rem; } }
+@media (min-width: 1024px) { .site-container { --site-gutter: 2rem; } }
+
+
+================================================================================
+resources/js/app.js
+================================================================================
+import Alpine from 'alpinejs';
+import { registerLandingEffects } from './pages/landing/landing.js';
+import { notificationBell } from './shared/notifications.js';
+import { navbar, navToggle } from './shared/navigation.js';
+import { voucherCard } from './pages/buyer/vouchers.js';
+import { addressBook } from './shared/buyer-addresses.js';
+import { checkoutPage, voucherCheckout } from './pages/buyer/checkout.js';
+import { termsAgreementState } from './shared/terms-modal.js';
+
+window.Alpine = Alpine;
+Alpine.data('shopleapBell', notificationBell);
+Alpine.data('navbar', navbar);
+Alpine.data('navToggle', navToggle);
+Alpine.data('voucherCard', voucherCard);
+Alpine.data('addressBook', addressBook);
+Alpine.data('checkoutPage', checkoutPage);
+Alpine.data('voucherCheckout', voucherCheckout);
+
+Alpine.data('otpRegistration', (config = {}) => ({
+    ...termsAgreementState(config),
+
+    verifyUrl: config.verifyUrl,
+    resendUrl: config.resendUrl,
+    loginUrl: config.loginUrl,
+
+    init() {
+        this.initTermsAgreement();
+    },
+
+    submitting: false,
+    showOtpModal: false,
+    otpDigits: ['', '', '', '', '', ''],
+    otpError: '',
+    formErrors: [],
+    email: '',
+    verifying: false,
+    resending: false,
+    resendCooldown: 0,
+    resendTimer: null,
+
+    csrfToken() {
+        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    },
+
+    async submitRegistration(event) {
+        if (!this.termsAccepted) {
+            this.openTermsModal();
+            this.termsError =
+                'Please read and agree to the Terms and Conditions and Privacy Policy before continuing.';
+            return;
+        }
+
+        this.termsError = '';
+        this.submitting = true;
+        this.formErrors = [];
+
+        const form = event.target;
+        const formData = new FormData(form);
+
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': this.csrfToken(),
+                    'Accept': 'application/json',
+                },
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (response.status === 422) {
+                const errors = data.errors ?? {};
+                this.formErrors = Object.values(errors).flat();
+
+                if (errors.terms_accepted?.length) {
+                    this.termsError = errors.terms_accepted[0];
+                    this.openTermsModal();
+                }
+
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return;
+            }
+
+            if (!response.ok) {
+                this.formErrors = [data.message || 'Something went wrong. Please try again.'];
+                return;
+            }
+
+            this.email = data.email;
+            this.openOtpModal();
+        } catch (error) {
+            console.error(error);
+            this.formErrors = ['Network error. Please check your connection and try again.'];
+        } finally {
+            this.submitting = false;
+        }
+    },
+
+    openOtpModal() {
+        this.otpDigits = ['', '', '', '', '', ''];
+        this.otpError = '';
+        this.showOtpModal = true;
+        this.startCooldown();
+        this.$nextTick(() => this.$refs.otpInput0?.focus());
+    },
+
+    closeOtpModal() {
+        this.showOtpModal = false;
+        clearInterval(this.resendTimer);
+    },
+
+    handleOtpInput(index, event) {
+        const digit = event.target.value.replace(/[^0-9]/g, '').slice(0, 1);
+        this.otpDigits[index] = digit;
+        event.target.value = digit;
+
+        if (digit && index < 5) {
+            this.$refs['otpInput' + (index + 1)]?.focus();
+        }
+
+        if (this.otpDigits.every((d) => d !== '')) {
+            this.verifyOtp();
+        }
+    },
+
+    handleOtpKeydown(index, event) {
+        if (event.key === 'Backspace' && !this.otpDigits[index] && index > 0) {
+            this.$refs['otpInput' + (index - 1)]?.focus();
+        }
+    },
+
+    handleOtpPaste(event) {
+        const pasted = (event.clipboardData?.getData('text') || '').replace(/[^0-9]/g, '').slice(0, 6);
+        if (!pasted) return;
+        event.preventDefault();
+
+        pasted.split('').forEach((digit, i) => {
+            this.otpDigits[i] = digit;
+            if (this.$refs['otpInput' + i]) this.$refs['otpInput' + i].value = digit;
+        });
+
+        if (pasted.length === 6) {
+            this.verifyOtp();
+        } else {
+            this.$refs['otpInput' + pasted.length]?.focus();
+        }
+    },
+
+    async verifyOtp() {
+        const code = this.otpDigits.join('');
+        if (code.length !== 6 || this.verifying) return;
+
+        this.verifying = true;
+        this.otpError = '';
+
+        try {
+            const response = await fetch(this.verifyUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': this.csrfToken(),
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ otp: code }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                this.otpError = data.message || data.errors?.otp?.[0] || 'Invalid code. Please try again.';
+                this.otpDigits = ['', '', '', '', '', ''];
+                this.$nextTick(() => this.$refs.otpInput0?.focus());
+                return;
+            }
+
+            window.location.href = this.loginUrl;
+        } catch (error) {
+            console.error(error);
+            this.otpError = 'Network error. Please try again.';
+        } finally {
+            this.verifying = false;
+        }
+    },
+
+    startCooldown() {
+        this.resendCooldown = 60;
+        clearInterval(this.resendTimer);
+        this.resendTimer = setInterval(() => {
+            this.resendCooldown--;
+            if (this.resendCooldown <= 0) clearInterval(this.resendTimer);
+        }, 1000);
+    },
+
+    async resendOtp() {
+        if (this.resendCooldown > 0 || this.resending) return;
+
+        this.resending = true;
+        this.otpError = '';
+
+        try {
+            const response = await fetch(this.resendUrl, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': this.csrfToken(),
+                    'Accept': 'application/json',
+                },
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                this.otpError = data.message || 'Could not resend code. Please try again.';
+                return;
+            }
+
+            this.startCooldown();
+        } catch (error) {
+            console.error(error);
+            this.otpError = 'Network error. Please try again.';
+        } finally {
+            this.resending = false;
+        }
+    },
+}));
+
+Alpine.store('wishlist', {
+    ids: {},          // { [productId]: true }
+    count: 0,
+    pending: {},      // { [productId]: true } while a request is in flight
+    url: '',
+    loginUrl: '/login',
+
+    // Alpine calls init() automatically when the store is registered.
+    init() {
+        const el = document.getElementById('wishlistData');
+        if (el) {
+            const data = JSON.parse(el.textContent || '{}');
+            (data.ids || []).forEach((id) => (this.ids[id] = true));
+            this.count = data.count ?? 0;
+            this.url = data.url;
+            this.loginUrl = data.loginUrl || '/login';
+        }
+
+        // Back/forward cache can show a stale heart; refresh when restored.
+        window.addEventListener('pageshow', (e) => {
+            if (e.persisted) window.location.reload();
+        });
+    },
+
+    has(id) {
+        return !!this.ids[id];
+    },
+
+    set(id, on) {
+        if (on) this.ids[id] = true;
+        else delete this.ids[id];
+    },
+
+    headers(json = false) {
+        return {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+            ...(json && { 'Content-Type': 'application/json' }),
+        };
+    },
+
+    toast(message, error = false) {
+        window.dispatchEvent(new CustomEvent('wishlist-toast', { detail: { message, error } }));
+    },
+
+    /** Optimistic toggle: update the UI now, roll back if the server says no. */
+    async toggle(id) {
+        if (this.pending[id]) return;
+
+        const wasOn = this.has(id);
+        this.pending[id] = true;
+        this.set(id, !wasOn);
+        this.count += wasOn ? -1 : 1;
+
+        try {
+            const res = await fetch(this.url.replace('__ID__', id), {
+                method: wasOn ? 'DELETE' : 'POST',
+                headers: this.headers(),
+            });
+
+            if (res.status === 401 || res.status === 419) {
+                window.location.href = this.loginUrl;
+                return;
+            }
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.success === false) {
+                throw new Error(data.message || 'Could not update your wishlist.');
+            }
+
+            this.count = data.wishlist_count; // trust the server's count
+            this.toast(data.message);
+        } catch (e) {
+            this.set(id, wasOn);
+            this.count += wasOn ? 1 : -1;
+            this.toast(e instanceof TypeError ? 'Network error. Please try again.' : e.message, true);
+        } finally {
+            delete this.pending[id];
+        }
+    },
+
+    /** Used by the wishlist page. Calls your existing cart endpoint. */
+    async addToCart(url) {
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: this.headers(true),
+                body: JSON.stringify({ quantity: 1 }),
+            });
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok || data.success === false) {
+                this.toast(data.message || 'Could not add to cart.', true);
+                return;
+            }
+
+            this.toast(data.message);
+            const badge = document.getElementById('buyerCartBadge');
+            if (badge && data.cart_count !== undefined) badge.textContent = data.cart_count;
+        } catch {
+            this.toast('Network error. Please try again.', true);
+        }
+    },
+});
+
+Alpine.store('follow', {
+    ids: {},          // { [sellerId]: true }
+    counts: {},       // { [sellerId]: follower count }
+    total: 0,         // sellers this buyer follows
+    pending: {},      // { [sellerId]: true } while a request is in flight
+    followUrl: '',
+    unfollowUrl: '',
+    loginUrl: '/login',
+
+    init() {
+        const el = document.getElementById('sellerFollowData');
+        if (!el) return;
+
+        const data = JSON.parse(el.textContent || '{}');
+        (data.ids || []).forEach((id) => (this.ids[id] = true));
+        Object.entries(data.counts || {}).forEach(([id, count]) => {
+            this.counts[id] = Number(count);
+        });
+
+        this.total = data.total ?? 0;
+        this.followUrl = data.followUrl;
+        this.unfollowUrl = data.unfollowUrl;
+        this.loginUrl = data.loginUrl || '/login';
+    },
+
+    has(id) {
+        return !!this.ids[id];
+    },
+
+    followerCount(id) {
+        return this.counts[id] ?? 0;
+    },
+
+    /** Seed a seller's state on pages that show a single shop. */
+    prime(id, count, following) {
+        if (this.pending[id]) return;
+
+        if (following) this.ids[id] = true;
+        else delete this.ids[id];
+
+        if (count !== null && count !== undefined) this.counts[id] = Number(count);
+    },
+
+    set(id, following) {
+        if (following) this.ids[id] = true;
+        else delete this.ids[id];
+    },
+
+    headers() {
+        return {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+        };
+    },
+
+    toast(message, error = false) {
+        window.dispatchEvent(new CustomEvent('seller-follow-toast', { detail: { message, error } }));
+    },
+
+    /** Optimistic toggle: update the UI now, roll back if the server says no. */
+    async toggle(id) {
+        if (this.pending[id]) return;
+
+        const wasFollowing = this.has(id);
+        const previousCount = this.followerCount(id);
+        const previousTotal = this.total;
+
+        this.pending[id] = true;
+        this.set(id, !wasFollowing);
+        this.counts[id] = Math.max(0, previousCount + (wasFollowing ? -1 : 1));
+        this.total = Math.max(0, previousTotal + (wasFollowing ? -1 : 1));
+
+        try {
+            const res = await fetch((wasFollowing ? this.unfollowUrl : this.followUrl).replace('__ID__', id), {
+                method: wasFollowing ? 'DELETE' : 'POST',
+                headers: this.headers(),
+            });
+
+            if (res.status === 401 || res.status === 419) {
+                window.location.href = this.loginUrl;
+                return;
+            }
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.success === false) {
+                throw new Error(data.message || 'Could not update your following list.');
+            }
+
+            this.set(id, data.following);
+            this.counts[id] = data.followers_count;
+            this.total = data.following_count;
+            this.toast(data.message);
+        } catch (e) {
+            this.set(id, wasFollowing);
+            this.counts[id] = previousCount;
+            this.total = previousTotal;
+            this.toast(e instanceof TypeError ? 'Network error. Please try again.' : e.message, true);
+        } finally {
+            delete this.pending[id];
+        }
+    },
+});
+
+registerLandingEffects(Alpine);
+Alpine.start();
+
+
+================================================================================
+resources/js/shared/navigation.js
+================================================================================
+const locks = new Set();
+let previousOverflow = '';
+let previousBodyOverflow = '';
+
+function scrollLock(id, enabled) {
+    if (!enabled && !locks.has(id)) { return; }
+    if (enabled && !locks.size) {
+        previousOverflow = document.documentElement.style.overflow;
+        previousBodyOverflow = document.body.style.overflow;
+    }
+    if (enabled) { locks.add(id); } else { locks.delete(id); }
+    document.documentElement.style.overflow = locks.size ? 'hidden' : previousOverflow;
+    document.body.style.overflow = locks.size ? 'hidden' : previousBodyOverflow;
+}
+
+export function navbar(config = {}) {
+    return {
+        id: config.id, desktop: window.innerWidth >= 1024, open: false, collapsed: false, activeDropdown: null, logoutOpen: false,
+        logoutSubmitting: false, logoutTrigger: null, logoutFromMenu: false, returnFocus: null, dropdownTrigger: null, unread: 0, poll: null,
+        init() {
+            try { this.collapsed = localStorage.getItem(`navigation:${this.id}:collapsed`) === 'true'; } catch {}
+            this.$watch('open', () => this.syncLock());
+            this.$watch('logoutOpen', () => this.syncLock());
+            if (config.unreadUrl) {
+                this.refreshUnread();
+                this.poll = setInterval(() => this.refreshUnread(), 20000);
+            }
+        },
+        destroy() { clearInterval(this.poll); scrollLock(this.id, false); },
+        syncLock() { scrollLock(this.id, this.logoutOpen || (this.open && window.innerWidth < 1024)); },
+        toggle(trigger = null) {
+            if (this.logoutOpen) { return; }
+            if (window.innerWidth >= 1024) { return; }
+            if (this.open) { this.close(); return; }
+            this.returnFocus = trigger || document.activeElement;
+            this.activeDropdown = null; this.open = true;
+            this.broadcast();
+            this.$nextTick(() => this.$refs.panel?.querySelector('button, a[href], input')?.focus());
+        },
+        close(restoreFocus = true) {
+            const wasOpen = this.open;
+            this.open = false; this.activeDropdown = null; this.syncLock(); this.broadcast();
+            if (wasOpen && restoreFocus) { this.returnFocus?.focus(); }
+        },
+        broadcast() { window.dispatchEvent(new CustomEvent('navigation-state', { detail: { id: this.id, open: this.open } })); },
+        resize() { this.desktop = window.innerWidth >= 1024; if (this.desktop) { this.close(false); } },
+        collapse() {
+            this.collapsed = !this.collapsed;
+            try { localStorage.setItem(`navigation:${this.id}:collapsed`, String(this.collapsed)); } catch {}
+        },
+        navigate(event) { if (event.target.closest('a[href]')) { this.close(false); } },
+        escape() {
+            if (this.logoutOpen) { this.cancelLogout(); return; }
+            if (this.activeDropdown) { this.activeDropdown = null; this.dropdownTrigger?.focus(); return; }
+            this.close();
+        },
+        dropdown(id, trigger) {
+            this.dropdownTrigger = trigger;
+            this.activeDropdown = this.activeDropdown === id ? null : id;
+        },
+        focusMenu(id, trigger) {
+            this.dropdownTrigger = trigger; this.activeDropdown = id;
+            this.$nextTick(() => trigger.closest('[data-nav-dropdown]')?.querySelector('[data-nav-dropdown-menu] a, [data-nav-dropdown-menu] button')?.focus());
+        },
+        moveMenu(event, direction) {
+            const root = event.target.closest('[data-nav-dropdown-menu]');
+            if (!root) { return; }
+            const items = [...root.querySelectorAll('a[href], button:not([disabled])')];
+            if (!items.length) { return; }
+            event.preventDefault(); items[(items.indexOf(document.activeElement) + direction + items.length) % items.length]?.focus();
+        },
+        trap(event) {
+            if (event.key !== 'Tab' || (!this.open && !this.logoutOpen)) { return; }
+            const root = this.logoutOpen ? this.$refs.logoutDialog : this.$refs.panel;
+            const items = [...(root?.querySelectorAll('a[href], button:not([disabled]), input, select, textarea') || [])].filter(el => el.getClientRects().length);
+            if (!items.length) { event.preventDefault(); root?.focus(); return; }
+            const first = items[0]; const last = items.at(-1);
+            if (event.shiftKey && (document.activeElement === first || !items.includes(document.activeElement))) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && (document.activeElement === last || !items.includes(document.activeElement))) { event.preventDefault(); first.focus(); }
+        },
+        requestLogout(trigger) {
+            if (this.logoutOpen) { return; }
+            this.logoutTrigger = trigger; this.logoutFromMenu = this.open; this.logoutSubmitting = false;
+            this.logoutOpen = true; this.close(false);
+            this.$nextTick(() => this.$refs.logoutDialog?.querySelector('button')?.focus());
+        },
+        cancelLogout() {
+            if (this.logoutSubmitting) { return; }
+            if (this.logoutFromMenu && !this.desktop) { this.open = true; this.broadcast(); }
+            this.logoutOpen = false;
+            this.syncLock();
+            this.$nextTick(() => this.logoutTrigger?.focus());
+        },
+        containLogoutFocus(event) {
+            if (this.logoutOpen && !this.$refs.logoutDialog?.contains(event.target)) {
+                const dialog = this.$refs.logoutDialog;
+                (dialog?.querySelector('button:not([disabled])') || dialog)?.focus();
+            }
+        },
+        confirmLogout(form) {
+            if (!this.logoutOpen || this.logoutSubmitting) { return; }
+            this.logoutSubmitting = true;
+            form.submit();
+        },
+        reset() {
+            this.logoutSubmitting = false; this.logoutOpen = false; this.close(false);
+        },
+        async refreshUnread() {
+            if (document.hidden) { return; }
+            try {
+                const response = await fetch(config.unreadUrl, { headers: { Accept: 'application/json' } });
+                if (response.ok) { this.unread = Number((await response.json()).count) || 0; }
+            } catch { /* Retain the last known count during a temporary network failure. */ }
+        },
+    };
+}
+
+export function navToggle(id) {
+    return { expanded: false, toggle() { window.dispatchEvent(new CustomEvent('navigation-toggle', { detail: { id, trigger: this.$el } })); } };
+}
+
+
+================================================================================
+resources/views/components/nav/shell.blade.php
+================================================================================
+@props(['id', 'sidebar' => false, 'label' => 'Main navigation', 'unreadUrl' => null, 'variant' => 'default'])
+@once
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+@endonce
+<div {{ $attributes->class(['nav-shell', 'nav-shell-sidebar' => $sidebar, 'nav-shell-top' => !$sidebar, 'buyer-header' => $variant === 'buyer']) }}
+    x-data="navbar(@js(['id' => $id, 'unreadUrl' => $unreadUrl]))" :data-collapsed="collapsed"
+    @navigation-toggle.window="if ($event.detail.id === id) toggle($event.detail.trigger)"
+    @open-logout-modal.window="if ($event.detail.navigationId === id) requestLogout($event.detail.trigger)"
+    @focusin.window="containLogoutFocus($event)"
+    @keydown.escape.window="escape()" @keydown.tab.window="trap($event)" @resize.window="resize()" @popstate.window="reset()" @pagehide.window="reset()">
+    @if ($sidebar)
+        <x-nav.mobile-menu :id="$id" :sidebar="true" :label="$label">
+            <div class="nav-sidebar-brand"><div class="nav-brand">{{ $brand }}</div><button type="button" class="btn btn-outline nav-toggle hidden lg:flex" @click="collapse()" :aria-expanded="!collapsed" aria-label="Collapse or expand navigation"><span aria-hidden="true">&#9776;</span></button><button type="button" class="btn btn-outline nav-toggle lg:hidden" @click="close()" aria-label="Close navigation menu">&times;</button></div>
+            <nav aria-label="{{ $label }}" class="nav-sidebar-links">{{ $desktopLinks }}</nav>
+            <div class="nav-sidebar-actions">{{ $actions ?? '' }}</div>
+        </x-nav.mobile-menu>
+    @else
+        <header class="nav-bar" @click="navigate($event)">
+            @if ($variant === 'buyer')
+                <div class="buyer-header-utility site-container">
+                    <nav aria-label="Buyer shortcuts" class="flex min-w-0 items-center gap-2">{{ $desktopLinks ?? '' }}</nav>
+                    <div class="flex shrink-0 items-center gap-2">{{ $utilityActions ?? '' }}</div>
+                </div>
+                @isset($location)<div class="buyer-header-location site-container">{{ $location }}</div>@endisset
+                <div class="nav-bar-row site-container">
+                    <x-nav.toggle :target="$id" />
+                    <div class="nav-brand">{{ $brand }}</div>
+                    <div class="buyer-header-search">{{ $search ?? '' }}</div>
+                    <div class="nav-actions">{{ $actions ?? '' }}</div>
+                </div>
+            @else
+                <div class="nav-bar-row"><x-nav.toggle :target="$id" /><div class="nav-brand">{{ $brand }}</div><nav aria-label="{{ $label }}" class="nav-desktop-links">{{ $desktopLinks ?? '' }}</nav><div class="nav-actions">{{ $actions ?? '' }}</div></div>
+                @isset($search)<div class="nav-search-row">{{ $search }}</div>@endisset
+            @endif
+        </header>
+        <x-nav.mobile-menu :id="$id" :label="$label">
+            {{ $mobileMenu ?? '' }}
+            <x-slot:footer>{{ $mobileUser ?? '' }}</x-slot:footer>
+        </x-nav.mobile-menu>
+    @endif
+    @auth
+        <x-logout-modal :id="$id.'-logout'" />
+    @endauth
+</div>
+
+
+================================================================================
+resources/views/components/nav/link.blade.php
+================================================================================
+@props(['href', 'active' => false, 'icon' => null, 'badge' => null, 'message' => false])
+<a href="{{ $href }}" @if ($active) aria-current="page" @endif {{ $attributes->class(['nav-item', 'is-active' => $active]) }}>
+    @if ($icon)<svg class="size-5 shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="{{ $icon }}" /></svg>@endif
+    <span class="nav-label min-w-0 flex-1">{{ $slot }}</span>
+    @if ($message)<span data-message-badge x-show="unread > 0" x-cloak x-text="unread > 9 ? '9+' : unread" class="nav-badge nav-label"></span>
+    @elseif ($badge)<span class="nav-badge nav-label">{{ $badge }}</span>@endif
+</a>
+
+
+================================================================================
+resources/views/components/nav/mobile-menu.blade.php
+================================================================================
+@props(['id', 'sidebar' => false, 'label' => 'Main navigation'])
+<template x-teleport="body"><div x-show="open" x-cloak x-transition.opacity class="nav-overlay lg:hidden" @click="close()" aria-hidden="true"></div></template>
+@if ($sidebar)
+    <aside x-cloak id="{{ $id }}" x-ref="panel" class="nav-panel nav-panel-sidebar" :data-open="open" :inert="!open && !desktop" @click="navigate($event)">
+        {{ $slot }}
+    </aside>
+@else
+    <template x-teleport="body">
+        <div id="{{ $id }}" x-ref="panel" x-show="open" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full" class="nav-panel nav-panel-mobile lg:hidden" @click.outside="if (open) close()" @click="navigate($event)">
+            <div class="nav-mobile-heading"><span class="font-semibold">{{ $label }}</span><button type="button" class="btn btn-outline nav-toggle" @click="close()" aria-label="Close navigation menu">&times;</button></div>
+            <nav aria-label="{{ $label }}" class="nav-mobile-links">{{ $slot }}</nav>
+            @isset($footer)<div class="nav-sidebar-actions">{{ $footer }}</div>@endisset
+        </div>
+    </template>
+@endif
+
+
+================================================================================
+resources/views/components/nav/toggle.blade.php
+================================================================================
+@props(['target' => 'workspace-navigation'])
+<button type="button" x-data="navToggle(@js($target))" @click="toggle()"
+    @navigation-state.window="if ($event.detail.id === @js($target)) expanded = $event.detail.open"
+    :aria-expanded="expanded" aria-controls="{{ $target }}" :aria-label="expanded ? 'Close navigation menu' : 'Open navigation menu'"
+    {{ $attributes->class(['btn btn-outline nav-toggle lg:hidden']) }}>
+    <svg aria-hidden="true" class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M4 6h16M4 12h16M4 18h16" /></svg>
+</button>
+
+
+================================================================================
+resources/views/components/nav/brand.blade.php
+================================================================================
+@props(['href' => null, 'label' => null])
+<a href="{{ $href ?? route('home') }}" class="flex min-w-0 items-center gap-2 text-primary" aria-label="Shopleap home"><img src="{{ asset('images/Shopleap-Logo.png') }}" alt="" class="size-9 shrink-0 object-contain"><span class="nav-label min-w-0"><span class="block font-logo text-lg font-semibold leading-tight">Shopleap</span>@if ($label)<span class="block truncate text-[10px] text-charcoal/60">{{ $label }}</span>@endif</span></a>
+
+
+================================================================================
+resources/views/components/nav/user-menu.blade.php
+================================================================================
+@props(['items' => [], 'id' => 'navigation-user-menu', 'user' => null])
+@php
+    $user = $user ?? auth()->user();
+@endphp
+@if ($user)
+    <div class="nav-user-section">
+        <button type="button" class="nav-user-logout" aria-label="Log out" title="Log out"
+            @click="$dispatch('open-logout-modal', { navigationId: id, trigger: $el })">
+            <span class="nav-user-identity">
+            <span class="nav-avatar">@if ($user->avatar_url)<img src="{{ $user->avatar_url }}" alt="" class="size-full object-cover">@else{{ mb_substr($user->name, 0, 1) }}@endif</span>
+            <span class="min-w-0"><span class="block truncate">{{ $user->name }}</span><span class="nav-user-role">{{ str($user->role)->replace('_', ' ')->title() }}</span></span>
+            </span>
+            <svg aria-hidden="true" class="nav-logout-icon size-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H5v14h4m5-14 7 7-7 7m7-7H9" /></svg>
+        </button>
+        @if (count($items))
+            <x-nav.dropdown :id="$id" label="More account options">
+                <x-slot:trigger><span class="sr-only">More account options</span></x-slot:trigger>
+                @foreach ($items as $item)<x-nav.link :href="route($item['route'])" :active="request()->routeIs($item['pattern'] ?? preg_replace('/\.index$/', '.*', $item['route']))">{{ $item['label'] }}</x-nav.link>@endforeach
+            </x-nav.dropdown>
+        @endif
+    </div>
+@endif
+
+
+================================================================================
+vite.config.js
+================================================================================
+
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import { bunny } from 'laravel-vite-plugin/fonts';
+import tailwindcss from '@tailwindcss/vite';
+import { globSync } from 'node:fs';
+
+export default defineConfig({
+    plugins: [
+        laravel({
+            input: [
+                // Automatically include all CSS and JavaScript files
+                // inside resources/css and resources/js
+                ...globSync([
+                    'resources/css/**/*.css',
+                    'resources/js/**/*.js',
+                ]),
+            ],
+
+            // Automatically refresh the browser when relevant files change
+            refresh: true,
+
+            // Bunny Fonts
+            fonts: [
+                bunny('Instrument Sans', {
+                    weights: [400, 500, 600],
+                }),
+            ],
+        }),
+
+        // Tailwind CSS v4
+        tailwindcss(),
+    ],
+
+    server: {
+        watch: {
+            // Ignore Laravel's compiled Blade views
+            ignored: ['**/storage/framework/views/**'],
+        },
+    },
+});
+
+
+================================================================================
+resources/views/components/landing/category-tile.blade.php
+================================================================================
+@props(['category', 'index'])
+@php
+    $imageSlug = \Illuminate\Support\Str::slug(str_replace(['&', "'"], ['and', ''], $category['name']));
+@endphp
+<a x-reveal="{{ $index }}" href="{{ route('home', ['category' => $category['name']]) }}#discover"
+    class="landing-category landing-card group flex min-w-0 flex-col items-center gap-3 rounded-lg border border-line bg-white p-3 text-center text-xs font-medium sm:p-4">
+    <span class="flex size-20 items-center justify-center overflow-hidden rounded-md bg-ice-blue sm:size-24">
+        <img src="{{ asset('images/categories/'.$imageSlug.'.png') }}" alt="{{ $category['name'] }}"
+            width="96" height="96" loading="{{ $index < 6 ? 'eager' : 'lazy' }}" decoding="async"
+            class="size-full object-contain">
+    </span>
+    <span class="max-w-40 leading-5">{{ $category['name'] }}</span>
+</a>
+
+
+================================================================================
+tests/Unit/LandingReveal.test.js
+================================================================================
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+function classes(...initial) {
+    const values = new Set(initial);
+    return {
+        add: (...names) => names.forEach(name => values.add(name)),
+        remove: (...names) => names.forEach(name => values.delete(name)),
+        contains: name => values.has(name),
+        toggle: (name, enabled) => enabled ? values.add(name) : values.delete(name),
+    };
+}
+
+let instance = 0;
+async function setup({ reduced = false, supported = true, broken = false, width = 320 } = {}) {
+    let directive;
+    let intersection;
+    let motionChange;
+    const observed = new Set();
+    const motion = { matches: reduced, addEventListener: (_, fn) => { motionChange = fn; } };
+    globalThis.document = {
+        body: { classList: classes('landing-page') },
+        documentElement: { classList: classes() },
+        querySelector: () => null,
+    };
+    globalThis.window = {
+        innerWidth: width, innerHeight: 800,
+        matchMedia: () => motion,
+    };
+    globalThis.getComputedStyle = () => ({ gridTemplateColumns: width < 640 ? '1fr 1fr' : '1fr 1fr 1fr 1fr 1fr 1fr' });
+    if (supported) {
+        globalThis.IntersectionObserver = window.IntersectionObserver = class {
+            constructor(callback) {
+                if (broken) { throw new Error('unavailable'); }
+                intersection = callback;
+            }
+            observe(element) { observed.add(element); }
+            unobserve(element) { observed.delete(element); }
+        };
+    }
+    const { registerLandingEffects } = await import(`../../resources/js/pages/landing/landing.js?test=${++instance}`);
+    registerLandingEffects({ directive: (_, callback) => { directive = callback; } });
+    function element(top) {
+        const style = new Map();
+        const events = new Map();
+        return {
+            classList: classes(), parentElement: {},
+            style: { setProperty: (key, value) => style.set(key, value), removeProperty: key => style.delete(key) },
+            getBoundingClientRect: () => ({ top, bottom: top + 100 }),
+            addEventListener: (name, callback) => events.set(name, callback),
+            removeEventListener: name => events.delete(name),
+            values: style, events,
+        };
+    }
+    function apply(target, index = '') {
+        let dispose;
+        directive(target, { expression: String(index) }, { cleanup: callback => { dispose = callback; } });
+        return dispose;
+    }
+    return { element, apply, observed, enter: target => intersection([{ target, isIntersecting: true }]), reduce: () => { motion.matches = true; motionChange(); } };
+}
+
+for (const width of [320, 768, 1024, 1440, 1920]) {
+    test(`first viewport stays visible immediately at ${width}px`, async () => {
+        const context = await setup({ width });
+        const first = context.element(150);
+        context.apply(first);
+        assert.equal(first.classList.contains('reveal-pending'), false);
+        assert.equal(context.observed.size, 0);
+    });
+}
+
+test('below-fold items reveal once, stagger by column, and release animation hints', async () => {
+    const context = await setup();
+    const tile = context.element(1000);
+    const dispose = context.apply(tile, 3);
+    assert.equal(tile.classList.contains('reveal-pending'), true);
+    assert.equal(tile.classList.contains('reveal-animating'), false);
+    assert.equal(tile.values.get('--reveal-delay'), '60ms');
+    context.enter(tile);
+    assert.equal(tile.classList.contains('reveal-pending'), false);
+    assert.equal(tile.classList.contains('reveal-animating'), true);
+    assert.equal(context.observed.size, 0);
+    dispose();
+    assert.equal(tile.classList.contains('reveal-animating'), false);
+    assert.equal(tile.values.size, 0);
+});
+
+test('reduced motion and observer failures leave everything visible', async () => {
+    for (const options of [{ reduced: true }, { supported: false }, { broken: true }]) {
+        const context = await setup(options);
+        const tile = context.element(1000);
+        context.apply(tile);
+        assert.equal(tile.classList.contains('reveal-pending'), false);
+    }
+});
+
+test('enabling reduced motion reveals waiting elements immediately', async () => {
+    const context = await setup();
+    const tile = context.element(1000);
+    context.apply(tile);
+    context.reduce();
+    assert.equal(tile.classList.contains('reveal-pending'), false);
+    assert.equal(context.observed.size, 0);
+});
+
+test('keyboard focus immediately reveals a waiting card', async () => {
+    const context = await setup();
+    const tile = context.element(1000);
+    context.apply(tile);
+    tile.events.get('focusin')();
+    assert.equal(tile.classList.contains('reveal-pending'), false);
+    assert.equal(context.observed.size, 0);
+});

@@ -11,8 +11,8 @@
     <div class="flex min-h-screen">
         <x-navbars.admin active="dashboard" />
         <div class="flex min-w-0 flex-1 flex-col">
-            <header class="frost-panel-solid flex h-20 items-center justify-between border-0 border-b border-line px-6">
-                <h2 class="text-page-title">Bag / Transfer Overview</h2>
+            <header class="workspace-header">
+                <h2 class="workspace-header-title">Bag / Transfer Overview</h2>
             </header>
             <main class="flex-1 overflow-y-auto p-6">
                 <div class="mb-4 flex flex-wrap gap-3 text-sm">
@@ -21,8 +21,8 @@
                     @endforeach
                 </div>
                 <div class="overflow-x-auto rounded-2xl border border-line bg-white">
-                    <table class="w-full text-sm">
-                        <thead class="border-b border-line bg-ice-blue text-left">
+                    <table class="app-table w-full text-sm">
+                        <thead class="text-left">
                             <tr>
                                 <th class="px-4 py-3">Code</th>
                                 <th class="px-4 py-3">From</th>
@@ -34,7 +34,7 @@
                         </thead>
                         <tbody>
                             @foreach ($bags as $bag)
-                                <tr class="border-b border-line/50">
+                                <tr>
                                     <td class="px-4 py-3 font-mono text-xs">{{ $bag->code }}</td>
                                     <td class="px-4 py-3">{{ $bag->fromHub?->business_name }}</td>
                                     <td class="px-4 py-3">{{ $bag->toHub?->business_name }}</td>

@@ -7,12 +7,26 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Review;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
     use LoadsCartSummary;
+
+    public function stock(Product $product): JsonResponse
+    {
+        abort_unless($product->isPubliclyVisible(), 404);
+
+        return response()->json([
+            'stock_quantity' => max(0, (int) $product->stock_quantity),
+            'variants' => $product->activeVariants()->get(['id', 'stock_quantity'])->map(fn ($variant): array => [
+                'id' => $variant->id,
+                'stock_quantity' => max(0, (int) $variant->stock_quantity),
+            ]),
+        ])->header('Cache-Control', 'no-store, private');
+    }
 
     public function index(Request $request)
     {

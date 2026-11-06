@@ -149,7 +149,7 @@
                         </div>
 
                         {{-- Shop Items --}}
-                        <div class="divide-y divide-line">
+                        <div class="app-table-body">
 
                             @foreach ($items as $item)
                                 @php
@@ -289,9 +289,9 @@
 
     {{-- Fixed Checkout Bar --}}
     @if (!$cartItems->isEmpty())
-        <div class="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white px-3 py-3 sm:px-6 lg:px-8">
+        <div class="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white">
 
-            <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-3">
+            <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-3 px-3 py-3 sm:px-6 lg:px-8">
 
                 <div class="flex flex-wrap items-center gap-3 sm:gap-4">
 
