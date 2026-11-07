@@ -1,13 +1,14 @@
 <?php
 
-
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\SellerProfile;
+use App\Notifications\RegistrationDecisionNotification;
+use App\Services\ActivityLogger;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use App\Services\ActivityLogger;
 
 class SellerManagementController extends Controller
 {
@@ -21,7 +22,7 @@ class SellerManagementController extends Controller
                 $q->where('first_name', 'ilike', "%{$search}%")
                     ->orWhere('last_name', 'ilike', "%{$search}%")
                     ->orWhere('business_name', 'ilike', "%{$search}%")
-                    ->orWhereHas('user', fn($uq) => $uq->where('email', 'ilike', "%{$search}%"));
+                    ->orWhereHas('user', fn ($uq) => $uq->where('email', 'ilike', "%{$search}%"));
             });
         }
 
@@ -30,7 +31,7 @@ class SellerManagementController extends Controller
         }
 
         if ($request->filled('acc_status') && $request->acc_status !== 'all') {
-            $query->whereHas('user', fn($uq) => $uq->where('account_status', $request->acc_status));
+            $query->whereHas('user', fn ($uq) => $uq->where('account_status', $request->acc_status));
         }
 
         $sellers = $query->paginate(15)->withQueryString();
@@ -65,17 +66,22 @@ class SellerManagementController extends Controller
         ]);
     }
 
-    public function approve(SellerProfile $sellerProfile)
+    public function approve(SellerProfile $sellerProfile): JsonResponse
     {
-        $sellerProfile->update([
+        $updated = SellerProfile::whereKey($sellerProfile->id)->where('status', 'pending')->update([
             'status' => 'approved',
             'reviewed_at' => now(),
             'rejection_reason' => null,
         ]);
 
+        if ($updated !== 1) {
+            return response()->json(['success' => false, 'message' => 'This application has already been reviewed.'], 422);
+        }
+        $sellerProfile->refresh();
+
         ActivityLogger::log('seller.approved', 'User Management', "Seller registration approved: {$sellerProfile->business_name}.", $sellerProfile);
 
-        // TODO: send approval email notification
+        $this->notifyDecision($sellerProfile, true);
 
         return response()->json([
             'success' => true,
@@ -85,21 +91,26 @@ class SellerManagementController extends Controller
         ]);
     }
 
-    public function reject(Request $request, SellerProfile $sellerProfile)
+    public function reject(Request $request, SellerProfile $sellerProfile): JsonResponse
     {
         $request->validate([
             'rejection_reason' => ['required', 'string', 'max:500'],
         ]);
 
-        $sellerProfile->update([
+        $updated = SellerProfile::whereKey($sellerProfile->id)->where('status', 'pending')->update([
             'status' => 'rejected',
             'reviewed_at' => now(),
             'rejection_reason' => $request->rejection_reason,
         ]);
 
+        if ($updated !== 1) {
+            return response()->json(['success' => false, 'message' => 'This application has already been reviewed.'], 422);
+        }
+        $sellerProfile->refresh();
+
         ActivityLogger::log('seller.rejected', 'User Management', "Seller registration rejected: {$sellerProfile->business_name} — {$request->rejection_reason}", $sellerProfile);
 
-        // TODO: send rejection email notification with reason
+        $this->notifyDecision($sellerProfile, false);
 
         return response()->json([
             'success' => true,
@@ -136,5 +147,14 @@ class SellerManagementController extends Controller
             'registration_status' => $sellerProfile->status,
             'account_status' => $request->status,
         ]);
+    }
+
+    private function notifyDecision(SellerProfile $profile, bool $approved): void
+    {
+        try {
+            $profile->user->notify(new RegistrationDecisionNotification('seller', $approved, $profile->rejection_reason));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 }

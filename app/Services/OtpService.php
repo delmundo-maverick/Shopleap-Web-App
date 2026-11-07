@@ -46,9 +46,9 @@ class OtpService
 
         try {
             if ($purpose === 'password_reset') {
-                Mail::to($email)->send(new PasswordResetOtp($otp));
+                Mail::to($email)->send(new PasswordResetOtp($otp, $role));
             } else {
-                Notification::route('mail', $email)->notify(new OtpNotification($otp, $purpose));
+                Notification::route('mail', $email)->notify(new OtpNotification($otp, $purpose, $role));
             }
         } catch (\Throwable $e) {
             report($e);

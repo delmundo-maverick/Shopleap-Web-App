@@ -67,14 +67,14 @@
                     <tr>
                         <td align="center" style="padding:24px 32px 32px 32px;">
                             <p style="margin:0 0 16px 0; font-size:13px; color:#2E3A46; opacity:0.6;">
-                                Already verified, or coming back later?
+                                {{ $loginHint ?? 'Already verified, or coming back later?' }}
                             </p>
                             <table role="presentation" cellpadding="0" cellspacing="0">
                                 <tr>
                                     <td align="center" style="border-radius:10px; background-color:#1A5FB4;">
-                                        <a href="{{ route('login') }}"
+                                        <a href="{{ $loginUrl ?? \App\Support\Portal::url('main', 'login') }}"
                                             style="display:inline-block; padding:12px 28px; font-size:14px; font-weight:700; color:#ffffff; text-decoration:none; border-radius:10px;">
-                                            Go to Login
+                                            {{ $loginLabel ?? 'Go to Login' }}
                                         </a>
                                     </td>
                                 </tr>

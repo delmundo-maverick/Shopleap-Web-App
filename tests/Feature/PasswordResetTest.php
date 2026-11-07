@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 
 beforeEach(function () {
     $this->withoutVite();
@@ -44,6 +45,9 @@ function requestRecoveryCode($test, User $user): string
 }
 
 it('resets each web role and revokes credentials and authorization', function (string $role) {
+    if ($role === 'logistics') {
+        URL::forceRootUrl(config('portals.logistics'));
+    }
     $user = recoveryUser($role);
     $user->createToken('test');
     config(['session.driver' => 'database']);

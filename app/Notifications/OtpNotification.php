@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\Portal;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -12,7 +13,8 @@ class OtpNotification extends Notification
 
     public function __construct(
         protected string $otp,
-        protected string $purpose = 'registration'
+        protected string $purpose = 'registration',
+        protected string $role = 'buyer',
     ) {}
 
     public function via($notifiable): array
@@ -31,6 +33,9 @@ class OtpNotification extends Notification
                     : 'Your Verification Code'
             )
             ->view('emails.otp', [
+                'loginUrl' => Portal::url(in_array($this->role, ['logistics', 'courier', 'courier_reset']) ? 'logistics' : 'main', in_array($this->role, ['courier', 'courier_reset']) ? '' : 'login'),
+                'loginLabel' => in_array($this->role, ['courier', 'courier_reset']) ? 'About ShopLeap Logistics' : 'Go to Login',
+                'loginHint' => in_array($this->role, ['courier', 'courier_reset']) ? 'Continue verification and sign in through the ShopLeap Rider app.' : 'Already verified, or coming back later?',
                 'otp' => $this->otp,
                 'purpose' => $this->purpose,
                 'heading' => $reset

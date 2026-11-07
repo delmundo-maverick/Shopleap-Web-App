@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\LogisticsProfile;
+use App\Notifications\LogisticsDecisionNotification;
+use App\Services\ActivityLogger;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use App\Services\ActivityLogger;
 
 class LogisticsManagementController extends Controller
 {
@@ -20,7 +22,7 @@ class LogisticsManagementController extends Controller
                 $q->where('first_name', 'ilike', "%{$search}%")
                     ->orWhere('last_name', 'ilike', "%{$search}%")
                     ->orWhere('business_name', 'ilike', "%{$search}%")
-                    ->orWhereHas('user', fn($uq) => $uq->where('email', 'ilike', "%{$search}%"));
+                    ->orWhereHas('user', fn ($uq) => $uq->where('email', 'ilike', "%{$search}%"));
             });
         }
 
@@ -29,7 +31,7 @@ class LogisticsManagementController extends Controller
         }
 
         if ($request->filled('acc_status') && $request->acc_status !== 'all') {
-            $query->whereHas('user', fn($uq) => $uq->where('account_status', $request->acc_status));
+            $query->whereHas('user', fn ($uq) => $uq->where('account_status', $request->acc_status));
         }
 
         $logisticsPartners = $query->paginate(15)->withQueryString();
@@ -51,6 +53,9 @@ class LogisticsManagementController extends Controller
             'age' => $logisticsProfile->age,
             'address' => "{$logisticsProfile->street_address}, {$logisticsProfile->barangay}, {$logisticsProfile->municipality}, {$logisticsProfile->province}",
             'business_name' => $logisticsProfile->business_name,
+            'service_regions' => $logisticsProfile->service_regions ?? [],
+            'sec_url' => $logisticsProfile->sec_certificate_path ? Storage::disk('r2')->temporaryUrl($logisticsProfile->sec_certificate_path, now()->addMinutes(10)) : null,
+            'bir_url' => $logisticsProfile->bir_registration_path ? Storage::disk('r2')->temporaryUrl($logisticsProfile->bir_registration_path, now()->addMinutes(10)) : null,
             'id_url' => Storage::disk('r2')->temporaryUrl($logisticsProfile->id_upload_path, now()->addMinutes(10)),
             'permit_url' => Storage::disk('r2')->temporaryUrl($logisticsProfile->business_permit_path, now()->addMinutes(10)),
             'registration_status' => $logisticsProfile->status,
@@ -60,17 +65,22 @@ class LogisticsManagementController extends Controller
         ]);
     }
 
-    public function approve(LogisticsProfile $logisticsProfile)
+    public function approve(LogisticsProfile $logisticsProfile): JsonResponse
     {
-        $logisticsProfile->update([
+        $updated = LogisticsProfile::whereKey($logisticsProfile->id)->where('status', 'pending')->update([
             'status' => 'approved',
             'reviewed_at' => now(),
             'rejection_reason' => null,
         ]);
 
+        if ($updated !== 1) {
+            return response()->json(['success' => false, 'message' => 'This application has already been reviewed.'], 422);
+        }
+        $logisticsProfile->refresh();
+
         ActivityLogger::log('logistics.approved', 'User Management', "Logistics registration approved: {$logisticsProfile->business_name}.", $logisticsProfile);
 
-        // TODO: send approval email notification
+        $this->notifyDecision($logisticsProfile, true);
 
         return response()->json([
             'success' => true,
@@ -80,21 +90,26 @@ class LogisticsManagementController extends Controller
         ]);
     }
 
-    public function reject(Request $request, LogisticsProfile $logisticsProfile)
+    public function reject(Request $request, LogisticsProfile $logisticsProfile): JsonResponse
     {
         $request->validate([
             'rejection_reason' => ['required', 'string', 'max:500'],
         ]);
 
-        $logisticsProfile->update([
+        $updated = LogisticsProfile::whereKey($logisticsProfile->id)->where('status', 'pending')->update([
             'status' => 'rejected',
             'reviewed_at' => now(),
             'rejection_reason' => $request->rejection_reason,
         ]);
 
+        if ($updated !== 1) {
+            return response()->json(['success' => false, 'message' => 'This application has already been reviewed.'], 422);
+        }
+        $logisticsProfile->refresh();
+
         ActivityLogger::log('logistics.rejected', 'User Management', "Logistics registration rejected: {$logisticsProfile->business_name} — {$request->rejection_reason}", $logisticsProfile);
 
-        // TODO: send rejection email notification with reason
+        $this->notifyDecision($logisticsProfile, false);
 
         return response()->json([
             'success' => true,
@@ -127,5 +142,14 @@ class LogisticsManagementController extends Controller
             'registration_status' => $logisticsProfile->status,
             'account_status' => $request->status,
         ]);
+    }
+
+    private function notifyDecision(LogisticsProfile $profile, bool $approved): void
+    {
+        try {
+            $profile->user->notify(new LogisticsDecisionNotification($approved, $profile->rejection_reason));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 }

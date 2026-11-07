@@ -24,6 +24,9 @@ class LogisticsProfile extends Model
         'joining_existing_company',
         'id_upload_path',
         'business_permit_path',
+        'sec_certificate_path',
+        'bir_registration_path',
+        'service_regions',
         'status',
         'rejection_reason',
         'reviewed_at',
@@ -32,6 +35,7 @@ class LogisticsProfile extends Model
     protected function casts(): array
     {
         return [
+            'service_regions' => 'array',
             'birthday' => 'date',
             'reviewed_at' => 'datetime',
             'joining_existing_company' => 'boolean',

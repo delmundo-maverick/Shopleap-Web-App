@@ -8,7 +8,10 @@
 
     @vite(['resources/css/app.css', 'resources/css/pages/auth-register.css', 'resources/js/app.js', 'resources/js/pages/auth/logistics-register.js'])
 
-    <title>Logistics / Sorting Center Registration | Shopleap</title>
+    @vite('resources/css/pages/logistics/portal.css')
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/png" href="{{ asset('images/Shopleap-Logo.png') }}">
+    <title>Register your company | ShopLeap Logistics</title>
 </head>
 
 <body x-data="otpRegistration({
@@ -18,7 +21,7 @@
     termsUrl: '{{ route('terms.content') }}',
     privacyUrl: '{{ route('privacy.content') }}',
     termsAccepted: @js((bool) old('terms_accepted'))
-})" class="min-h-screen bg-ice-blue text-charcoal antialiased">
+})" class="logistics-portal min-h-screen bg-ice-blue text-charcoal antialiased">
 
     @php
         $labelClass = 'mb-2 block text-sm font-semibold text-charcoal';
@@ -35,7 +38,7 @@
     @endphp
 
     <!-- HEADER -->
-    <x-nav.guest />
+    <x-logistics.public-header />
 
     <main class="px-4 py-10 sm:px-6 lg:py-14">
         <div class="mx-auto max-w-4xl">
@@ -415,7 +418,7 @@
 
                         <div>
                             <label for="business_permit" class="{{ $labelClass }}">
-                                Upload Business / DTI Permit <span class="text-sale-red">*</span>
+                                Mayor’s / Business Permit <span class="text-sale-red">*</span>
                             </label>
 
                             <div
@@ -451,6 +454,9 @@
                 </section>
 
                 <!-- SECTION 6: APPROVAL NOTICE & SUBMIT -->
+                <section class="border-b border-light-gray px-6 py-7 sm:px-8">
+                    <x-logistics.application-fields :selected="old('service_regions', [])" :all-documents="false" />
+                </section>
                 <section class="px-6 py-7 sm:px-8">
                     <div class="rounded-2xl border border-primary/10 bg-ice-blue p-4 sm:p-5">
                         <div class="flex items-start gap-3">
@@ -487,7 +493,7 @@
                     </button>
 
                     <div class="mt-5 text-center">
-                        <a href="{{ route('register') }}"
+                        <a href="{{ \App\Support\Portal::url('logistics') }}"
                             class="text-sm font-semibold text-charcoal/60 transition hover:text-primary">
                             ← Back to account type selection
                         </a>

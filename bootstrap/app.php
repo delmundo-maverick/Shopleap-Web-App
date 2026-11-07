@@ -1,11 +1,14 @@
 <?php
 
+use App\Http\Middleware\EnforcePortalHost;
 use App\Http\Middleware\EnsureCourier;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsBuyer;
 use App\Http\Middleware\EnsureUserIsLogistics;
 use App\Http\Middleware\EnsureUserIsSeller;
+use App\Http\Middleware\IsolatePortalSession;
 use App\Http\Middleware\ResolveHubScope;
+use App\Support\Portal;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -19,7 +22,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->trustProxies(at: '*');
+        $middleware->trustProxies(at: '*', headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_HOST | Request::HEADER_X_FORWARDED_PORT | Request::HEADER_X_FORWARDED_PROTO);
+        $middleware->trustHosts(at: fn (): array => Portal::trustedHosts(), subdomains: false);
+        $middleware->append(EnforcePortalHost::class);
+        $middleware->web(append: [IsolatePortalSession::class]);
 
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,

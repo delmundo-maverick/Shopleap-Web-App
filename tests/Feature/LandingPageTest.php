@@ -2,6 +2,7 @@
 
 use App\Models\Product;
 use App\Services\PublicCatalog;
+use App\Support\Portal;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 
@@ -22,7 +23,7 @@ it('renders the public landing page with empty states and real guest destination
         ->assertSee(asset('images/Shopleap-Logo-White.png'), false)
         ->assertSee(route('register.buyer'), false)
         ->assertSee(route('register.seller'), false)
-        ->assertSee(route('register.logistics'), false)
+        ->assertSee(Portal::url('logistics'), false)
         ->assertSee(route('terms'), false)
         ->assertSee(route('privacy'), false)
         ->assertDontSee('Rider')->assertDontSee('rider')

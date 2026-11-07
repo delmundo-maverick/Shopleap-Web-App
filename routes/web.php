@@ -34,6 +34,7 @@ use App\Http\Controllers\Logistics\InboundController;
 use App\Http\Controllers\Logistics\IncomingParcelController;
 use App\Http\Controllers\Logistics\OutboundController;
 use App\Http\Controllers\Logistics\PickupController;
+use App\Http\Controllers\Logistics\PortalController;
 use App\Http\Controllers\Logistics\ReportController as LogisticsReportController;
 use App\Http\Controllers\Logistics\RiderController;
 use App\Http\Controllers\Logistics\ServiceAreaController;
@@ -54,6 +55,7 @@ use App\Http\Controllers\Seller\ReviewController as SellerReviewController;
 use App\Http\Controllers\Seller\ShopVoucherController;
 use App\Http\Controllers\Seller\WaybillController;
 use App\Http\Controllers\SupportController;
+use App\Support\Portal;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schedule;
 
@@ -64,6 +66,15 @@ use Illuminate\Support\Facades\Schedule;
 */
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
+
+Route::domain(Portal::host('logistics'))->group(function (): void {
+    Route::get('/register', [LogisticsRegistrationController::class, 'create'])->name('register.logistics');
+    Route::post('/register', [LogisticsRegistrationController::class, 'store'])->middleware('throttle:10,1');
+    Route::get('/logistics/application', [PortalController::class, 'application'])
+        ->middleware('auth')->name('logistics.application');
+    Route::post('/logistics/application', [PortalController::class, 'resubmit'])
+        ->middleware(['auth', 'throttle:5,1'])->name('logistics.application.resubmit');
+});
 
 Route::get('/terms', [PolicyController::class, 'terms'])->name('terms');
 Route::get('/terms/content', [PolicyController::class, 'termsContent'])->name('terms.content');
@@ -92,7 +103,7 @@ Route::middleware('guest')->prefix('forgot-password')->group(function () {
 
 Route::controller(LoginController::class)->group(function () {
     Route::get('/login', 'create')->name('login');
-    Route::post('/login', 'store');
+    Route::post('/login', 'store')->middleware('throttle:10,1');
     Route::post('/logout', 'destroy')->name('logout');
 });
 
@@ -114,11 +125,6 @@ Route::prefix('register')->group(function () {
     Route::controller(SellerRegistrationController::class)->group(function () {
         Route::get('/seller', 'create')->name('register.seller');
         Route::post('/seller', 'store');
-    });
-
-    Route::controller(LogisticsRegistrationController::class)->group(function () {
-        Route::get('/logistics', 'create')->name('register.logistics');
-        Route::post('/logistics', 'store');
     });
 
     // OTP verification (shared by all three roles)
@@ -377,38 +383,26 @@ Route::middleware(['auth', 'seller'])
             ->name('dashboard');
 
         // Products
-        Route::prefix('products')
-            ->name('products.')
-            ->group(function () {
-
-                Route::controller(SellerProductController::class)->group(function () {
-                    Route::get('/', 'index')->name('index');
-                    Route::get('/create', 'create')->name('create');
-                    Route::post('/', 'store')->name('store');
-                    Route::get('/{product}/details', 'details')->name('details');
-                    Route::post('/{product}', 'update')->name('update');
-                    Route::post('/{product}/status', 'updateStatus')->name('status');
-
-                    // General product images (max 5)
-                    Route::post('/{product}/images', 'storeImage')->name('images.store');
-                    Route::post('/{product}/images/{image}', 'updateImage')->name('images.update');
-                    Route::delete('/{product}/images/{image}', 'destroyImage')->name('images.destroy');
-
-                    // Optional image per variant
-                    Route::post('/{product}/variants/{variant}/image', 'storeVariantImage')
-                        ->name('variants.image');
-
-                    Route::delete('/{product}/variants/{variant}/image', 'destroyVariantImage')
-                        ->name('variants.image.destroy');
-                });
-
-                // Discounts
-                Route::controller(SellerProductDiscountController::class)->group(function () {
-                    Route::get('/{product}/discount', 'edit')->name('discount.edit');
-                    Route::post('/{product}/discount', 'update')->name('discount.update');
-                    Route::delete('/{product}/discount', 'destroy')->name('discount.destroy');
-                });
+        Route::prefix('products')->name('products.')->group(function (): void {
+            Route::controller(SellerProductDiscountController::class)->prefix('discounts')->name('discounts.')->group(function (): void {
+                Route::get('/', 'index')->name('index');
+                Route::post('/', 'store')->name('store');
+                Route::put('/{discount}', 'update')->name('update');
+                Route::delete('/{discount}', 'destroy')->name('destroy');
             });
+            Route::controller(SellerProductController::class)->group(function (): void {
+                Route::get('/', 'index')->name('index');
+                Route::get('/create', 'create')->name('create');
+                Route::post('/', 'store')->name('store');
+                Route::post('/bulk', 'bulk')->name('bulk');
+                Route::get('/{product}/edit', 'edit')->name('edit');
+                Route::put('/{product}', 'update')->name('update');
+                Route::patch('/{product}/status', 'updateStatus')->name('status');
+                Route::patch('/{product}/quick', 'quickUpdate')->name('quick');
+                Route::post('/{product}/duplicate', 'duplicate')->name('duplicate');
+                Route::delete('/{product}', 'destroy')->name('destroy');
+            });
+        });
 
         // Orders
         Route::prefix('orders')
@@ -514,6 +508,7 @@ Route::middleware(['auth', 'seller'])
 */
 
 Route::middleware(['auth', 'logistics', 'hub.scope'])
+    ->domain(Portal::host('logistics'))
     ->prefix('logistics')
     ->name('logistics.')
     ->group(function () {
@@ -527,6 +522,8 @@ Route::middleware(['auth', 'logistics', 'hub.scope'])
             ->controller(RiderController::class)
             ->group(function () {
                 Route::get('/', 'index')->name('index');
+                Route::get('/{rider}', 'show')->name('show');
+                Route::get('/{rider}/documents/{document}', 'document')->whereIn('document', ['license', 'or-cr'])->name('document');
                 Route::post('/{rider}/approve', 'approve')->name('approve');
                 Route::post('/{rider}/reject', 'reject')->name('reject');
                 Route::post('/{rider}/toggle-active', 'toggleActive')->name('toggle-active');
@@ -664,6 +661,7 @@ Route::middleware(['auth', 'logistics', 'hub.scope'])
 */
 
 Route::middleware(['auth', 'admin'])
+    ->domain(Portal::host('admin'))
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {

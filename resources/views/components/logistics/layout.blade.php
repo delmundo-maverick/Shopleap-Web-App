@@ -10,6 +10,7 @@
     @vite(array_merge(['resources/css/app.css'], $scripts, ['resources/js/app.js']))
 
     <title>{{ $title }} | Shopleap Logistics</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/Shopleap-Logo.png') }}">
     <style>
         [x-cloak] {
             display: none !important;
