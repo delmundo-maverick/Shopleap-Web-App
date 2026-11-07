@@ -1,18 +1,28 @@
-@props(['label', 'home', 'sections', 'active' => null])
+@props(['label', 'home', 'sections', 'active' => null, 'collapsibleSections' => []])
 <x-nav.shell id="workspace-navigation" :sidebar="true" :label="$label" :unread-url="route('messages.unread-count')" {{ $attributes }}>
     <x-slot:brand><x-nav.brand :href="route($home)" :label="$label" /></x-slot:brand>
     <x-slot:desktopLinks>
         @foreach ($sections as $section => $links)
+            @if (in_array($section, $collapsibleSections, true))
+                <div x-data="productNavigation(@js(request()->routeIs('seller.products.*')))">
+                    <button type="button" class="nav-item mt-3 w-full" @click="toggleGroup()" :aria-expanded="expanded" aria-controls="seller-products-navigation" title="Products">
+                        <svg class="size-5 shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="1.7" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                        <span class="nav-label flex-1 text-left">{{ $section }}</span><span class="nav-label" aria-hidden="true" x-text="expanded ? '-' : '+'"></span>
+                    </button>
+                    <div id="seller-products-navigation" x-show="expanded" x-cloak class="space-y-1">
+            @else
             <p class="nav-section px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-wide text-charcoal/55">{{ $section }}</p>
+            @endif
             @foreach ($links as $link)
                 @php
-                    $pattern = preg_replace('/\.index$/', '.*', $link['route']);
+                    $pattern = $link['pattern'] ?? preg_replace('/\.index$/', '.*', $link['route']);
                     $selected = request()->routeIs($link['route'] === 'admin.settings.index' ? $link['route'] : $pattern);
                     if (isset($link['params']['status'])) { $selected = request()->routeIs($link['route']) && (request('status', 'new') === $link['params']['status']); }
                     if ($link['route'] === 'messages.support') { $selected = $active === 'help'; }
                 @endphp
-                <x-nav.link :href="route($link['route'], $link['params'] ?? [])" :active="$selected" :icon="$link['icon'] ?? null" :badge="$link['count'] ?? null" :message="!empty($link['badge'])" :title="$link['label']">{{ $link['label'] }}</x-nav.link>
+                <x-nav.link :href="route($link['route'], $link['params'] ?? [])" :active="$selected" :icon="\App\Support\NavigationIcons::forRoute($link['route']) ?? ($link['icon'] ?? null)" :badge="$link['count'] ?? null" :message="!empty($link['badge'])" :title="$link['title'] ?? $link['label']">{{ $link['label'] }}</x-nav.link>
             @endforeach
+            @if (in_array($section, $collapsibleSections, true))</div></div>@endif
         @endforeach
     </x-slot:desktopLinks>
     <x-slot:actions>

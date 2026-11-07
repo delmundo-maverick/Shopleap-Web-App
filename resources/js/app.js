@@ -1,4 +1,8 @@
 import Alpine from 'alpinejs';
+import { productWorkspace } from './pages/seller/product-workspace.js';
+import { productList, productNavigation } from './pages/seller/products.js';
+import { productForm } from './pages/seller/product-form.js';
+import { productDiscounts } from './pages/seller/discounts.js';
 import { accountTabs } from './pages/buyer/account-tabs.js';
 import { registerLandingEffects } from './pages/landing/landing.js';
 import { notificationBell } from './shared/notifications.js';
@@ -9,6 +13,11 @@ import { checkoutPage, voucherCheckout } from './pages/buyer/checkout.js';
 import { termsAgreementState } from './shared/terms-modal.js';
 
 window.Alpine = Alpine;
+Alpine.data('productWorkspace', productWorkspace);
+Alpine.data('productList', productList);
+Alpine.data('productNavigation', productNavigation);
+Alpine.data('productForm', productForm);
+Alpine.data('productDiscounts', productDiscounts);
 Alpine.data('accountTabs', accountTabs);
 Alpine.data('shopleapBell', notificationBell);
 Alpine.data('navbar', navbar);

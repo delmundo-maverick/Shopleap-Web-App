@@ -255,6 +255,12 @@
                         </div>
 
                         <!-- Registration decision -->
+                        <div class="modal-section space-y-3">
+                            <p class="modal-section__title">Company documents &amp; coverage</p>
+                            <a x-show="record.sec_url" :href="record.sec_url" target="_blank" rel="noopener noreferrer" class="block text-sm font-semibold text-primary underline">View SEC Certificate</a>
+                            <a x-show="record.bir_url" :href="record.bir_url" target="_blank" rel="noopener noreferrer" class="block text-sm font-semibold text-primary underline">View BIR Form 2303</a>
+                            <p class="text-sm" x-text="(record.service_regions || []).join(', ')"></p>
+                        </div>
                         <div x-show="record.registration_status === 'pending'"
                             class="modal-section space-y-3 bg-ice-blue/60">
                             <p class="modal-section__title">Registration decision</p>

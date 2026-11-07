@@ -11,6 +11,7 @@ use App\Support\PolicyAcceptance;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class LogisticsRegistrationController extends Controller
 {
@@ -39,6 +40,10 @@ class LogisticsRegistrationController extends Controller
             'company_name' => ['required', 'string', 'max:150'],
             'id_upload' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'business_permit' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'sec_certificate' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'bir_registration' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'service_regions' => ['required', 'array', 'min:1'],
+            'service_regions.*' => ['required', 'string', 'distinct', Rule::in(config('logistics.regions'))],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'terms_accepted' => ['required', 'accepted'],
         ], [
@@ -83,6 +88,9 @@ class LogisticsRegistrationController extends Controller
             'joining_existing_company' => $joiningExisting,
             'id_upload_path' => $idPath,
             'business_permit_path' => $permitPath,
+            'sec_certificate_path' => $request->file('sec_certificate')->store('logistics_uploads/sec', 'r2'),
+            'bir_registration_path' => $request->file('bir_registration')->store('logistics_uploads/bir', 'r2'),
+            'service_regions' => $validated['service_regions'],
             'status' => 'pending',
         ];
 

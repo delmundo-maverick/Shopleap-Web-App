@@ -4,10 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reset password | Shopleap</title>
+    @if (\App\Support\Portal::isLogistics())
+        @vite('resources/css/pages/logistics/portal.css')
+        <meta name="robots" content="noindex, nofollow">
+    @endif
     @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/pages/auth/password-recovery.js'])
 </head>
-<body class="min-h-dvh bg-ice-blue text-charcoal">
-<x-nav.guest />
+<body class="{{ \App\Support\Portal::isLogistics() ? 'logistics-portal' : '' }} min-h-dvh bg-ice-blue text-charcoal">
+@if (\App\Support\Portal::isLogistics())
+    <x-logistics.public-header />
+@else
+    <x-nav.guest />
+@endif
 <main class="mx-auto flex min-h-dvh max-w-lg items-center px-4 py-10">
     <section class="w-full rounded-md border border-charcoal/10 bg-white p-6 sm:p-8">
         <a href="{{ route('login') }}" class="font-bold text-primary">Shopleap</a>

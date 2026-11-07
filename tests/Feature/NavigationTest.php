@@ -17,6 +17,18 @@ beforeEach(function () {
     Schema::table('users', function (Blueprint $table) {
         $table->string('role')->default('buyer');
     });
+    Schema::create('products', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('seller_id');
+        $table->integer('stock_quantity')->default(0);
+        $table->integer('low_stock_threshold')->nullable();
+    });
+    Schema::create('product_variants', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('product_id');
+        $table->integer('stock_quantity')->default(0);
+        $table->boolean('is_active')->default(true);
+    });
     Schema::create('order_returns', function (Blueprint $table) {
         $table->id();
         $table->unsignedBigInteger('seller_id')->nullable();
@@ -84,6 +96,22 @@ it('keeps a single Alpine bootstrap and removes the disconnected legacy handlers
     expect($app)->not->toContain("Alpine.store('sidebar'");
     expect(is_file(resource_path('js/shared/navbar.js')))->toBeFalse();
 });
+
+it('highlights only the selected logistics sorting workspace', function (string $routeName, string $activeRouteName) {
+    $this->actingAs(User::factory()->create(['role' => 'logistics']));
+    $request = Request::create('/logistics/sorting');
+    $request->setRouteResolver(fn () => app('router')->getRoutes()->getByName($routeName));
+    app()->instance('request', $request);
+
+    $html = Blade::render('<x-navbars.logistics />');
+    preg_match_all('/<a\b[^>]*href="([^"]+)"[^>]*aria-current="page"[^>]*>/', $html, $activeLinks);
+
+    expect($activeLinks[1])->toBe([route($activeRouteName)]);
+})->with([
+    ['logistics.sorting.index', 'logistics.sorting.index'],
+    ['logistics.sorting.sessions.index', 'logistics.sorting.sessions.index'],
+    ['logistics.sorting.sessions.summary', 'logistics.sorting.sessions.index'],
+]);
 
 it('logs each web role out and refuses the next authenticated page request', function (string $role, string $destination) {
     $this->actingAs(User::factory()->create(['role' => $role]), 'web');

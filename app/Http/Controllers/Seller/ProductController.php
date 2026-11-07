@@ -3,502 +3,314 @@
 namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Seller\SaveProductRequest;
 use App\Models\Product;
-use App\Models\ProductImage;
-use App\Models\ProductOption;
-use App\Models\ProductVariant;
+use App\Services\SellerProductImages;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class ProductController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): View
     {
-        $threshold = (int) config('shop.low_stock_threshold', 5);
-
-        $query = Product::with(['images', 'variants', 'liveDiscount'])
-            ->where('seller_id', $request->user()->id)
-            ->latest();
-
+        $request->validate([
+            'search' => ['nullable', 'string', 'max:150'],
+            'status' => ['nullable', Rule::in(array_keys(Product::STATUS_LABELS))],
+            'category' => ['nullable', 'string', 'max:100'],
+            'stock' => ['nullable', Rule::in(['low', 'out', 'in'])],
+            'discount' => ['nullable', Rule::in(['yes', 'no'])],
+            'sort' => ['nullable', Rule::in(['newest', 'oldest', 'name', 'price_asc', 'price_desc', 'stock'])],
+        ]);
+        $owned = Product::where('seller_id', $request->user()->id);
+        $query = (clone $owned)->with(['images', 'variants', 'liveDiscount']);
         if ($request->filled('search')) {
-            $query->where('name', 'ilike', '%'.$request->search.'%');
+            $term = '%'.$request->input('search').'%';
+            $query->where(fn ($search) => $search->whereLike('name', $term)->orWhereLike('sku', $term)
+                ->orWhereHas('variants', fn ($variants) => $variants->whereLike('sku', $term)));
         }
-
-        if ($request->filled('category') && $request->category !== 'all') {
-            $query->where('category', $request->category);
+        foreach (['status', 'category'] as $field) {
+            if ($request->filled($field)) {
+                $query->where($field, $request->input($field));
+            }
         }
-
-        if ($request->filled('status') && $request->status !== 'all') {
-            $query->where('status', $request->status);
+        if ($request->filled('stock')) {
+            $query->stockLevel($request->input('stock'));
         }
-
-        if ($request->filled('stock') && $request->stock !== 'all') {
-            $query->stockLevel($request->stock, $threshold);
+        if ($request->filled('discount')) {
+            $request->input('discount') === 'yes' ? $query->whereHas('liveDiscount') : $query->whereDoesntHave('liveDiscount');
         }
-
-        $products = $query->paginate(15)->withQueryString();
-        $categories = config('shopleap_categories.list');
-
-        return view('seller.products.index', compact('products', 'categories'));
-    }
-
-    public function create(Request $request)
-    {
-        $categories = config('shopleap_categories.list');
-        $sellerCategory = $request->user()->sellerProfile?->line_of_business;
-
-        return view('seller.products.create', compact('categories', 'sellerCategory'));
-    }
-
-    public function store(Request $request)
-    {
-        $isDraft = $request->input('status') === Product::STATUS_DRAFT;
-
-        $rules = [
-            'name' => ['required', 'string', 'max:150'],
-            'description' => ['nullable', 'string', 'max:2000'],
-            'status' => ['nullable', Rule::in([Product::STATUS_DRAFT, Product::STATUS_ACTIVE])],
-            'weight_kg' => ['nullable', 'numeric', 'min:0', 'max:99999.999'],
-
-            // A draft can be saved before photos are ready. Publishing needs
-            // at least one general image or one variant image (checked below).
-            'images' => ['nullable', 'array', 'max:5'],
-            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-
-            'options' => ['nullable', 'array', 'max:3'],
-            'options.*.name' => ['required', 'string', 'max:100', 'distinct:ignore_case'],
-            'options.*.values' => ['required', 'string', 'max:500'],
-
-            'variants' => ['nullable', 'array', 'max:100'],
-            'variants.*.options' => ['required', 'array'],
-            'variants.*.price' => $isDraft
-                ? ['nullable', 'numeric', 'min:0']
-                : ['required', 'numeric', 'min:0'],
-            'variants.*.stock_quantity' => $isDraft
-                ? ['nullable', 'integer', 'min:0']
-                : ['required', 'integer', 'min:0'],
-            'variants.*.sku' => ['nullable', 'string', 'max:100', 'distinct'],
-            'variants.*.weight_kg' => ['nullable', 'numeric', 'min:0', 'max:99999.999'],
-            'variants.*.image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+        [$column, $direction] = match ($request->input('sort', 'newest')) {
+            'oldest' => ['created_at', 'asc'],
+            'name' => ['name', 'asc'],
+            'price_asc' => ['price', 'asc'],
+            'price_desc' => ['price', 'desc'],
+            'stock' => ['stock_quantity', 'asc'],
+            default => ['created_at', 'desc'],
+        };
+        $counts = (clone $owned)->select('status')->selectRaw('count(*) as total')->groupBy('status')->pluck('total', 'status');
+        $summary = [
+            'Total' => $counts->sum(),
+            'Active' => $counts->get(Product::STATUS_ACTIVE, 0),
+            'Low stock' => (clone $owned)->stockLevel('low')->count(),
+            'Out of stock' => (clone $owned)->stockLevel('out')->count(),
+            'Pending review' => $counts->get(Product::STATUS_PENDING, 0),
+            'Rejected' => $counts->get(Product::STATUS_REJECTED, 0),
         ];
 
-        if ($isDraft) {
-            $rules['price'] = ['nullable', 'numeric', 'min:0'];
-            $rules['stock_quantity'] = ['nullable', 'integer', 'min:0'];
-        } else {
-            $rules['price'] = ['required_without:variants', 'nullable', 'numeric', 'min:0'];
-            $rules['stock_quantity'] = ['required_without:variants', 'nullable', 'integer', 'min:0'];
-            $rules['options'] = ['required_with:variants', 'nullable', 'array', 'max:3'];
-            $rules['variants'] = ['required_with:options', 'nullable', 'array', 'max:100'];
-        }
-
-        $validated = $request->validate($rules, [
-            'variants.required_with' => 'Click "Generate Variant Combinations" and fill in each variant before saving.',
-            'options.required_with' => 'Add at least one option group for your variants.',
-            'options.*.name.distinct' => 'Each option needs a different name.',
-            'variants.*.sku.distinct' => 'Each variant needs a different SKU.',
-            'images.max' => 'You can upload up to 5 product images.',
-        ]);
-
-        if (! empty($validated['variants']) && empty($validated['options'])) {
-            throw ValidationException::withMessages([
-                'options' => 'Add at least one option group for your variants.',
-            ]);
-        }
-
-        $sellerCategory = $request->user()->sellerProfile?->line_of_business;
-
-        $groups = [];
-        $variants = [];
-
-        if (! empty($validated['variants'])) {
-            $normalizedVariants = collect($validated['variants'])
-                ->map(fn (array $variant) => [
-                    ...$variant,
-                    'price' => (float) ($variant['price'] ?? 0),
-                    'stock_quantity' => (int) ($variant['stock_quantity'] ?? 0),
-                ])
-                ->all();
-
-            $groups = $this->normalizeOptions($validated['options']);
-            $variants = $this->matchVariantsToOptions($groups, $normalizedVariants);
-        }
-
-        // Selling without a general gallery is fine as long as each SKU can
-        // show its own photo, so accept either kind of image when publishing.
-        $hasGeneralImageUpload = collect($request->file('images', []))
-            ->filter()
-            ->isNotEmpty();
-        $hasVariantImageUpload = collect($request->file('variants', []))
-            ->contains(fn ($variant) => is_array($variant) && ! empty($variant['image']));
-
-        if (! $isDraft && ! $hasGeneralImageUpload && ! $hasVariantImageUpload) {
-            throw ValidationException::withMessages([
-                'images' => 'Add at least one product photo, or a photo for at least one variant, before publishing.',
-            ]);
-        }
-
-        $hasVariants = $variants !== [];
-        $status = $isDraft ? Product::STATUS_DRAFT : Product::STATUS_ACTIVE;
-
-        DB::transaction(function () use ($request, $validated, $sellerCategory, $hasVariants, $groups, $variants, $status) {
-            $product = Product::create([
-                'seller_id' => $request->user()->id,
-                'name' => $validated['name'],
-                'description' => $validated['description'] ?? null,
-                'category' => $sellerCategory,
-                'subcategory' => null,
-
-                // With variants: "starting from" price and total stock.
-                'price' => $hasVariants
-                    ? collect($variants)->min('price')
-                    : ($validated['price'] ?? 0),
-                'stock_quantity' => $hasVariants
-                    ? collect($variants)->sum('stock_quantity')
-                    : ($validated['stock_quantity'] ?? 0),
-                'weight_kg' => $validated['weight_kg'] ?? null,
-
-                'status' => $status,
-            ]);
-
-            foreach ($request->file('images', []) as $index => $file) {
-                $path = $file->store('product_images', 'r2_public');
-
-                ProductImage::create([
-                    'product_id' => $product->id,
-                    'path' => $path,
-                    'sort_order' => $index,
-                ]);
-            }
-
-            foreach ($groups as $name => $values) {
-                ProductOption::create([
-                    'product_id' => $product->id,
-                    'name' => $name,
-                    'values' => $values,
-                ]);
-            }
-
-            foreach ($variants as $index => $variant) {
-                $imagePath = $request->hasFile("variants.{$index}.image")
-                    ? $request->file("variants.{$index}.image")->store('variant_images', 'r2_public')
-                    : null;
-
-                ProductVariant::create([
-                    'product_id' => $product->id,
-                    'options' => $variant['options'],
-                    'price' => $variant['price'],
-                    'stock_quantity' => $variant['stock_quantity'],
-                    'sku' => ($variant['sku'] ?? null) ?: null,
-                    'weight_kg' => $variant['weight_kg'] ?? null,
-                    'image_path' => $imagePath,
-                    'is_active' => true,
-                ]);
-            }
-        });
-
-        return redirect()->route('seller.products.index')
-            ->with(
-                'status',
-                $isDraft
-                    ? 'Product saved as a draft. Publish it when you are ready.'
-                    : 'Product added successfully.'
-            );
-    }
-
-    public function details(Request $request, Product $product)
-    {
-        $this->authorizeOwnership($request, $product);
-
-        $product->load(['images', 'options', 'variants' => fn ($q) => $q->orderBy('id')]);
-
-        return response()->json([
-            'id' => $product->id,
-            'name' => $product->name,
-            'description' => $product->description,
-            'category' => $product->category,
-            'subcategory' => $product->subcategory,
-            'price' => (float) $product->price,
-            'discount_price' => $product->discount_price ? (float) $product->discount_price : null,
-            'stock_quantity' => $product->stock_quantity,
-            'weight_kg' => $product->weight_kg !== null ? (float) $product->weight_kg : null,
-            'low_stock_variants' => $product->lowStockVariantCount((int) config('shop.low_stock_threshold', 5)),
-            'status' => $product->status,
-            'images' => $product->images->map(fn ($img) => ['id' => $img->id, 'url' => $img->url]),
-            'options' => $product->options->map(fn ($o) => ['name' => $o->name, 'values' => $o->values]),
-            'has_variants' => $product->variants->isNotEmpty(),
-            'variants' => $this->variantPayload($product),
+        return view('seller.products.index', [
+            'products' => $query->orderBy($column, $direction)->orderBy('id')->paginate(15)->withQueryString(),
+            'categories' => config('shopleap_categories.list'),
+            'summary' => $summary,
         ]);
     }
 
-    public function update(Request $request, Product $product)
+    public function create(Request $request): View
     {
-        $this->authorizeOwnership($request, $product);
+        return $this->form(new Product([
+            'status' => Product::STATUS_DRAFT,
+            'category' => $request->user()->sellerProfile?->line_of_business,
+            'low_stock_threshold' => config('shop.low_stock_threshold', 5),
+        ]));
+    }
 
-        $categories = collect(config('shopleap_categories.list'));
-        $hasVariants = $product->hasVariants();
+    public function edit(Request $request, Product $product): View
+    {
+        Gate::authorize('update', $product);
 
-        $rules = [
-            'name' => ['required', 'string', 'max:150'],
-            'description' => ['nullable', 'string', 'max:2000'],
-            'category' => ['required', Rule::in($categories->pluck('name')->all())],
-            'subcategory' => ['nullable', 'string', 'max:100'],
-            'weight_kg' => ['nullable', 'numeric', 'min:0', 'max:99999.999'],
-        ];
+        return $this->form($product->load(['images', 'options', 'variants' => fn ($query) => $query->orderBy('id')]));
+    }
 
-        // Variant products: price/stock live on the variants. Simple products: edit directly.
-        $rules += $hasVariants
-            ? [
-                'variants' => ['required', 'array', 'min:1'],
-                'variants.*.id' => ['required', 'integer'],
-                'variants.*.price' => ['required', 'numeric', 'min:0'],
-                'variants.*.stock_quantity' => ['required', 'integer', 'min:0'],
-                'variants.*.weight_kg' => ['nullable', 'numeric', 'min:0', 'max:99999.999'],
-                'variants.*.sku' => ['nullable', 'string', 'max:100', 'distinct'],
-                'variants.*.is_active' => ['required', 'boolean'],
-            ]
-            : [
-                'price' => ['required', 'numeric', 'min:0'],
-                'stock_quantity' => ['required', 'integer', 'min:0'],
-            ];
-
-        $validated = $request->validate($rules, [
-            'variants.*.sku.distinct' => 'Each variant needs a different SKU.',
+    private function form(Product $product): View
+    {
+        return view('seller.products.create', [
+            'product' => $product,
+            'categories' => config('shopleap_categories.list'),
         ]);
+    }
 
-        $allowedSubcategories = $categories->firstWhere('name', $validated['category'])['subcategories'] ?? [];
+    public function store(SaveProductRequest $request, SellerProductImages $images): RedirectResponse|JsonResponse
+    {
+        return $this->save($request, new Product(['seller_id' => $request->user()->id]), $images);
+    }
 
-        if (! empty($validated['subcategory']) && ! in_array($validated['subcategory'], $allowedSubcategories, true)) {
-            throw ValidationException::withMessages([
-                'subcategory' => 'Choose a subcategory that belongs to the selected category.',
-            ]);
-        }
+    public function update(SaveProductRequest $request, Product $product, SellerProductImages $images): RedirectResponse|JsonResponse
+    {
+        return $this->save($request, $product, $images);
+    }
 
-        DB::transaction(function () use ($product, $validated, $hasVariants) {
-            // Lock order everywhere (checkout, restoreStock, here): product first, then variants.
-            Product::whereKey($product->id)->lockForUpdate()->first();
+    private function save(SaveProductRequest $request, Product $product, SellerProductImages $images): RedirectResponse|JsonResponse
+    {
+        $data = $request->validated();
+        try {
+            DB::transaction(function () use ($request, $product, $data, $images): void {
+                $creating = ! $product->exists;
+                if (! $creating) {
+                    $product->setRawAttributes(Product::whereKey($product->id)->lockForUpdate()->firstOrFail()->getAttributes(), true);
+                }
+                $remainingImages = $product->images()->whereNotIn('id', $request->input('remove_images', []))->count();
+                if ($remainingImages + count($request->file('images', [])) > 5) {
+                    throw ValidationException::withMessages(['images' => 'Keep at most five product images. Reload to see the latest photos.']);
+                }
+                $status = $data['status'];
+                $product->requires_review = $product->requires_review || in_array($product->status, [Product::STATUS_REJECTED, Product::STATUS_PENDING], true);
+                if ($product->requires_review && $status !== Product::STATUS_DRAFT) {
+                    $status = Product::STATUS_PENDING;
+                }
+                $product->fill(collect($data)->only(['name', 'description', 'category', 'subcategory', 'sku', 'weight_kg', 'low_stock_threshold'])->all());
+                $product->status = $status;
+                if ($status === Product::STATUS_PENDING) {
+                    $product->rejection_reason = null;
+                }
+                $product->price = $data['price'] ?? $product->price ?? 0;
+                $product->stock_quantity = $data['stock_quantity'] ?? $product->stock_quantity ?? 0;
+                $product->save();
 
-            if ($hasVariants) {
-                $this->applyVariantChanges($product, $validated['variants']);
-
-                $product->update(collect($validated)->only(['name', 'description', 'category', 'subcategory', 'weight_kg'])->all());
+                if ($creating && ! empty($data['variants'])) {
+                    $groups = $this->normalizeOptions($data['options']);
+                    $variants = $this->matchVariantsToOptions($groups, $data['variants']);
+                    foreach ($groups as $name => $values) {
+                        $product->options()->create(['name' => $name, 'values' => $values]);
+                    }
+                    foreach ($variants as $variant) {
+                        $product->variants()->create([
+                            'options' => $variant['options'],
+                            'price' => $variant['price'] ?? 0,
+                            'stock_quantity' => $variant['stock_quantity'] ?? 0,
+                            'sku' => ($variant['sku'] ?? null) ?: null,
+                            'weight_kg' => $variant['weight_kg'] ?? null,
+                            'is_active' => $variant['is_active'],
+                        ]);
+                    }
+                } elseif ($product->hasVariants()) {
+                    $variants = $product->variants()->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+                    foreach ($data['variants'] as $row) {
+                        $variants[$row['id']]->update([
+                            'price' => $row['price'] ?? 0,
+                            'stock_quantity' => $row['stock_quantity'] ?? 0,
+                            'sku' => ($row['sku'] ?? null) ?: null,
+                            'weight_kg' => $row['weight_kg'] ?? null,
+                            'is_active' => $row['is_active'],
+                        ]);
+                    }
+                }
                 $product->syncFromVariants();
-            } else {
-                $product->update($validated);
+                $this->validateDiscountPrice($product, (float) $product->price);
+                $images->sync($request, $product);
+            });
+        } catch (ValidationException $exception) {
+            $images->discardUploads();
+            throw $exception;
+        } catch (Throwable $exception) {
+            $images->discardUploads();
+            report($exception);
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Product could not be saved. Your form is still here; please try again.'], 503);
             }
+
+            return back()->withInput($request->except(['images', 'variants.*.image']))
+                ->with('error', 'Product could not be saved. Check your connection and try again.');
+        }
+        $images->finish();
+
+        return $this->complete(redirect()->route('seller.products.edit', $product), $product->isDraft() ? 'Draft saved.' : 'Product saved.');
+    }
+
+    public function updateStatus(Request $request, Product $product): RedirectResponse|JsonResponse
+    {
+        Gate::authorize('update', $product);
+        $data = $request->validate(['status' => ['required', Rule::in([Product::STATUS_ACTIVE, Product::STATUS_ARCHIVED])]]);
+        DB::transaction(function () use ($product, $data): void {
+            $product = Product::whereKey($product->id)->lockForUpdate()->firstOrFail();
+            if ($data['status'] === Product::STATUS_ACTIVE) {
+                if ($product->requires_review || in_array($product->status, [Product::STATUS_PENDING, Product::STATUS_REJECTED], true)) {
+                    throw ValidationException::withMessages(['status' => 'Edit this product and resubmit it for review.']);
+                }
+                $this->validatePublication($product);
+            } elseif ($product->requires_review || in_array($product->status, [Product::STATUS_PENDING, Product::STATUS_REJECTED], true)) {
+                throw ValidationException::withMessages(['status' => 'Review status cannot be changed using this action.']);
+            }
+            $product->update($data);
         });
 
-        $product->refresh()->load('variants', 'liveDiscount');
-        $threshold = (int) config('shop.low_stock_threshold', 5);
-
-        return response()->json([
-            'success' => true,
-            'message' => "{$product->name} was updated successfully.",
-            'product' => [
-                'name' => $product->name,
-                'category' => $product->category,
-                'price' => (float) $product->price,
-                // products.js reads this key for the sale price + strike-through.
-                'discount_price' => $product->was_price ? $product->display_price : null,
-                'stock_quantity' => $product->stock_quantity,
-                'weight_kg' => $product->weight_kg !== null ? (float) $product->weight_kg : null,
-                'status' => $product->status,
-                'low_stock_variants' => $product->lowStockVariantCount($threshold),
-            ],
-            'variants' => $this->variantPayload($product),
-        ]);
+        return $this->complete(back(), 'Product status updated.');
     }
 
-    public function updateStatus(Request $request, Product $product)
+    public function quickUpdate(Request $request, Product $product): RedirectResponse|JsonResponse
     {
-        $this->authorizeOwnership($request, $product);
-
-        $request->validate([
-            'status' => ['required', Rule::in([Product::STATUS_DRAFT, Product::STATUS_ACTIVE, Product::STATUS_ARCHIVED])],
+        Gate::authorize('update', $product);
+        $data = $request->validate([
+            'price' => ['required', 'numeric', 'min:0', 'max:99999999.99'],
+            'stock_quantity' => ['required', 'integer', 'min:0', 'max:2147483647'],
         ]);
+        DB::transaction(function () use ($product, $data): void {
+            $product = Product::whereKey($product->id)->lockForUpdate()->firstOrFail();
+            abort_if($product->hasVariants(), 422, 'Edit variant prices and stock on the product page.');
+            $this->validateDiscountPrice($product, (float) $data['price']);
+            $product->update($data);
+        });
 
-        // A draft may be saved without photos, but it cannot be published empty.
-        // Variant photos count: a product with only per-SKU images is complete.
-        if ($request->status === Product::STATUS_ACTIVE
-            && ! $product->images()->exists()
-            && ! $product->variants()->whereNotNull('image_path')->exists()) {
-            throw ValidationException::withMessages([
-                'status' => 'Add at least one product photo, or a variant photo, before publishing.',
-            ]);
+        return $this->complete(back(), 'Price and stock updated.');
+    }
+
+    public function duplicate(Request $request, Product $product): RedirectResponse|JsonResponse
+    {
+        Gate::authorize('update', $product);
+        $copy = DB::transaction(function () use ($product): Product {
+            $product = Product::whereKey($product->id)->lockForUpdate()->firstOrFail()->load('images', 'options', 'variants');
+            $copy = $product->replicate();
+            $copy->fill(['name' => mb_substr($product->name, 0, 140).' (copy)', 'sku' => null, 'status' => Product::STATUS_DRAFT]);
+            $copy->rejection_reason = null;
+            $copy->requires_review = $product->requires_review || in_array($product->status, [Product::STATUS_PENDING, Product::STATUS_REJECTED], true);
+            $copy->discount_price = null;
+            $copy->save();
+            foreach (['images', 'options', 'variants'] as $relation) {
+                foreach ($product->{$relation} as $related) {
+                    $replica = $related->replicate();
+                    $replica->product_id = $copy->id;
+                    $replica->save();
+                }
+            }
+
+            return $copy;
+        });
+
+        return $this->complete(redirect()->route('seller.products.edit', $copy), 'Product duplicated as a draft.');
+    }
+
+    public function destroy(Request $request, Product $product, SellerProductImages $images): RedirectResponse|JsonResponse
+    {
+        Gate::authorize('delete', $product);
+        $paths = DB::transaction(fn () => $this->deleteProduct(Product::whereKey($product->id)->lockForUpdate()->firstOrFail()));
+        $images->deleteUnused($paths);
+
+        return $this->complete(redirect()->route('seller.products.index'), 'Product deleted.');
+    }
+
+    public function bulk(Request $request, SellerProductImages $images): RedirectResponse|JsonResponse
+    {
+        $data = $request->validate([
+            'product_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'product_ids.*' => ['integer', 'distinct'],
+            'action' => ['required', Rule::in(['deactivate', 'delete'])],
+        ]);
+        $paths = DB::transaction(function () use ($request, $data): array {
+            $products = Product::where('seller_id', $request->user()->id)->whereKey($data['product_ids'])->orderBy('id')->lockForUpdate()->get();
+            abort_unless($products->count() === count($data['product_ids']), 403);
+            $paths = [];
+            foreach ($products as $product) {
+                if ($data['action'] === 'delete') {
+                    $paths = [...$paths, ...$this->deleteProduct($product)];
+                } elseif (in_array($product->status, [Product::STATUS_ACTIVE, Product::STATUS_ARCHIVED], true)) {
+                    $product->update(['status' => Product::STATUS_ARCHIVED]);
+                } else {
+                    throw ValidationException::withMessages(['product_ids' => 'Only active or inactive products can be bulk deactivated.']);
+                }
+            }
+
+            return $paths;
+        });
+        $images->deleteUnused($paths);
+
+        return $this->complete(back(), 'Selected products updated.');
+    }
+
+    private function deleteProduct(Product $product): array
+    {
+        $paths = [...$product->images()->pluck('path')->all(), ...$product->variants()->pluck('image_path')->all()];
+        $product->delete();
+
+        return $paths;
+    }
+
+    private function validatePublication(Product $product): void
+    {
+        if (! $product->images()->exists() && ! $product->variants()->whereNotNull('image_path')->exists()) {
+            throw ValidationException::withMessages(['status' => 'Add a product or variant photo before publishing.']);
         }
-
-        $product->update(['status' => $request->status]);
-
-        return response()->json([
-            'success' => true,
-            'message' => "{$product->name} is now {$request->status}.",
-            'status' => $request->status,
-        ]);
-    }
-
-    // ------------------------------------------------------------------
-    // Product / variant image management
-    // ------------------------------------------------------------------
-
-    /** Add one general product image (max 5 per product). */
-    public function storeImage(Request $request, Product $product)
-    {
-        $this->authorizeOwnership($request, $product);
-
-        $request->validate([
-            'image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-        ], [
-            'image.max' => 'Each image must be 10MB or smaller.',
-        ]);
-
-        if ($product->images()->count() >= 5) {
-            throw ValidationException::withMessages([
-                'image' => 'You can upload up to 5 product images.',
-            ]);
-        }
-
-        $image = ProductImage::create([
-            'product_id' => $product->id,
-            'path' => $request->file('image')->store('product_images', 'r2_public'),
-            'sort_order' => ((int) $product->images()->max('sort_order')) + 1,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product image added.',
-            'image' => ['id' => $image->id, 'url' => $image->url],
-            'images' => $this->imagePayload($product),
-        ]);
-    }
-
-    /** Replace one general product image without touching the other images. */
-    public function updateImage(Request $request, Product $product, ProductImage $image)
-    {
-        $this->authorizeOwnership($request, $product);
-        abort_unless($image->product_id === $product->id, 404);
-
-        $request->validate([
-            'image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-        ], [
-            'image.max' => 'Each image must be 10MB or smaller.',
-        ]);
-
-        $oldPath = $image->path;
-        $image->update([
-            'path' => $request->file('image')->store('product_images', 'r2_public'),
-        ]);
-
-        Storage::disk('r2_public')->delete($oldPath);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product image replaced.',
-            'images' => $this->imagePayload($product),
-        ]);
-    }
-
-    /** Remove one general product image. Variant images are stored separately. */
-    public function destroyImage(Request $request, Product $product, ProductImage $image)
-    {
-        $this->authorizeOwnership($request, $product);
-        abort_unless($image->product_id === $product->id, 404);
-
-        $path = $image->path;
-        $image->delete();
-        Storage::disk('r2_public')->delete($path);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product image removed.',
-            'images' => $this->imagePayload($product),
-        ]);
-    }
-
-    /** Upload or replace the single optional image for one variant. */
-    public function storeVariantImage(Request $request, Product $product, ProductVariant $variant)
-    {
-        $this->authorizeOwnership($request, $product);
-        abort_unless($variant->product_id === $product->id, 404);
-
-        $request->validate([
-            'image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-        ], [
-            'image.max' => 'Each image must be 10MB or smaller.',
-        ]);
-
-        $oldPath = $variant->image_path;
-        $variant->update([
-            'image_path' => $request->file('image')->store('variant_images', 'r2_public'),
-        ]);
-
-        if ($oldPath) {
-            Storage::disk('r2_public')->delete($oldPath);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Variant image updated.',
-            'image_url' => $variant->image_url,
-        ]);
-    }
-
-    /** Remove one variant's image only. General images are untouched. */
-    public function destroyVariantImage(Request $request, Product $product, ProductVariant $variant)
-    {
-        $this->authorizeOwnership($request, $product);
-        abort_unless($variant->product_id === $product->id, 404);
-
-        $path = $variant->image_path;
-        $variant->update(['image_path' => null]);
-
-        if ($path) {
-            Storage::disk('r2_public')->delete($path);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Variant image removed.',
-            'image_url' => null,
-        ]);
-    }
-
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
-
-    /** Update variants by id. Never delete: carts and orders reference them. */
-    private function applyVariantChanges(Product $product, array $rows): void
-    {
-        $existing = $product->variants()->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-        $rows = collect($rows);
-
-        if ($rows->pluck('id')->diff($existing->keys())->isNotEmpty()) {
-            throw ValidationException::withMessages([
-                'variants' => 'One or more variants no longer exist. Close this window and try again.',
-            ]);
-        }
-
-        if ($rows->filter(fn ($r) => (bool) $r['is_active'])->isEmpty()) {
-            throw ValidationException::withMessages([
-                'variants' => 'Keep at least one variant active, or archive the whole product instead.',
-            ]);
-        }
-
-        foreach ($rows as $row) {
-            $existing[$row['id']]->update([
-                'price' => $row['price'],
-                'stock_quantity' => $row['stock_quantity'],
-                'weight_kg' => $row['weight_kg'] ?? null,
-                'sku' => $row['sku'] ?? null,
-                'is_active' => (bool) $row['is_active'],
-            ]);
+        if ($product->hasVariants() && ! $product->activeVariants()->exists()) {
+            throw ValidationException::withMessages(['status' => 'Activate at least one variant before publishing.']);
         }
     }
 
-    /** "Pack Size" => "Pack of 4, Pack of 5" becomes ['Pack Size' => ['Pack of 4', 'Pack of 5']]. */
+    private function validateDiscountPrice(Product $product, float $price): void
+    {
+        $discount = $product->discount()->where('is_active', true)->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', now()))->first();
+        if ($discount && ($discount->type === 'fixed' ? round($price - (float) $discount->value, 2) : round($price * (1 - (float) $discount->value / 100), 2)) < 0.01) {
+            throw ValidationException::withMessages(['price' => 'End or adjust the discount first. The final price must be at least ₱0.01.']);
+        }
+    }
+
+    /**
+     * @param  array<int, array{name: string, values: string}>  $options
+     * @return array<string, list<string>>
+     */
     private function normalizeOptions(array $options): array
     {
         $groups = [];
@@ -506,7 +318,7 @@ class ProductController extends Controller
         foreach ($options as $option) {
             $groups[trim($option['name'])] = collect(explode(',', $option['values']))
                 ->map(fn ($v) => trim($v))
-                ->filter()
+                ->filter(fn (string $value): bool => $value !== '')
                 ->unique()
                 ->values()
                 ->all();
@@ -559,37 +371,12 @@ class ProductController extends Controller
         return $ordered;
     }
 
-    private function variantPayload(Product $product): array
+    private function complete(RedirectResponse $redirect, string $message): RedirectResponse|JsonResponse
     {
-        return $product->variants->sortBy('id')->values()->map(fn ($v) => [
-            'id' => $v->id,
-            'options' => $v->options,
-            'label' => $v->label,
-            'price' => (float) $v->price,
-            'stock_quantity' => $v->stock_quantity,
-            'weight_kg' => $v->weight_kg !== null ? (float) $v->weight_kg : null,
-            'sku' => $v->sku,
-            'image_url' => $v->image_url,
-            'is_active' => $v->is_active,
-        ])->all();
-    }
+        $redirect->with('status', $message);
 
-    private function imagePayload(Product $product): array
-    {
-        return $product->images()
-            ->orderBy('sort_order')
-            ->get()
-            ->map(fn (ProductImage $image) => [
-                'id' => $image->id,
-                'url' => $image->url,
-            ])
-            ->all();
-    }
-
-    private function authorizeOwnership(Request $request, Product $product): void
-    {
-        if ($product->seller_id !== $request->user()->id) {
-            abort(403, 'You do not have access to this product.');
-        }
+        return request()->expectsJson()
+            ? response()->json(['redirect' => $redirect->getTargetUrl(), 'message' => $message])
+            : $redirect;
     }
 }

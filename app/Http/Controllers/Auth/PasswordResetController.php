@@ -7,6 +7,7 @@ use App\Mail\PasswordChanged;
 use App\Models\OtpVerification;
 use App\Models\User;
 use App\Services\OtpService;
+use App\Support\Portal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -58,7 +59,7 @@ class PasswordResetController extends Controller
         RateLimiter::hit($key.':cooldown', 60);
         try {
             DB::transaction(function () use ($email, $otp): void {
-                $user = User::whereRaw('LOWER(email) = ?', [$email])->whereIn('role', ['buyer', 'seller', 'logistics', 'super_admin'])->lockForUpdate()->first();
+                $user = User::whereRaw('LOWER(email) = ?', [$email])->whereIn('role', $this->allowedRoles())->lockForUpdate()->first();
                 if ($user) {
                     OtpVerification::where('email', $email)->whereNull('used_at')->update(['used_at' => now(), 'reset_token_hash' => null]);
                     $otp->generateAndSend($email, $user->role, 'password_reset');
@@ -90,7 +91,7 @@ class PasswordResetController extends Controller
         $email = $request->session()->get('password_recovery_email', '');
         $token = Str::random(64);
         $recordId = DB::transaction(function () use ($email, $data, $otp, $token): ?int {
-            $user = User::whereRaw('LOWER(email) = ?', [$email])->whereIn('role', ['buyer', 'seller', 'logistics', 'super_admin'])->lockForUpdate()->first();
+            $user = User::whereRaw('LOWER(email) = ?', [$email])->whereIn('role', $this->allowedRoles())->lockForUpdate()->first();
             if (! $user) {
                 return null;
             }
@@ -127,7 +128,7 @@ class PasswordResetController extends Controller
         if (! is_array($grant)) {
             return null;
         }
-        $query = OtpVerification::whereKey($grant['record_id'])->where('purpose', 'password_reset');
+        $query = OtpVerification::whereKey($grant['record_id'])->where('purpose', 'password_reset')->whereIn('role', $this->allowedRoles());
         if ($lock) {
             $query->lockForUpdate();
         }
@@ -165,5 +166,18 @@ class PasswordResetController extends Controller
         }
 
         return redirect()->route('login')->with('status', 'Your password has been changed. Please log in.');
+    }
+
+    /** @return list<string> */
+    private function allowedRoles(): array
+    {
+        if (Portal::isLogistics()) {
+            return ['logistics'];
+        }
+        if (Portal::host('admin') !== Portal::host('main')) {
+            return request()->getHost() === Portal::host('admin') ? ['super_admin'] : ['buyer', 'seller'];
+        }
+
+        return ['buyer', 'seller', 'super_admin'];
     }
 }

@@ -2,10 +2,26 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
+    use HasFactory;
+
+    public const STATUS_PENDING = 'pending_review';
+
+    public const STATUS_REJECTED = 'rejected';
+
+    public const STATUS_LABELS = [
+        'draft' => 'Draft',
+        'active' => 'Active',
+        'archived' => 'Inactive',
+        'pending_review' => 'Pending review',
+        'rejected' => 'Rejected',
+    ];
+
     public const STATUS_DRAFT = 'draft';
 
     public const STATUS_ACTIVE = 'active';
@@ -14,6 +30,8 @@ class Product extends Model
 
     protected $fillable = [
         'seller_id',
+        'sku',
+        'low_stock_threshold',
         'name',
         'description',
         'category',
@@ -29,6 +47,8 @@ class Product extends Model
     {
         return [
             'price' => 'decimal:2',
+            'low_stock_threshold' => 'integer',
+            'requires_review' => 'boolean',
             'discount_price' => 'decimal:2',
             'stock_quantity' => 'integer',
             'weight_kg' => 'decimal:3',
@@ -127,7 +147,7 @@ class Product extends Model
     /** Active variants at or below the threshold (includes sold-out ones). */
     public function lowStockVariantCount(?int $threshold = null): int
     {
-        $threshold ??= (int) config('shop.low_stock_threshold', 5);
+        $threshold ??= $this->low_stock_threshold ?? (int) config('shop.low_stock_threshold', 5);
 
         $this->loadMissing('variants');
 
@@ -140,7 +160,7 @@ class Product extends Model
     /** Low when the total is low, or when any single active variant is. */
     public function isLowStock(?int $threshold = null): bool
     {
-        $threshold ??= (int) config('shop.low_stock_threshold', 5);
+        $threshold ??= $this->low_stock_threshold ?? (int) config('shop.low_stock_threshold', 5);
 
         return $this->stock_quantity <= $threshold
             || $this->lowStockVariantCount($threshold) > 0;
@@ -198,15 +218,16 @@ class Product extends Model
      *  'out' => nothing left to sell
      *  'low' => still sellable, but the total or any active variant is at/below the threshold
      */
-    public function scopeStockLevel($query, ?string $level, int $threshold)
+    public function scopeStockLevel(Builder $query, ?string $level, ?int $threshold = null): Builder
     {
+        $stockThreshold = $threshold !== null ? (string) $threshold : 'COALESCE('.$query->getModel()->qualifyColumn('low_stock_threshold').', '.(int) config('shop.low_stock_threshold', 5).')';
+
         return match ($level) {
             'out' => $query->where('stock_quantity', '<=', 0),
-            'low' => $query->where('stock_quantity', '>', 0)->where(function ($q) use ($threshold) {
-                $q->where('stock_quantity', '<=', $threshold)
-                    ->orWhereHas('variants', fn ($v) => $v
-                        ->where('is_active', true)
-                        ->where('stock_quantity', '<=', $threshold));
+            'in' => $query->where('stock_quantity', '>', 0),
+            'low' => $query->where('stock_quantity', '>', 0)->where(function ($q) use ($stockThreshold) {
+                $q->whereRaw('stock_quantity <= '.$stockThreshold)
+                    ->orWhereHas('variants', fn ($v) => $v->where('is_active', true)->whereRaw('stock_quantity <= '.$stockThreshold));
             }),
             default => $query,
         };

@@ -3,65 +3,81 @@
 namespace App\Http\Controllers\Logistics;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Logistics\RiderApplicationsRequest;
 use App\Models\CourierProfile;
 use App\Notifications\RiderDecisionNotification;
 use App\Services\ActivityLogger;
 use App\Services\HubContext;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RiderController extends Controller
 {
-    public function index(Request $request)
+    public function index(RiderApplicationsRequest $request): View
     {
-        $logisticsProfile = HubContext::require($request);
+        $hubId = HubContext::require($request)->id;
+        $filters = $request->validated();
+        $status = $filters['status'] ?? 'pending';
+        $search = $filters['search'] ?? '';
+        $query = CourierProfile::with('user')->where('logistics_profile_id', $hubId)->latest();
 
-        $query = CourierProfile::with('user')
-            ->where('logistics_profile_id', $logisticsProfile->id)
-            ->latest();
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-
-            $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'ilike', "%{$search}%")
-                    ->orWhere('last_name', 'ilike', "%{$search}%")
-                    ->orWhere('plate_number', 'ilike', "%{$search}%");
+        if ($search !== '') {
+            $query->where(function (Builder $query) use ($search): void {
+                $query->whereLike('first_name', "%{$search}%")
+                    ->orWhereLike('last_name', "%{$search}%")
+                    ->orWhereLike('plate_number', "%{$search}%")
+                    ->orWhereHas('user', fn (Builder $userQuery): Builder => $userQuery->whereLike('email', "%{$search}%"));
             });
         }
-
-        $status = $request->get('status', 'pending');
-
         if ($status !== 'all') {
             $query->where('status', $status);
         }
 
         $riders = $query->paginate(15)->withQueryString();
+        $counts = CourierProfile::where('logistics_profile_id', $hubId)
+            ->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status')->all();
+        $counts = array_replace(['pending' => 0, 'approved' => 0, 'rejected' => 0], $counts);
 
-        $counts = [
-            'pending' => CourierProfile::where(
-                'logistics_profile_id',
-                $logisticsProfile->id
-            )->where('status', 'pending')->count(),
-
-            'approved' => CourierProfile::where(
-                'logistics_profile_id',
-                $logisticsProfile->id
-            )->where('status', 'approved')->count(),
-
-            'rejected' => CourierProfile::where(
-                'logistics_profile_id',
-                $logisticsProfile->id
-            )->where('status', 'rejected')->count(),
-        ];
-
-        return view(
-            'logistics.riders.index',
-            compact('riders', 'status', 'counts')
-        );
+        return view('logistics.riders.index', compact('riders', 'status', 'search', 'counts'));
     }
 
-    public function approve(Request $request, CourierProfile $rider)
+    public function show(Request $request, CourierProfile $rider): Response
+    {
+        $this->authorizeOwnership($request, $rider);
+        $rider->load('user');
+
+        return response()->view('logistics.riders.show', compact('rider'))
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    public function document(Request $request, CourierProfile $rider, string $document): StreamedResponse
+    {
+        $this->authorizeOwnership($request, $rider);
+        $path = match ($document) {
+            'license' => $rider->license_upload_path,
+            'or-cr' => $rider->or_cr_upload_path,
+            default => abort(404),
+        };
+        $disk = Storage::disk('r2');
+        abort_unless($path && $disk->exists($path), 404);
+        $mimeType = $disk->mimeType($path);
+        abort_unless(in_array($mimeType, ['image/jpeg', 'image/png', 'application/pdf'], true), 404);
+
+        return $disk->response($path, null, [
+            'Content-Type' => $mimeType,
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; frame-ancestors 'self'",
+        ]);
+    }
+
+    public function approve(Request $request, CourierProfile $rider): RedirectResponse
     {
         $this->authorizeOwnership($request, $rider);
 
@@ -76,7 +92,7 @@ class RiderController extends Controller
             ]) > 0;
 
         if (! $moved) {
-            return back()->with(
+            return redirect()->route('logistics.riders.show', $rider)->with(
                 'status',
                 "{$rider->full_name} was already reviewed."
             );
@@ -96,13 +112,13 @@ class RiderController extends Controller
 
         $this->notifyRider($rider, true);
 
-        return back()->with(
+        return redirect()->route('logistics.riders.show', $rider)->with(
             'status',
             "{$rider->full_name} has been approved. {$mapping['message']}"
         );
     }
 
-    public function reject(Request $request, CourierProfile $rider)
+    public function reject(Request $request, CourierProfile $rider): RedirectResponse
     {
         $this->authorizeOwnership($request, $rider);
 
@@ -121,7 +137,7 @@ class RiderController extends Controller
             ]) > 0;
 
         if (! $moved) {
-            return back()->with(
+            return redirect()->route('logistics.riders.show', $rider)->with(
                 'status',
                 "{$rider->full_name} was already reviewed. Use Deactivate for approved riders."
             );
@@ -142,7 +158,7 @@ class RiderController extends Controller
             $request->rejection_reason
         );
 
-        return back()->with(
+        return redirect()->route('logistics.riders.show', $rider)->with(
             'status',
             "{$rider->full_name}'s application was rejected."
         );
@@ -170,12 +186,12 @@ class RiderController extends Controller
         }
     }
 
-    public function toggleActive(Request $request, CourierProfile $rider)
+    public function toggleActive(Request $request, CourierProfile $rider): RedirectResponse
     {
         $this->authorizeOwnership($request, $rider);
 
         if ($rider->status !== 'approved') {
-            return back()->with(
+            return redirect()->route('logistics.riders.show', $rider)->with(
                 'status',
                 'Only approved riders can be activated or deactivated.'
             );
@@ -185,7 +201,7 @@ class RiderController extends Controller
             'is_active' => ! $rider->is_active,
         ]);
 
-        return back()->with(
+        return redirect()->route('logistics.riders.show', $rider)->with(
             'status',
             "{$rider->full_name} is now ".
                 ($rider->is_active ? 'active' : 'inactive').
@@ -199,7 +215,7 @@ class RiderController extends Controller
     ): void {
         if (
             $rider->logistics_profile_id !==
-            $request->user()->logisticsProfile->id
+            HubContext::require($request)->id
         ) {
             abort(403, 'You do not have access to this rider.');
         }

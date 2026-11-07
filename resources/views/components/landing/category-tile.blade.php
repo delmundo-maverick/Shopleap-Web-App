@@ -10,4 +10,4 @@
             class="size-full object-contain">
     </span>
     <span class="max-w-40 leading-5">{{ $category['name'] }}</span>
-</a>
+    </a>

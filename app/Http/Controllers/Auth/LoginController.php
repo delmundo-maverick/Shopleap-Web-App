@@ -8,6 +8,7 @@ use App\Models\LogisticsProfile;
 use App\Models\SellerProfile;
 use App\Models\User;
 use App\Services\OtpService;
+use App\Support\Portal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -19,12 +20,17 @@ class LoginController extends Controller
     protected function checkRole(string $role): void
     {
         abort_unless(in_array($role, $this->validRoles), 404);
+        abort_unless(($role === 'logistics') === Portal::isLogistics(), 404);
     }
 
     // â”€â”€ LOGIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     public function create(Request $request)
     {
+        if (Portal::isLogistics($request)) {
+            return view('logistics.login');
+        }
+
         if ($request->query('continue') === 'landing') {
             $filters = $request->validate([
                 'search' => ['nullable', 'string', 'max:100'],
@@ -45,6 +51,17 @@ class LoginController extends Controller
             'email' => ['required', 'email'],
             'password' => ['required'],
         ]);
+
+        $credentials[] = function ($query) use ($request): void {
+            if (Portal::isLogistics($request)) {
+                $query->where('role', 'logistics');
+            } else {
+                $query->where('role', '!=', 'logistics');
+                if (Portal::host('admin') !== Portal::host('main')) {
+                    $query->where('role', $request->getHost() === Portal::host('admin') ? '=' : '!=', 'super_admin');
+                }
+            }
+        };
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
             return back()->withErrors([
@@ -82,7 +99,7 @@ class LoginController extends Controller
             default => null,
         };
 
-        if ($profile && $profile->status !== 'approved') {
+        if ($profile && $profile->status !== 'approved' && $user->role !== 'logistics') {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
@@ -111,6 +128,12 @@ class LoginController extends Controller
         }
 
         $request->session()->regenerate();
+
+        if ($user->role === 'logistics') {
+            $request->session()->forget('url.intended');
+
+            return redirect()->route($profile?->status === 'approved' ? 'logistics.dashboard' : 'logistics.application');
+        }
 
         return match ($user->role) {
             'super_admin' => redirect()->intended(route('admin.dashboard')),
@@ -145,7 +168,7 @@ class LoginController extends Controller
             'Please start registration again.'
         );
 
-        return view('auth.verify-otp', [
+        return view($role === 'logistics' ? 'logistics.verify-otp' : 'auth.verify-otp', [
             'role' => $role,
             'email' => $pending['email'],
         ]);

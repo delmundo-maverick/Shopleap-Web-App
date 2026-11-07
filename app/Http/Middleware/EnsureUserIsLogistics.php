@@ -21,7 +21,9 @@ class EnsureUserIsLogistics
         }
 
         if (! $user->logisticsProfile || $user->logisticsProfile->status !== 'approved') {
-            abort(403, 'Your logistics registration has not been approved yet.');
+            abort_if($request->expectsJson(), 403, 'Your logistics registration has not been approved yet.');
+
+            return redirect()->route('logistics.application');
         }
 
         return $next($request);
