@@ -17,6 +17,7 @@ class NavigationIcons
         'sorting' => 'M5 3v12a4 4 0 004 4h10M5 7h14M16 4l3 3-3 3M16 16l3 3-3 3',
         'history' => 'M3 11a9 9 0 119 10M3 4v7h7M12 7v5l3 2',
         'deliveries' => 'M3 6h11v11H3zM14 10h4l3 4v3h-7M7 21a2 2 0 100-4 2 2 0 000 4M17 21a2 2 0 100-4 2 2 0 000 4',
+        'rider-rate' => 'M12 3v18M17 7H9a4 4 0 000 8h6a4 4 0 000-8M7 17h10',
         'reports' => 'M4 3h11l5 5v13H4V3zM14 3v6h6M8 17v-3m4 3v-6m4 6v-4',
         'messages' => 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
         'support' => 'M9 9a3 3 0 016 0c0 2-3 2-3 4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
@@ -33,6 +34,7 @@ class NavigationIcons
     public static function forRoute(string $route): ?string
     {
         foreach ([
+            'logistics.rider-rate.*' => 'rider-rate',
             '*.dashboard' => 'dashboard', '*.reports.*' => 'reports', 'messages.support' => 'support',
             'messages.*' => 'messages', '*.account.*' => 'account', '*.orders.*' => 'orders',
             '*.returns.*' => 'returns', 'logistics.riders.*' => 'riders', 'logistics.areas.*' => 'areas',

@@ -79,6 +79,9 @@ Route::prefix('courier')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'summary']);
         Route::get('/history', [HistoryController::class, 'index']);
         Route::get('/earnings', [EarningsController::class, 'index']);
+        Route::get('/earnings/rate', [EarningsController::class, 'rate']);
+        Route::get('/earnings/summary', [EarningsController::class, 'index']);
+        Route::get('/earnings/history', [EarningsController::class, 'history']);
 
         // Notifications.
         Route::get('/notifications', [NotificationController::class, 'index']);

@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 class DashboardController extends Controller
 {
     /** Counts for the dashboard tiles and unread notifications. */
-    public function summary(Request $request): JsonResponse
+    public function summary(Request $request, RiderEarnings $earnings): JsonResponse
     {
         $c = $request->attributes->get('courier');
 
@@ -47,10 +47,8 @@ class DashboardController extends Controller
                     ->count(),
             ],
             'delivered_today' => $deliveredToday,
-            'earned_today' => round(
-                $deliveredToday * RiderEarnings::feePerDelivery(),
-                2
-            ),
+            'earned_today' => $earnings->totals($earnings->deliveries(null, $c->id, now()->startOfDay(), now()->endOfDay()))['rider_pay'] ?? '0.00',
+            'currency' => 'PHP',
             'unread_notifications' => $request->user()
                 ->unreadNotifications()
                 ->count(),

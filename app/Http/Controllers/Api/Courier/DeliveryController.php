@@ -8,6 +8,7 @@ use App\Models\CourierProfile;
 use App\Models\Order;
 use App\Services\OrderTransitions;
 use App\Services\RiderCoverage;
+use App\Services\RiderEarnings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -44,16 +45,16 @@ class DeliveryController extends Controller
     }
 
     /** Delivered: the rider sends the cash actually collected. A difference from the order total is flagged to the hub. */
-    public function delivered(Request $request, Order $order, OrderTransitions $transitions): JsonResponse
+    public function delivered(Request $request, Order $order, OrderTransitions $transitions, RiderEarnings $earnings): JsonResponse
     {
-        $this->owned($request, $order);
+        $courier = $this->owned($request, $order);
         $data = $request->validate(['amount' => ['required', 'numeric', 'min:0']]);
 
-        if (! $transitions->delivered($order, $request->user()->id, (float) $data['amount'])) {
+        if (! $transitions->delivered($order, $request->user()->id, (float) $data['amount'], expectedCourierId: $courier->id, expectedHubId: in_array($order->status, RiderEarnings::EARNED_STATUSES, true) ? null : $courier->logistics_profile_id)) {
             return $this->wrongStage();
         }
 
-        return response()->json(['message' => 'Delivery recorded. Thank you.']);
+        return response()->json(['message' => 'Delivery recorded. Thank you.', 'earning' => $earnings->earning($order)]);
     }
 
     public function failed(Request $request, Order $order, OrderTransitions $transitions): JsonResponse
@@ -80,6 +81,12 @@ class DeliveryController extends Controller
     {
         $courier = $request->attributes->get('courier');
 
+        if (in_array($order->status, RiderEarnings::EARNED_STATUSES, true)) {
+            abort_unless((int) ($order->earning_courier_id ?? $order->delivery_rider_id) === (int) $courier->id, 403, 'This delivery is not assigned to you.');
+
+            return $courier;
+        }
+
         abort_unless($order->delivery_rider_id === $courier->id, 403, 'This delivery is not assigned to you.');
 
         abort_unless(
@@ -96,7 +103,7 @@ class DeliveryController extends Controller
                 $dest['province'],
                 $dest['municipality'],
                 $dest['barangay'],
-                $order->logistics_profile_id
+                $courier->logistics_profile_id
             ),
             422,
             'You do not cover this delivery address. Ask the sorting center to reassign it.'

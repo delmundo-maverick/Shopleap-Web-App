@@ -58,6 +58,7 @@ beforeEach(function () {
         $table->timestamp('cod_collected_at')->nullable();
         $table->timestamps();
     });
+    (require database_path('migrations/2026_11_08_002023_add_earnings_snapshot_to_orders_table.php'))->up();
     (require database_path('migrations/2026_10_31_030000_create_parcel_events_table.php'))->up();
     (require database_path('migrations/2026_10_31_010000_create_shipment_bags_table.php'))->up();
     (require database_path('migrations/2026_10_31_020000_create_shipment_bag_items_table.php'))->up();
@@ -122,7 +123,8 @@ it('counts only recorded cash and earnings at the delivery hub without inventing
     reportOrder($origin, ['destination_hub_id' => $destination->id, 'cod_collected_amount' => 123.45, 'delivery_attempts' => 3]);
     reportOrder($destination, ['cod_collected_at' => null, 'cod_collected_amount' => null]);
     expect(buildLogisticsReport($origin, 'shipping_earnings')['hasData'])->toBeFalse();
-    expect(buildLogisticsReport($destination, 'shipping_earnings')['summary'][0]['value'])->toBe('PHP 40.00');
+    expect(buildLogisticsReport($destination, 'shipping_earnings')['summary'][0]['value'])->toBe(2);
+    expect(buildLogisticsReport($destination, 'shipping_earnings')['summary'][1]['value'])->toBe('-');
     expect(buildLogisticsReport($destination, 'cod_remittance')['summary'][0]['value'])->toBe('PHP 123.45');
 });
 
