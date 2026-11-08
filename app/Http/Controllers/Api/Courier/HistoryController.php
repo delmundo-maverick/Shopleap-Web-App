@@ -35,17 +35,15 @@ class HistoryController extends Controller
         $when = 'COALESCE(delivered_at, updated_at)';
 
         $orders = Order::with(['items', 'buyer.buyerProfile'])
-            ->where('delivery_rider_id', $courier->id)
+            ->whereRaw('COALESCE(earning_courier_id, delivery_rider_id) = ?', [$courier->id])
             ->whereIn('status', $statuses)
-            ->when($data['from'] ?? null, fn($q, $d) => $q->whereRaw("$when >= ?", [Carbon::parse($d)->startOfDay()]))
-            ->when($data['to'] ?? null, fn($q, $d) => $q->whereRaw("$when <= ?", [Carbon::parse($d)->endOfDay()]))
+            ->when($data['from'] ?? null, fn ($q, $d) => $q->whereRaw("$when >= ?", [Carbon::parse($d)->startOfDay()]))
+            ->when($data['to'] ?? null, fn ($q, $d) => $q->whereRaw("$when <= ?", [Carbon::parse($d)->endOfDay()]))
             ->orderByRaw("$when DESC")
             ->paginate(20);
 
-        $fee = RiderEarnings::feePerDelivery();
-
         return response()->json([
-            'data' => $orders->getCollection()->map(function (Order $o) use ($fee) {
+            'data' => $orders->getCollection()->map(function (Order $o) {
                 $ship = $o->ship_to;
                 $earned = in_array($o->status, RiderEarnings::EARNED_STATUSES, true);
 
@@ -57,8 +55,9 @@ class HistoryController extends Controller
                     'barangay' => $ship['barangay'],
                     'municipality' => $ship['municipality'],
                     'items_count' => $o->items->sum('quantity'),
-                    'cod_collected' => $o->cod_collected_amount !== null ? (float) $o->cod_collected_amount : null,
-                    'earning' => $earned ? $fee : 0,
+                    'cod_collected' => $o->cod_collected_amount !== null ? $o->cod_collected_amount : null,
+                    'earning' => $earned ? $o->rider_pay : '0.00',
+                    'currency' => 'PHP',
                     'finished_at' => ($o->delivered_at ?? $o->updated_at)?->toIso8601String(),
                 ];
             }),

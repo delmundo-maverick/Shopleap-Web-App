@@ -6,4 +6,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | --- | --- |
 | resources/views/components/nav*/** | .ai/rules/components.md |
 | app/Http/Controllers/Seller/Product*.php | .ai/rules/seller.md |
-| app/Services/SellerProductImages.php, app/Services/LogisticsDashboardService.php | .ai/rules/services.md |
+| app/Services/SellerProductImages.php, app/Services/LogisticsDashboardService.php, app/Services/RiderEarnings.php | .ai/rules/services.md |

@@ -37,6 +37,7 @@ use App\Http\Controllers\Logistics\PickupController;
 use App\Http\Controllers\Logistics\PortalController;
 use App\Http\Controllers\Logistics\ReportController as LogisticsReportController;
 use App\Http\Controllers\Logistics\RiderController;
+use App\Http\Controllers\Logistics\RiderRateController;
 use App\Http\Controllers\Logistics\ServiceAreaController;
 use App\Http\Controllers\Logistics\SortingController;
 use App\Http\Controllers\Logistics\SortingSessionController as LogisticsSortingSessionController;
@@ -641,6 +642,9 @@ Route::middleware(['auth', 'logistics', 'hub.scope'])
                     ->middleware('throttle:120,1')
                     ->name('scan.index');
             });
+
+        Route::get('/rider-rate', [RiderRateController::class, 'index'])->name('rider-rate.index');
+        Route::post('/rider-rate', [RiderRateController::class, 'store'])->name('rider-rate.store');
 
         // Reports
         Route::prefix('reports')

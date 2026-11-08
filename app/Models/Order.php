@@ -68,6 +68,9 @@ class Order extends Model
         return [
             'shipping_address' => 'array',
             'shipping_fee' => 'decimal:2',
+            'rider_pay' => 'decimal:2',
+            'delivered_shipping_fee' => 'decimal:2',
+            'earnings_recorded_at' => 'datetime',
             'voucher_discount' => 'decimal:2',
             'pickup_date' => 'date',
             'waybill_printed_at' => 'datetime',
@@ -457,6 +460,11 @@ class Order extends Model
     public function pickupRider()
     {
         return $this->belongsTo(CourierProfile::class, 'pickup_rider_id');
+    }
+
+    public function earningCourier(): BelongsTo
+    {
+        return $this->belongsTo(CourierProfile::class, 'earning_courier_id');
     }
 
     public function deliveryRider()

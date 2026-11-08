@@ -108,7 +108,7 @@ class DeliveryController extends Controller
 
         // Stand-in: records the expected COD amount.
         // The app sends the cash actually collected.
-        if (! $transitions->delivered($order, $request->user()->id)) {
+        if (! $transitions->delivered($order, $request->user()->id, expectedHubId: HubContext::id($request))) {
             return $this->wrongStage();
         }
 

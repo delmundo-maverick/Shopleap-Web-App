@@ -13,10 +13,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
- * @phpstan-type Report array{title: string, summary: array<int, array<string, mixed>>, secondary: array, columns: array<int, array{key: string, label: string, align: string}>, rows: array<int, array<string, mixed>>, chart: array<string, mixed>|null, notes: array<int, string>, hasData: bool, emptyMessage: string}
+ * @phpstan-type Report array{title: string, summary: array<int, array<string, mixed>>, secondary: array, columns: array<int, array{key: string, label: string, align: string}>, rows: iterable<int, array<string, mixed>>, chart: array<string, mixed>|null, notes: array<int, string>, hasData: bool, emptyMessage: string}
  */
 class LogisticsReportService
 {
+    public function __construct(private RiderEarnings $earnings) {}
+
     /** @return array<string, string> */
     public function types(): array
     {
@@ -29,7 +31,7 @@ class LogisticsReportService
     /** @param array<string, mixed> $filters
      * @return Report
      */
-    public function build(?int $hubId, Carbon $from, Carbon $to, string $type, array $filters = []): array
+    public function build(?int $hubId, Carbon $from, Carbon $to, string $type, array $filters = [], bool $paginate = false): array
     {
         if (! $hubId) {
             return $this->report($this->types()[$type] ?? 'Report', [], [], [], null, ['No hub context is available.']);
@@ -39,7 +41,8 @@ class LogisticsReportService
             'delivery_performance' => $this->delivery($hubId, $from, $to, $filters),
             'failed_returns' => $this->incidents($hubId, $from, $to, $filters, false),
             'damaged_lost' => $this->incidents($hubId, $from, $to, $filters, true),
-            'shipping_earnings', 'cod_remittance' => $this->money($hubId, $from, $to, $filters, $type),
+            'shipping_earnings' => $this->shippingEarnings($hubId, $from, $to, $filters, $paginate),
+            'cod_remittance' => $this->money($hubId, $from, $to, $filters, $type),
             'rider_performance' => $this->riderPerformance($hubId, $from, $to, $filters),
             'area_route' => $this->areas($hubId, $from, $to, $filters),
             'hub_throughput' => $this->throughput($hubId, $from, $to, $filters),
@@ -72,12 +75,18 @@ class LogisticsReportService
         return $query;
     }
 
+    public function ridersForHub(int $hubId): Builder
+    {
+        return CourierProfile::where('logistics_profile_id', $hubId)
+            ->orWhereIn('id', Order::where('earning_hub_id', $hubId)->whereNotNull('earning_courier_id')->select('earning_courier_id'));
+    }
+
     public function filterOptions(int $hubId): array
     {
         $orders = $this->scopedOrders($hubId);
         $sellers = User::whereIn('id', (clone $orders)->select('seller_id'))->with('sellerProfile')->orderBy('name')->get();
 
-        return ['riders' => CourierProfile::where('logistics_profile_id', $hubId)->orderBy('last_name')->get(),
+        return ['riders' => $this->ridersForHub($hubId)->orderBy('last_name')->get(),
             'sellers' => $sellers,
             'origins' => $sellers->map(fn (User $seller) => $seller->sellerProfile?->municipality)->filter()->unique()->sort()->values(),
             'destinations' => (clone $orders)->pluck('ship_municipality')->merge((clone $orders)->pluck('delivery_area'))->filter()->unique()->sort()->values()];
@@ -116,7 +125,7 @@ class LogisticsReportService
     {
         $columns = [];
         foreach ($labels as $key => $label) {
-            $columns[] = ['key' => $key, 'label' => $label, 'align' => in_array($key, ['count', 'share', 'amount', 'fees', 'volume', 'delivered', 'failed', 'attempts', 'parcels'], true) ? 'right' : 'left'];
+            $columns[] = ['key' => $key, 'label' => $label, 'align' => in_array($key, ['count', 'share', 'amount', 'fees', 'pay', 'margin', 'volume', 'delivered', 'failed', 'attempts', 'parcels'], true) ? 'right' : 'left'];
         }
 
         return $columns;
@@ -185,6 +194,53 @@ class LogisticsReportService
             $this->columns(['order' => 'Order', 'date' => 'Delivered at', 'rider' => 'Delivery rider', 'attempts' => 'Failed attempts', 'time' => 'Order to delivery']), $rows,
             $this->chart('Deliveries by day', $daily->keys()->all(), [['label' => 'Delivered', 'data' => $daily->values()->all()]], 'line'),
             ['Based on delivered_at, including orders created before the period. Delivery is credited to the destination hub.', 'delivery_attempts records failed attempts. Zero means delivered without a failed attempt. No delivery deadline is stored, so an on-time/late SLA cannot be calculated.']);
+    }
+
+    private function shippingEarnings(int $hubId, Carbon $from, Carbon $to, array $filters, bool $paginate): array
+    {
+        $query = $this->earnings->deliveries($hubId, isset($filters['rider_id']) ? (int) $filters['rider_id'] : null, $from, $to);
+        foreach (['status', 'seller_id'] as $column) {
+            if (! empty($filters[$column])) {
+                $query->where($column, $filters[$column]);
+            }
+        }
+        if (! empty($filters['origin_area'])) {
+            $query->whereHas('seller.sellerProfile', fn (Builder $profile) => $profile->where('municipality', $filters['origin_area']));
+        }
+        if (! empty($filters['destination_area'])) {
+            $query->where(fn (Builder $destination) => $destination->where('ship_municipality', $filters['destination_area'])->orWhere('delivery_area', $filters['destination_area']));
+        }
+        $totals = $this->earnings->totals($query);
+        $daily = (clone $query)->toBase()->selectRaw('DATE(delivered_at) AS day, COUNT(*) AS parcels')->groupByRaw('DATE(delivered_at)')->pluck('parcels', 'day');
+        $daily = $this->days($from, $to, $daily)->map(fn ($count) => (int) $count);
+        $groups = (clone $query)->toBase()->selectRaw('COALESCE(earning_courier_id, delivery_rider_id) AS courier_id, COUNT(*) AS parcels, SUM(rider_pay) AS rider_pay')
+            ->groupByRaw('COALESCE(earning_courier_id, delivery_rider_id)')->get();
+        $couriers = CourierProfile::whereIn('id', $groups->pluck('courier_id')->filter())->get()->keyBy('id');
+        $riders = $groups->map(fn ($group) => ['rider' => $couriers->get($group->courier_id)?->full_name ?? 'Unassigned',
+            'barangay' => $couriers->get($group->courier_id)?->barangay ?? '-', 'parcels' => (int) $group->parcels,
+            'pay' => $group->rider_pay === null ? '-' : $this->currency((float) $group->rider_pay)])->all();
+        $details = (clone $query)->with(['earningCourier', 'deliveryRider'])->orderByDesc('delivered_at')->orderByDesc('id');
+        $paginator = $paginate ? $details->paginate(25)->withQueryString() : null;
+        $rows = ($paginator ? $paginator->getCollection() : $details->lazy(250))->map(fn (Order $order) => [
+            'date' => $order->delivered_at->format('Y-m-d H:i'), 'order' => '#'.$order->id,
+            'rider' => ($order->earnings_recorded_at ? $order->earningCourier : $order->deliveryRider)?->full_name ?? 'Unassigned',
+            'fees' => $order->delivered_shipping_fee === null ? '-' : $this->currency((float) $order->delivered_shipping_fee),
+            'pay' => $order->rider_pay === null ? '-' : $this->currency((float) $order->rider_pay),
+            'margin' => $order->rider_pay === null || $order->delivered_shipping_fee === null ? '-' : $this->currency((float) $order->delivered_shipping_fee - (float) $order->rider_pay),
+        ]);
+        if ($paginator) {
+            $paginator->setCollection($rows);
+        }
+        $money = fn (?string $amount) => $amount === null ? ($totals['deliveries'] === 0 ? $this->currency(0) : '-') : $this->currency((float) $amount);
+
+        return ['title' => 'Shipping Fees & Earnings', 'summary' => $this->cards(['Parcels delivered' => $totals['deliveries'],
+            'Shipping fees collected' => $money($totals['shipping_fees']), 'Rider payouts owed' => $money($totals['rider_pay']), 'Net margin' => $money($totals['margin'])]),
+            'secondary' => $riders, 'columns' => $this->columns(['date' => 'Date', 'order' => 'Order', 'rider' => 'Rider', 'fees' => 'Shipping fee', 'pay' => 'Rider pay', 'margin' => 'Margin']),
+            'rows' => $rows, 'paginator' => $paginator, 'chart' => $this->chart('Parcels delivered per day', $daily->keys()->all(), [['label' => 'Delivered', 'data' => $daily->values()->all()]], 'line'),
+            'notes' => ['Delivery is credited to the recorded holding hub and courier. Legacy deliveries use their destination hub and assigned rider for parcel counts only.',
+                'Money totals include recorded delivery snapshots only. Missing pay and margins are shown as -; no old orders are backfilled.',
+                $totals['snapshots'].' of '.$totals['deliveries'].' deliveries have shipping snapshots; '.$totals['paid_snapshots'].' have rider pay. Net margin is unavailable if any shipping snapshot has no rider pay.'],
+            'hasData' => $totals['deliveries'] > 0, 'emptyMessage' => 'No delivered parcels in this period. Try a different date range or clear the filters.'];
     }
 
     private function money(int $hubId, Carbon $from, Carbon $to, array $filters, string $type): array

@@ -11,6 +11,12 @@
         ],
         'Rider Management' => [
             [
+                'key' => 'rider-rate',
+                'label' => 'Rider Rate',
+                'route' => 'logistics.rider-rate.index',
+                'icon' => \App\Support\NavigationIcons::forRoute('logistics.rider-rate.index'),
+            ],
+            [
                 'key' => 'riders',
                 'label' => 'Rider Applications',
                 'route' => 'logistics.riders.index',

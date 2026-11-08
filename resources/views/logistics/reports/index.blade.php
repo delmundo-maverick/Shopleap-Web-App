@@ -26,9 +26,22 @@
 
     <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Report totals">
         @foreach ($report['summary'] as $card)
-            <div class="rounded-lg border border-line bg-white p-4"><p class="text-xs font-semibold text-charcoal/60">{{ $card['label'] }}</p><p class="mt-2 text-2xl font-bold {{ $card['accent'] ? 'text-primary' : 'text-charcoal' }}">{{ $card['value'] }}</p></div>
+            <x-seller.stat-card :label="$card['label']" :value="0" :display-value="$card['value']" class="rounded bg-white shadow-none" />
         @endforeach
     </section>
+    @if ($type === 'shipping_earnings')
+        <section class="space-y-3">
+            <h2 class="text-sm font-bold">Per-rider earnings</h2>
+            <x-seller.data-table label="Per-rider earnings" responsive="scroll" class="rounded bg-white shadow-none">
+                <x-slot:head><tr><th>Rider</th><th>Barangay</th><th>Parcels delivered</th><th>Rider pay total</th></tr></x-slot:head>
+                @forelse ($report['secondary'] as $rider)
+                    <tr><td>{{ $rider['rider'] }}</td><td>{{ $rider['barangay'] }}</td><td>{{ $rider['parcels'] }}</td><td>{{ $rider['pay'] }}</td></tr>
+                @empty
+                    <tr><td colspan="4" class="py-8 text-center">No rider deliveries in this period.</td></tr>
+                @endforelse
+            </x-seller.data-table>
+        </section>
+    @endif
     @if (!$report['hasData'])
         <section class="rounded-lg border border-dashed border-line bg-white px-5 py-14 text-center"><h2 class="font-semibold">No matching records</h2><p class="mt-2 text-sm text-charcoal/60">{{ $report['emptyMessage'] }}</p></section>
     @else
@@ -36,8 +49,12 @@
             <section class="rounded-lg border border-line bg-white p-4 sm:p-5"><h2 class="text-sm font-bold">{{ $report['chart']['title'] }}</h2><p class="mt-1 text-xs text-charcoal/55">{{ $report['chart']['subtitle'] }}</p><div class="relative mt-4 h-72"><canvas id="reportChart" role="img" aria-label="{{ $report['chart']['title'] }}. The same data is available in the table below."></canvas></div><p data-chart-error hidden class="mt-3 text-xs text-sale-red">Chart could not load. All report figures remain available below.</p></section>
         @endif
         <section class="overflow-hidden rounded-lg border border-line bg-white">
-            <div class="flex items-center justify-between gap-3 border-b border-line px-4 py-3"><h2 class="text-sm font-bold">Detailed breakdown</h2><span class="text-xs text-charcoal/55">{{ $rows->total() }} records</span></div>
-            <div class="overflow-x-auto"><table class="app-table w-full text-left text-xs"><thead><tr>@foreach ($report['columns'] as $column)<th scope="col" class="whitespace-nowrap px-4 py-3 font-semibold {{ $column['align'] === 'right' ? 'text-right' : '' }}">{{ $column['label'] }}</th>@endforeach</tr></thead><tbody>@foreach ($rows as $row)<tr class="hover:bg-ice-blue/60">@foreach ($report['columns'] as $column)<td class="px-4 py-3 align-top {{ $column['align'] === 'right' ? 'text-right tabular-nums' : '' }}">{{ $row[$column['key']] ?? '' }}</td>@endforeach</tr>@endforeach</tbody></table></div>
+            <div class="flex items-center justify-between gap-3 border-b border-line px-4 py-3"><h2 class="text-sm font-bold">{{ $type === 'shipping_earnings' ? 'Delivered parcels' : 'Detailed breakdown' }}</h2><span class="text-xs text-charcoal/55">{{ $rows->total() }} records</span></div>
+            <x-seller.data-table label="Delivered parcels and report details" responsive="scroll" class="rounded bg-white shadow-none">
+                <x-slot:head><tr>@foreach ($report['columns'] as $column)<th scope="col" class="whitespace-nowrap px-4 py-3 font-semibold {{ $column['align'] === 'right' ? 'text-right' : '' }}">{{ $column['label'] }}</th>@endforeach</tr></x-slot:head>
+                @forelse ($rows as $row)<tr>@foreach ($report['columns'] as $column)<td class="px-4 py-3 align-top {{ $column['align'] === 'right' ? 'text-right tabular-nums' : '' }}">{{ $row[$column['key']] ?? '' }}</td>@endforeach</tr>
+                @empty<tr><td colspan="{{ count($report['columns']) }}" class="py-8 text-center">No records on this page.</td></tr>@endforelse
+            </x-seller.data-table>
             @if ($rows->hasPages())<div class="border-t border-line p-4">{{ $rows->links() }}</div>@endif
         </section>
     @endif

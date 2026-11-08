@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Logistics;
 
 use App\Http\Controllers\Controller;
-use App\Models\CourierProfile;
 use App\Models\LogisticsProfile;
 use App\Models\Order;
 use App\Services\HubContext;
@@ -25,9 +24,9 @@ class ReportController extends Controller
     public function index(Request $request, LogisticsReportService $service): View
     {
         [$hub, $from, $to, $params] = $this->parameters($request, $service);
-        $report = $service->build($hub->id, $from, $to, $params['type'], $params);
+        $report = $service->build($hub->id, $from, $to, $params['type'], $params, paginate: true);
         $page = LengthAwarePaginator::resolveCurrentPage();
-        $rows = new LengthAwarePaginator(array_slice($report['rows'], ($page - 1) * 25, 25), count($report['rows']), 25, $page,
+        $rows = $report['paginator'] ?? new LengthAwarePaginator(array_slice($report['rows'], ($page - 1) * 25, 25), count($report['rows']), 25, $page,
             ['path' => $request->url(), 'query' => $params]);
 
         return view('logistics.reports.index', ['report' => $report, 'rows' => $rows, 'from' => $from, 'to' => $to,
@@ -82,7 +81,7 @@ class ReportController extends Controller
             'from' => ['required_if:preset,custom', 'nullable', 'date_format:Y-m-d'],
             'to' => ['required_if:preset,custom', 'nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
             'status' => ['nullable', Rule::in($this->statuses())],
-            'rider_id' => ['nullable', 'integer', Rule::exists(CourierProfile::class, 'id')->where('logistics_profile_id', $hub->id)],
+            'rider_id' => ['nullable', 'integer', Rule::in($service->ridersForHub($hub->id)->pluck('id')->all())],
             'seller_id' => ['nullable', 'integer', Rule::in($service->scopedOrders($hub->id)->distinct()->pluck('seller_id')->all())],
             'origin_area' => ['nullable', 'string', 'max:255'], 'destination_area' => ['nullable', 'string', 'max:255'],
             'payment_type' => ['nullable', Rule::in(['COD'])],

@@ -55,7 +55,7 @@
         </table>
     @endif
 
-    @if (! empty($report['columns']) && ! empty($report['rows']))
+    @if ($report['hasData'])
         <h2>Details</h2>
         <table class="grid">
             <thead>
