@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Auth\Concerns\HandlesOtpRegistration;
 use App\Http\Controllers\Controller;
+use App\Rules\UniqueRoleEmail;
 use App\Services\OtpService;
 use App\Support\PolicyAcceptance;
 use Carbon\Carbon;
@@ -21,8 +22,10 @@ class BuyerRegistrationController extends Controller
 
     public function store(Request $request, OtpService $otpService)
     {
+        $request->merge(['email' => strtolower(trim((string) $request->input('email')))]);
+
         $validated = $request->validate([
-            'email' => ['required', 'email', 'unique:users,email'],
+            'email' => ['required', 'email', 'max:255', new UniqueRoleEmail('buyer')],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'last_name' => ['required', 'string', 'max:100'],
             'first_name' => ['required', 'string', 'max:100'],

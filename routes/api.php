@@ -44,7 +44,7 @@ Route::prefix('courier')->group(function () {
 
     // Signed-in couriers, regardless of approval state.
     // Pending, rejected, and approved couriers can access these routes.
-    Route::middleware(['auth:sanctum', 'courier'])->group(function () {
+    Route::middleware(['auth:sanctum', 'courier', 'throttle:courier-reads', 'throttle:mutations'])->group(function () {
 
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
@@ -61,7 +61,7 @@ Route::prefix('courier')->group(function () {
     });
 
     // Approved, active couriers of approved hubs.
-    Route::middleware(['auth:sanctum', 'courier:approved'])->group(function () {
+    Route::middleware(['auth:sanctum', 'courier:approved', 'throttle:courier-reads', 'throttle:mutations'])->group(function () {
 
         // Pickups.
         Route::get('/pickups', [PickupController::class, 'index']);

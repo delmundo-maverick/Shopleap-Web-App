@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\DashboardController;
 use App\Models\LogisticsProfile;
 use App\Models\User;
 use App\Notifications\LogisticsDecisionNotification;
@@ -89,6 +90,43 @@ it('does not authenticate logistics credentials on main', function () {
     $this->post(Portal::url('main', 'login'), ['email' => $user->email, 'password' => 'password'])
         ->assertSessionHasErrors('email');
     $this->assertGuest();
+});
+
+it('logs admins in through the shared login and keeps their dashboard session', function () {
+    expect(Portal::host('admin'))->toBe(Portal::host('main'));
+
+    $admin = User::factory()->create(['role' => 'super_admin']);
+    $this->partialMock(DashboardController::class)
+        ->shouldReceive('index')->once()->andReturn(response('Admin dashboard'));
+
+    $this->post(Portal::url('main', 'login'), ['email' => $admin->email, 'password' => 'password'])
+        ->assertSessionHasNoErrors()->assertRedirect(route('admin.dashboard'));
+    $this->assertAuthenticatedAs($admin);
+    $this->get(route('admin.dashboard'))->assertOk()->assertSee('Admin dashboard');
+    $this->assertAuthenticatedAs($admin);
+});
+
+it('rejects invalid admin credentials on the shared login', function () {
+    $admin = User::factory()->create(['role' => 'super_admin']);
+
+    $this->post(Portal::url('main', 'login'), ['email' => $admin->email, 'password' => 'wrong-password'])
+        ->assertSessionHasErrors('email');
+    $this->assertGuest();
+});
+
+it('keeps admin pages restricted to admins on the shared host', function (string $role) {
+    $this->actingAs(User::factory()->create(['role' => $role]))
+        ->get(route('admin.dashboard'))->assertForbidden();
+})->with(['buyer', 'seller']);
+
+it('preserves role isolation when a separate admin host is configured', function () {
+    config(['portals.admin' => 'http://admin.localhost:8000']);
+
+    expect(Portal::loginRoles(Request::create(Portal::url('main', 'login'))))->toBe(['buyer', 'seller'])
+        ->and(Portal::loginRoles(Request::create(Portal::url('admin', 'login'))))->toBe(['super_admin']);
+
+    $this->get(Portal::url('main', 'admin/dashboard'))
+        ->assertRedirect(Portal::url('admin', 'admin/dashboard'));
 });
 
 it('does not authenticate other roles on logistics', function (string $role) {

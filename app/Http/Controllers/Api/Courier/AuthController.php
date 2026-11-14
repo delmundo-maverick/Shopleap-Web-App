@@ -8,9 +8,11 @@ use App\Models\HubServiceArea;
 use App\Models\HubServiceAreaBarangay;
 use App\Models\LogisticsProfile;
 use App\Models\User;
+use App\Rules\UniqueRoleEmail;
 use App\Services\HubBarangayCatalog;
 use App\Services\OtpService;
 use Carbon\Carbon;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -35,7 +37,7 @@ class AuthController extends Controller
             'first_name' => ['required', 'string', 'max:100'],
             'middle_initial' => ['nullable', 'string', 'max:5'],
             'sex' => ['required', 'in:male,female'],
-            'email' => ['required', 'email', 'unique:users,email'],
+            'email' => ['required', 'email', 'max:255', new UniqueRoleEmail('courier')],
             'contact_no' => ['required', 'string', 'max:20'],
             'birthday' => ['required', 'date', 'before:today'],
             'province' => ['required', 'string', 'not_regex:/^\d+$/'],
@@ -119,12 +121,14 @@ class AuthController extends Controller
             'otp' => ['required', 'digits:6'],
         ]);
 
-        $email = strtolower($data['email']);
+        $email = strtolower(trim($data['email']));
         $pending = Cache::get($this->cacheKey($email));
 
         if (! $pending) {
             return response()->json(['message' => 'Your registration expired. Please start again.'], 422);
         }
+
+        validator(['email' => $email], ['email' => [new UniqueRoleEmail('courier')]])->validate();
 
         [$ok, $message] = $otp->verify($email, 'courier', $data['otp']);
 
@@ -132,10 +136,16 @@ class AuthController extends Controller
             return response()->json(['message' => $message], 422);
         }
 
-        DB::transaction(function () use ($pending) {
-            $user = User::create($pending['user'] + ['email_verified_at' => now()]);
-            CourierProfile::create($pending['profile'] + ['user_id' => $user->id]);
-        });
+        try {
+            DB::transaction(function () use ($pending) {
+                $user = User::create($pending['user'] + ['email_verified_at' => now()]);
+                CourierProfile::create($pending['profile'] + ['user_id' => $user->id]);
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            validator(['email' => $pending['user']['email']], ['email' => [new UniqueRoleEmail('courier')]])->validate();
+
+            throw $exception;
+        }
 
         Cache::forget($this->cacheKey($email));
         $otp->consume($email, 'courier');
@@ -148,7 +158,7 @@ class AuthController extends Controller
 
     public function resendOtp(Request $request, OtpService $otp): JsonResponse
     {
-        $email = strtolower($request->validate(['email' => ['required', 'email']])['email']);
+        $email = strtolower(trim($request->validate(['email' => ['required', 'email']])['email']));
 
         if (! Cache::has($this->cacheKey($email))) {
             return response()->json(['message' => 'Your registration expired. Please start again.'], 422);
@@ -167,7 +177,7 @@ class AuthController extends Controller
             'device_name' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $user = User::whereRaw('LOWER(email) = ?', [strtolower($data['email'])])->first();
+        $user = User::withEmail($data['email'])->where('role', 'courier')->first();
 
         if (! $user || $user->role !== 'courier' || ! Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages(['email' => 'These credentials do not match our records.']);
@@ -279,7 +289,7 @@ class AuthController extends Controller
             $request->validate(['email' => ['required', 'email']])['email']
         ));
 
-        $isRider = User::whereRaw('LOWER(email) = ?', [$email])
+        $isRider = User::withEmail($email)
             ->where('role', 'courier')
             ->whereNotNull('email_verified_at')
             ->exists();
@@ -307,7 +317,7 @@ class AuthController extends Controller
 
         $email = strtolower(trim($data['email']));
 
-        $user = User::whereRaw('LOWER(email) = ?', [$email])
+        $user = User::withEmail($email)
             ->where('role', 'courier')
             ->first();
 

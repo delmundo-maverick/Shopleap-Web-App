@@ -240,7 +240,7 @@
                                 <tbody>
                                     @foreach ($orders as $order)
                                         <tr class="transition hover:bg-white/40">
-                                            <td class="px-5 py-4 font-semibold">#{{ $order->id }}</td>
+                                            <td class="px-5 py-4 font-semibold">#{{ $order->order_number }}</td>
                                             <td class="px-5 py-4 text-charcoal/70">{{ $order->buyer_name }}</td>
                                             <td class="px-5 py-4 text-charcoal/70">
                                                 {{ $order->seller->sellerProfile->business_name ?? ($order->seller->name ?? '—') }}
@@ -270,7 +270,6 @@
     </div>
 
     <script id="transactionsData" type="application/json">@json($chartPayload)</script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
 </body>
 

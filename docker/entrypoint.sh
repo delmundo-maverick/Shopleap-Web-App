@@ -2,11 +2,7 @@
 set -e
 cd /var/www
 
-# Cache at runtime so Render's env vars are available.
-# "|| echo" means a caching failure is logged but won't stop the app from starting.
-php artisan config:cache || echo "WARNING: config:cache failed"
-php artisan route:cache  || echo "WARNING: route:cache failed (closure routes?)"
-php artisan view:cache   || echo "WARNING: view:cache failed"
+sh /var/www/docker/prepare-deploy.sh
 
 chown -R www-data:www-data storage bootstrap/cache
 

@@ -101,7 +101,7 @@
                                         @foreach ($returns as $return)
                                             <tr class="transition hover:bg-white/40">
                                                 <td class="px-5 py-4 font-semibold">#{{ $return->id }}</td>
-                                                <td class="px-5 py-4">#{{ $return->order_id }}</td>
+                                                <td class="px-5 py-4">#{{ $return->order?->order_number }}</td>
                                                 <td class="px-5 py-4 text-charcoal/80">{{ $return->order->buyer_name }}
                                                 </td>
                                                 <td class="px-5 py-4 text-charcoal/80">

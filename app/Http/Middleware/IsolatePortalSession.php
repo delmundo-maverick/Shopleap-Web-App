@@ -25,7 +25,7 @@ class IsolatePortalSession
         $request->session()->put('portal_host', $host);
 
         $user = $request->user();
-        if ($user && (($user->role === 'logistics') !== Portal::isLogistics($request))) {
+        if ($user && ! in_array($user->role, Portal::loginRoles($request), true)) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();

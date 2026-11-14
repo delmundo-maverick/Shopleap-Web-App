@@ -238,3 +238,12 @@
     min-height: 0;
     padding-block: 0;
 }
+
+/* Public pages use the buyer header's 40px mark and 30px wordmark. */
+.public-brand { --public-brand-height: 2.5rem; gap: .5rem; text-decoration: none; }
+.public-brand > div { width: var(--public-brand-height); height: var(--public-brand-height); }
+.public-brand > div > img,
+.buyer-header .nav-brand .public-brand img { width: 100%; height: 100%; }
+.public-brand > .font-logo,
+.buyer-header .nav-brand .public-brand > .font-logo { font-size: calc(var(--public-brand-height) * .75); font-weight: 500; line-height: 1; }
+.public-brand-label { align-self: center; padding-left: .5rem; border-left: 1px solid currentColor; font-size: .6875rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }

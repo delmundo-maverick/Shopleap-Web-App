@@ -36,19 +36,7 @@
                 </div>
 
                 <div class="flex items-center gap-4">
-                    <div class="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 frost-chip">
-                        <div
-                            class="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
-                            {{ strtoupper(substr($sellerProfile->first_name ?? (auth()->user()->name ?? 'S'), 0, 1)) }}
-                        </div>
-
-                        <div class="hidden sm:block">
-                            <p class="text-sm font-semibold leading-tight text-charcoal">
-                                {{ auth()->user()->name }}
-                            </p>
-                            <p class="text-xs leading-tight text-charcoal/50">Seller</p>
-                        </div>
-                    </div>
+                    <x-notification-bell />
                 </div>
 
             </header>

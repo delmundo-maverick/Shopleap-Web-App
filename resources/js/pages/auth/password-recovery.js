@@ -46,7 +46,8 @@ if (resend) {
     tick();
 }
 document.querySelectorAll('[data-recovery-form]').forEach(form => {
-    form.addEventListener('submit', () => {
+    form.addEventListener('submit', event => {
+        if (form.getAttribute('aria-busy') === 'true') { event.preventDefault(); return; }
         const button = form.querySelector('button');
         button.disabled = true;
         button.textContent = button.dataset.loading;

@@ -38,7 +38,7 @@
                     </a>
                     <div>
                         <h1 class="workspace-header-title">Case #{{ $return->id }} · Order
-                            #{{ $return->order_id }}</h1>
+                            #{{ $return->order?->order_number }}</h1>
                         <p class="workspace-header-subtitle">{{ $return->type_label }} · requested
                             {{ $return->created_at->format('M d, Y g:i A') }}</p>
                     </div>

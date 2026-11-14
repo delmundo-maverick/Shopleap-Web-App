@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Buyer\Concerns\LoadsCartSummary;
+use App\Support\OrderCodes;
 use Illuminate\Http\Request;
 
 class NotificationController extends Controller
@@ -19,6 +20,7 @@ class NotificationController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        OrderCodes::presentNotifications($notifications->getCollection());
         $unread = $user->unreadNotifications()->count();
 
         // The buyer's page uses the shop header, which needs the cart summary.
@@ -34,16 +36,17 @@ class NotificationController extends Controller
 
         $items = $user->notifications()
             ->limit(15)
-            ->get()
-            ->map(fn($n) => [
-                'id' => $n->id,
-                'kind' => $n->data['kind'] ?? '',
-                'title' => $n->data['title'] ?? 'Update',
-                'body' => $n->data['body'] ?? '',
-                'url' => $this->safeUrl($n->data['url'] ?? null),
-                'read' => $n->read_at !== null,
-                'time' => $n->created_at->diffForHumans(),
-            ])
+            ->get();
+        OrderCodes::presentNotifications($items);
+        $items = $items->map(fn ($n) => [
+            'id' => $n->id,
+            'kind' => $n->data['kind'] ?? '',
+            'title' => $n->data['title'] ?? 'Update',
+            'body' => $n->data['body'] ?? '',
+            'url' => $this->safeUrl($n->data['url'] ?? null),
+            'read' => $n->read_at !== null,
+            'time' => $n->created_at->diffForHumans(),
+        ])
             ->values();
 
         return response()
@@ -56,6 +59,7 @@ class NotificationController extends Controller
     {
         $notification = $request->user()->notifications()->whereKey($id)->firstOrFail();
         $notification->markAsRead();
+        OrderCodes::presentNotifications([$notification]);
 
         $url = $this->safeUrl($notification->data['url'] ?? null) ?? route('notifications.index', [], false);
 

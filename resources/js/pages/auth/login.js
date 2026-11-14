@@ -47,7 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
         submitArrow?.classList.toggle('hidden', isSubmitting);
     };
 
-    form.addEventListener('submit', () => setSubmitting(true));
+    form.addEventListener('submit', event => {
+        if (submit?.disabled) { event.preventDefault(); return; }
+        setSubmitting(true);
+    });
 
     // Restore the button if the page is shown again from the back/forward cache
     window.addEventListener('pageshow', (event) => {

@@ -33,7 +33,7 @@ class ReturnController extends Controller
         $tab = array_key_exists($request->get('tab'), self::TABS) ? $request->get('tab') : 'disputes';
 
         $counts = collect(self::TABS)
-            ->map(fn($statuses) => OrderReturn::whereIn('status', $statuses)->count())
+            ->map(fn ($statuses) => OrderReturn::whereIn('status', $statuses)->count())
             ->all();
 
         $query = OrderReturn::with(['order', 'seller.sellerProfile'])
@@ -43,9 +43,9 @@ class ReturnController extends Controller
             $search = trim($request->search);
 
             $query->where(function ($q) use ($search) {
-                $q->where('order_id', is_numeric($search) ? (int) $search : 0)
-                    ->orWhereHas('order', fn($o) => $o->where('buyer_name', 'ilike', "%{$search}%"))
-                    ->orWhereHas('seller.sellerProfile', fn($s) => $s->where('business_name', 'ilike', "%{$search}%"));
+                $q->whereHas('order', fn ($order) => $order->matchingPublicCode($search))
+                    ->orWhereHas('order', fn ($o) => $o->where('buyer_name', 'ilike', "%{$search}%"))
+                    ->orWhereHas('seller.sellerProfile', fn ($s) => $s->where('business_name', 'ilike', "%{$search}%"));
             });
         }
 
@@ -90,7 +90,7 @@ class ReturnController extends Controller
         ActivityLogger::log(
             $approve ? 'return.approved' : 'return.rejected',
             'Returns',
-            "Return/refund #{$orderReturn->id} for order #{$orderReturn->order_id} " . ($approve ? 'approved' : 'rejected') . ' after review.',
+            "Return/refund #{$orderReturn->id} for order #{$orderReturn->order_id} ".($approve ? 'approved' : 'rejected').' after review.',
             $orderReturn
         );
 
@@ -115,7 +115,7 @@ class ReturnController extends Controller
         ActivityLogger::log(
             'return.refunded',
             'Returns',
-            "Refund of ₱" . number_format($orderReturn->refund_amount, 2) . " sent for return #{$orderReturn->id} (order #{$orderReturn->order_id}).",
+            'Refund of ₱'.number_format($orderReturn->refund_amount, 2)." sent for return #{$orderReturn->id} (order #{$orderReturn->order_id}).",
             $orderReturn
         );
 

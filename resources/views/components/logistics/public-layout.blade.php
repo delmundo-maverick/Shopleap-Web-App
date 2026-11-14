@@ -8,13 +8,17 @@
     @if ($noindex)<meta name="robots" content="noindex, nofollow">@endif
     <link rel="icon" type="image/png" href="{{ asset('images/Shopleap-Logo.png') }}">
     <title>{{ $title }} | ShopLeap Logistics</title>
-    @vite(['resources/css/app.css', 'resources/css/pages/logistics/portal.css'])
+    @vite(['resources/css/app.css', 'resources/css/pages/logistics/portal.css', 'resources/js/shared/landing-viewport.js'])
 </head>
 <body class="logistics-portal">
     <a class="portal-skip" href="#content">Skip to content</a>
     <x-logistics.public-header />
     <main id="content">{{ $slot }}</main>
     <footer class="portal-footer">
+        <div class="portal-container portal-footer-top">
+            <div><p class="portal-footer-brand">Shopleap <span>Logistics</span></p><p>A little coordination. A smoother delivery.<br>Your next chapter starts here.</p></div>
+            <div><p class="portal-eyebrow">Grow with us</p><a href="{{ route('register.logistics') }}">Become a logistics partner &rarr;</a></div>
+        </div>
         <div class="portal-container">
             <p>&copy; {{ now()->year }} ShopLeap Logistics</p>
             <nav aria-label="Footer">

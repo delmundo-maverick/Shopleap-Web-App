@@ -9,7 +9,7 @@
                     <a class="portal-button" href="{{ route('register.logistics') }}">Register your company <span aria-hidden="true">&rarr;</span></a>
                     <a class="portal-button portal-button-light" href="{{ route('login') }}">Log in</a>
                 </div>
-                <p class="portal-small">For logistics companies ready to go the extra mile.</p>
+                <p class="portal-small">For logistics companies ready to go the extra mile. Grow with us.</p>
             </div>
             <aside class="portal-route-card" aria-label="Your delivery network">
                 <p class="portal-eyebrow">Built for your next delivery</p>
@@ -69,11 +69,10 @@
                 ['Who can register?', 'An authorized representative of a logistics company with the required business documents can apply.'],
                 ['How are riders added?', 'Riders use the ShopLeap Rider app to apply to your sorting center. Once your company is approved, you can review and approve their applications in the portal.'],
                 ['Which documents do I need?', 'An SEC Certificate, BIR Form 2303, Mayor’s or Business Permit, and a valid ID of the authorized representative. Upload JPG, PNG or PDF files up to 5 MB each.'],
-                ['How can I get support?', 'After signing in, use Help in your Logistics portal to contact the support team. If a support email is listed below, you can also contact us there.'],
+                ['How can I get support?', 'After signing in, use Help in your Logistics portal to contact the support team.'],
             ] as [$question, $answer])
                 <details><summary>{{ $question }}</summary><p>{{ $answer }}</p></details>
             @endforeach
-            @if (config('portals.support_email'))<p class="portal-support">Need a hand? <a href="mailto:{{ config('portals.support_email') }}">{{ config('portals.support_email') }}</a></p>@endif
         </div>
     </section>
     <section class="portal-final-cta portal-container"><div><h2>Your next chapter starts here.</h2><p>Put your delivery network to work with ShopLeap.</p></div><a class="portal-button" href="{{ route('register.logistics') }}">Register your company &rarr;</a></section>

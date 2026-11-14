@@ -1,4 +1,4 @@
-<x-logistics.layout title="Outbound Transfer" subtitle="Bag parcels for another hub of your company, seal it, and dispatch it"
+<x-logistics.layout title="Outbound Transfer" subtitle="Select parcels, seal the bag, print its manifest, then put it in transit"
     active="outbound">
 
     @php
@@ -57,7 +57,7 @@
 
                         <ul class="mt-3 space-y-1 text-xs text-charcoal/70">
                             @foreach ($orders->take(4) as $order)
-                                <li>#{{ $order->id }} · {{ $order->items->sum('quantity') }} item(s)</li>
+                                <li>#{{ $order->order_number }} · {{ $order->items->sum('quantity') }} item(s)</li>
                             @endforeach
                             @if ($orders->count() > 4)
                                 <li class="text-charcoal/50">+ {{ $orders->count() - 4 }} more</li>

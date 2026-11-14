@@ -33,17 +33,7 @@
         @endforeach
     </div>
 
-    <script>
-        (function() {
-            document.querySelectorAll('.announcement-banner').forEach(function(el) {
-                if (localStorage.getItem('dismissed_announcement_' + el.dataset.announcementId)) el.remove();
-            });
-            document.querySelectorAll('.announcement-dismiss-btn').forEach(function(btn) {
-                btn.addEventListener('click', function() {
-                    localStorage.setItem('dismissed_announcement_' + this.dataset.id, '1');
-                    this.closest('.announcement-banner').remove();
-                });
-            });
-        })();
-    </script>
+    @once
+        @vite('resources/js/components/announcement-banner.js')
+    @endonce
 @endif

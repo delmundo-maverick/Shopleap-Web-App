@@ -51,6 +51,16 @@ class User extends Authenticatable
         ];
     }
 
+    public function setEmailAttribute(string $email): void
+    {
+        $this->attributes['email'] = strtolower(trim($email));
+    }
+
+    public function scopeWithEmail(Builder $query, string $email): Builder
+    {
+        return $query->whereRaw('LOWER(TRIM(email)) = ?', [strtolower(trim($email))]);
+    }
+
     public function getAvatarUrlAttribute(): ?string
     {
         if (! $this->avatar_path) {

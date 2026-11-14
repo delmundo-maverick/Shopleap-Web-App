@@ -9,25 +9,24 @@ use Illuminate\Http\Request;
 
 class ReviewController extends Controller
 {
-
     private const REPLY_TEMPLATES = [
         // 4–5 star reviews
         'positive' => [
             [
                 'label' => 'Thank you',
-                'text'  => 'Thank you so much for your kind review! We are happy you enjoyed your {product}. We hope to serve you again soon.',
+                'text' => 'Thank you so much for your kind review! We are happy you enjoyed your {product}. We hope to serve you again soon.',
             ],
             [
                 'label' => 'Salamat po',
-                'text'  => 'Salamat po for shopping with {shop}! We are glad you loved your order. See you again on your next purchase!',
+                'text' => 'Salamat po for shopping with {shop}! We are glad you loved your order. See you again on your next purchase!',
             ],
             [
                 'label' => 'Appreciate support',
-                'text'  => 'We really appreciate your feedback and your support for our shop. Your review motivates us to keep delivering quality products. Looking forward to your next order!',
+                'text' => 'We really appreciate your feedback and your support for our shop. Your review motivates us to keep delivering quality products. Looking forward to your next order!',
             ],
             [
                 'label' => 'Great rating',
-                'text'  => 'Thank you for the great rating! We will keep working to give every customer the same experience. Enjoy your {product}!',
+                'text' => 'Thank you for the great rating! We will keep working to give every customer the same experience. Enjoy your {product}!',
             ],
         ],
 
@@ -35,19 +34,19 @@ class ReviewController extends Controller
         'negative' => [
             [
                 'label' => 'Apologize & offer help',
-                'text'  => 'We are sorry that your {product} did not meet your expectations. Please message us through chat so we can make this right for you.',
+                'text' => 'We are sorry that your {product} did not meet your expectations. Please message us through chat so we can make this right for you.',
             ],
             [
                 'label' => 'Replacement / refund',
-                'text'  => 'Thank you for your honest feedback, and we apologize for the inconvenience. Please contact us through chat with your order number so we can help with a replacement or refund.',
+                'text' => 'Thank you for your honest feedback, and we apologize for the inconvenience. Please contact us through chat with your order number so we can help with a replacement or refund.',
             ],
             [
                 'label' => 'Sorry po',
-                'text'  => 'Sorry po for the trouble with your order. We would love a chance to fix this. Kindly send us a message with your order number and photos so we can assist you right away.',
+                'text' => 'Sorry po for the trouble with your order. We would love a chance to fix this. Kindly send us a message with your order number and photos so we can assist you right away.',
             ],
             [
                 'label' => 'Will improve',
-                'text'  => 'We appreciate you telling us about this. We will use your feedback to improve our products and packaging, and we would like to resolve this with you directly through chat.',
+                'text' => 'We appreciate you telling us about this. We will use your feedback to improve our products and packaging, and we would like to resolve this with you directly through chat.',
             ],
         ],
     ];
@@ -77,13 +76,13 @@ class ReviewController extends Controller
         $unreplied = (int) ($summary->unreplied ?? 0);
 
         $stats = [
-            'count'     => $total,
-            'average'   => $total > 0 ? round((float) $summary->average, 1) : null,
+            'count' => $total,
+            'average' => $total > 0 ? round((float) $summary->average, 1) : null,
             'unreplied' => $unreplied,
-            'replied'   => $total - $unreplied,
+            'replied' => $total - $unreplied,
         ];
 
-        $query = Review::with(['media', 'orderItem', 'product', 'buyer'])
+        $query = Review::with(['media', 'orderItem', 'product', 'buyer', 'order'])
             ->where('seller_id', $user->id)
             ->latest();
 
@@ -101,18 +100,18 @@ class ReviewController extends Controller
             $query->whereNotNull('seller_reply');
         }
 
-        $reviews = $query->paginate(10)->withQueryString()->through(fn(Review $review) => [
-            'id'         => $review->id,
-            'rating'     => $review->rating,
-            'comment'    => $review->comment,
-            'product'    => $review->orderItem?->product_name ?? $review->product?->name ?? 'Product',
-            'buyer'      => $review->buyer_masked_name,
-            'order_id'   => $review->order_id,
+        $reviews = $query->paginate(10)->withQueryString()->through(fn (Review $review) => [
+            'id' => $review->id,
+            'rating' => $review->rating,
+            'comment' => $review->comment,
+            'product' => $review->orderItem?->product_name ?? $review->product?->name ?? 'Product',
+            'buyer' => $review->buyer_masked_name,
+            'order_id' => $review->order?->order_number,
             'created_at' => $review->created_at,
-            'reply'      => $review->seller_reply,
+            'reply' => $review->seller_reply,
             'replied_at' => $review->seller_replied_at,
-            'media'      => $review->media->map(fn($m) => [
-                'url'      => $m->url,
+            'media' => $review->media->map(fn ($m) => [
+                'url' => $m->url,
                 'is_video' => $m->is_video,
             ])->values(),
         ]);
@@ -149,7 +148,7 @@ class ReviewController extends Controller
         $isEdit = filled($review->seller_reply);
 
         $review->update([
-            'seller_reply'      => trim($data['reply']),
+            'seller_reply' => trim($data['reply']),
             'seller_replied_at' => now(),
         ]);
 
@@ -161,7 +160,7 @@ class ReviewController extends Controller
         $this->authorizeOwnership($request, $review);
 
         $review->update([
-            'seller_reply'      => null,
+            'seller_reply' => null,
             'seller_replied_at' => null,
         ]);
 

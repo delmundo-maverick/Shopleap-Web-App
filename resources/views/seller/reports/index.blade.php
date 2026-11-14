@@ -369,7 +369,6 @@
     </div>
 
     <script id="reportData" type="application/json">@json($chartPayload)</script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
 </body>
 

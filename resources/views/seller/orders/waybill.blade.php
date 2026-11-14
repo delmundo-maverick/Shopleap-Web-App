@@ -139,7 +139,7 @@
                 <span class="muted">Shipping Waybill</span>
             </td>
             <td width="40%" style="text-align: right;">
-                <span class="order-id">Order #{{ $order->id }}</span><br>
+                <span class="order-id">Order #{{ $order->waybill_order_number }}</span><br>
                 <span class="muted">{{ $order->created_at->format('M d, Y') }}</span>
             </td>
         </tr>

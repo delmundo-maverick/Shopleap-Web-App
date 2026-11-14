@@ -438,6 +438,7 @@
 
     {{-- Shared Message Widget --}}
     <x-Buyer.message-widget />
+    <x-footer />
 </body>
 
 </html>

@@ -1,10 +1,16 @@
+import { pollingRequest } from './polling-request.js';
+
 export function notificationBell(cfg) {
+            const fetchFeed = pollingRequest(15000);
             return {
                 open: false,
                 loading: false,
                 failed: false,
                 unread: cfg.unread,
                 items: [],
+                timer: null,
+                onVisibility: null,
+                markingAll: false,
 
                 init() {
                     if (cfg.navDropdownId) {
@@ -16,13 +22,19 @@ export function notificationBell(cfg) {
                         });
                     }
                     // Keep the count and list fresh while the tab is visible.
-                    setInterval(() => {
+                    this.timer = setInterval(() => {
                         if (!document.hidden) this.refresh();
                     }, 45000);
 
-                    document.addEventListener('visibilitychange', () => {
+                    this.onVisibility = () => {
                         if (!document.hidden) this.refresh();
-                    });
+                    };
+                    document.addEventListener('visibilitychange', this.onVisibility);
+                },
+
+                destroy() {
+                    clearInterval(this.timer);
+                    document.removeEventListener('visibilitychange', this.onVisibility);
                 },
 
                 badge() {
@@ -31,13 +43,14 @@ export function notificationBell(cfg) {
 
                 async refresh() {
                     try {
-                        const res = await fetch(cfg.feedUrl, {
+                        const res = await fetchFeed(cfg.feedUrl, {
                             headers: {
                                 'Accept': 'application/json'
                             },
                             credentials: 'same-origin',
                         });
 
+                        if (!res) return;
                         if (!res.ok) throw new Error('feed ' + res.status);
 
                         const data = await res.json();
@@ -77,6 +90,8 @@ export function notificationBell(cfg) {
                 },
 
                 async markAll() {
+                    if (this.markingAll) return;
+                    this.markingAll = true;
                     try {
                         const res = await fetch(cfg.readAllUrl, {
                             method: 'POST',
@@ -96,6 +111,8 @@ export function notificationBell(cfg) {
                         this.unread = 0;
                     } catch (e) {
                         this.failed = true;
+                    } finally {
+                        this.markingAll = false;
                     }
                 },
             };

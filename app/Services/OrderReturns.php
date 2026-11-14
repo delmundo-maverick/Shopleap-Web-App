@@ -27,6 +27,7 @@ class OrderReturns
     {
         $return = $this->persist($order, $buyerId, $data, $orderItems, $files);
         $this->notifier->returnChanged($return, $buyerId);
+
         return $return;
     }
 
@@ -35,7 +36,8 @@ class OrderReturns
         $meta = OrderReturn::REASONS[$data['reason']];
         $disputed = $data['reason'] === 'not_received';
 
-        $itemsAmount = round((float) $orderItems->sum('subtotal'), 2);
+        $itemsAmount = round($orderItems->sum(fn ($item) => (float) $item->subtotal
+            - ($order->items_subtotal !== null ? (float) $item->voucher_discount_allocated : 0)), 2);
         $wholeOrder = $orderItems->count() === $order->items()->count();
         $shipping = $wholeOrder ? round((float) $order->shipping_fee, 2) : 0.0;
         $commission = (float) $order->total_amount > 0
@@ -51,7 +53,7 @@ class OrderReturns
                 if (! $locked->canRequestReturn()) {
                     throw new \DomainException(
                         'A return/refund can\'t be requested for this order. It may already have a request, or the '
-                            . Order::returnWindowDays() . '-day window has passed.'
+                            .Order::returnWindowDays().'-day window has passed.'
                     );
                 }
 
@@ -80,13 +82,14 @@ class OrderReturns
                     $return->items()->create([
                         'order_item_id' => $item->id,
                         'quantity' => $item->quantity,
-                        'amount' => $item->subtotal,
+                        'amount' => round((float) $item->subtotal
+                            - ($order->items_subtotal !== null ? (float) $item->voucher_discount_allocated : 0), 2),
                     ]);
                 }
 
                 foreach ($files as $i => $file) {
                     $path = Storage::disk(ReviewMedia::DISK)
-                        ->putFileAs("returns/{$return->id}", $file, Str::uuid() . '.' . $file->extension());
+                        ->putFileAs("returns/{$return->id}", $file, Str::uuid().'.'.$file->extension());
 
                     if (! $path) {
                         throw new \RuntimeException('Evidence upload failed.');
@@ -109,7 +112,7 @@ class OrderReturns
 
                 $order->logInternalEvent(
                     'Return/refund requested',
-                    $meta['label'] . ' · ₱' . number_format($return->refund_amount, 2),
+                    $meta['label'].' · ₱'.number_format($return->refund_amount, 2),
                     $buyerId
                 );
 
@@ -153,7 +156,7 @@ class OrderReturns
             'Buyer shipped the item back',
             "{$courier} · {$tracking}",
             $actorId,
-            fn($q) => $q->where('type', OrderReturn::TYPE_RETURN_AND_REFUND)
+            fn ($q) => $q->where('type', OrderReturn::TYPE_RETURN_AND_REFUND)
         );
     }
 
@@ -172,7 +175,7 @@ class OrderReturns
             'Buyer asked Shopleap to review',
             $reason,
             $actorId,
-            fn($q) => $q->where('escalate_until', '>', now())
+            fn ($q) => $q->where('escalate_until', '>', now())
         );
     }
 
@@ -193,7 +196,7 @@ class OrderReturns
             ],
             $auto ? 'Approved automatically' : 'Seller approved the request',
             $auto
-                ? 'The seller did not respond within ' . OrderReturn::RESPONSE_DAYS . ' days.'
+                ? 'The seller did not respond within '.OrderReturn::RESPONSE_DAYS.' days.'
                 : ($refundOnly ? 'Shopleap will send the refund.' : 'The buyer can now ship the item back.'),
             $actorId
         );
@@ -227,7 +230,7 @@ class OrderReturns
             ],
             $auto ? 'Receipt confirmed automatically' : 'Seller received the item',
             $auto
-                ? 'The seller did not respond within ' . OrderReturn::RECEIPT_DAYS . ' days of the shipment.'
+                ? 'The seller did not respond within '.OrderReturn::RECEIPT_DAYS.' days of the shipment.'
                 : 'Shopleap will send the refund.',
             $actorId
         );
@@ -298,12 +301,12 @@ class OrderReturns
                 'refunded_at' => now(),
             ],
             'Refund sent',
-            "₱" . number_format($return->refund_amount, 2) . " · Ref {$reference}",
+            '₱'.number_format($return->refund_amount, 2)." · Ref {$reference}",
             $adminId
         );
 
         if ($done) {
-            $return->order->logInternalEvent('Refund sent to the buyer', '₱' . number_format($return->refund_amount, 2), $adminId);
+            $return->order->logInternalEvent('Refund sent to the buyer', '₱'.number_format($return->refund_amount, 2), $adminId);
         }
 
         return $done;
@@ -350,7 +353,7 @@ class OrderReturns
                         [OrderReturn::STATUS_APPROVED],
                         ['status' => OrderReturn::STATUS_EXPIRED],
                         'Request expired',
-                        'The item was not shipped back within ' . OrderReturn::SHIP_BACK_DAYS . ' days.',
+                        'The item was not shipped back within '.OrderReturn::SHIP_BACK_DAYS.' days.',
                         null
                     );
                     $expired && $out['expired']++;

@@ -166,7 +166,7 @@
             <nav class="flex overflow-x-auto border-t border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 aria-label="Shop navigation">
                 <div class="flex min-w-max flex-1 sm:min-w-0">
-                    <a href="#"
+                    <a href="{{ route('buyer.shop.show', $seller) }}"
                         class="flex flex-1 items-center justify-center whitespace-nowrap border-b-2 border-primary px-4 py-3.5 text-center text-sm font-semibold text-primary transition-colors">Home</a>
                     <a href="#all-products"
                         class="flex flex-1 items-center justify-center whitespace-nowrap border-b-2 border-transparent px-4 py-3.5 text-center text-sm font-semibold text-charcoal/60 transition-colors hover:text-charcoal">All
@@ -341,6 +341,7 @@
     <x-Buyer.message-widget />
 
     <x-Buyer.seller-follow-data :ids="$isFollowing ? [$seller->id] : []" :counts="[$seller->id => $followersCount]" :total="$followingCount" />
+    <x-footer />
 </body>
 
 </html>

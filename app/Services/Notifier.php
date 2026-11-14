@@ -16,12 +16,12 @@ class Notifier
 
     public function orderCancelled(Order $order, string $by, bool $fromRequest, ?int $actorId, bool $pickupWasScheduled): void
     {
-        $no = "#{$order->id}";
+        $no = "#{$order->order_number}";
         $reason = $order->cancel_reason ? " Reason: {$order->cancel_reason}." : '';
 
         $buyerUrl = route('buyer.orders.index', ['tab' => 'cancelled'], false);
         $sellerUrl = route('seller.orders.show', $order, false);
-        $meta = ['order_id' => $order->id];
+        $meta = ['order_id' => $order->order_number, 'waybill_code' => $order->waybill_code];
 
         if ($by === 'seller') {
             $this->send(
@@ -96,10 +96,10 @@ class Notifier
             $actorId,
             'cancel.requested',
             'Cancellation request',
-            "Order #{$order->id}: the buyer asked to cancel ({$order->cancel_request_reason}). Answer within "
+            "Order #{$order->order_number}: the buyer asked to cancel ({$order->cancel_request_reason}). Answer within "
                 .Order::CANCEL_REQUEST_AUTO_APPROVE_HOURS.' hours, or it is approved automatically.',
             route('seller.orders.show', $order, false),
-            ['order_id' => $order->id]
+            ['order_id' => $order->order_number, 'waybill_code' => $order->waybill_code]
         );
     }
 
@@ -110,9 +110,9 @@ class Notifier
             $actorId,
             'cancel.withdrawn',
             'Cancellation request withdrawn',
-            "The buyer withdrew the request to cancel order #{$order->id}.",
+            "The buyer withdrew the request to cancel order #{$order->order_number}.",
             route('seller.orders.show', $order, false),
-            ['order_id' => $order->id]
+            ['order_id' => $order->order_number, 'waybill_code' => $order->waybill_code]
         );
     }
 
@@ -123,9 +123,9 @@ class Notifier
             $actorId,
             'cancel.declined',
             'Cancellation declined',
-            "Order #{$order->id}: the seller declined your cancellation request. {$order->cancel_request_response}",
+            "Order #{$order->order_number}: the seller declined your cancellation request. {$order->cancel_request_response}",
             route('buyer.orders.index', [], false),
-            ['order_id' => $order->id]
+            ['order_id' => $order->order_number, 'waybill_code' => $order->waybill_code]
         );
     }
 
@@ -136,9 +136,9 @@ class Notifier
             null,
             'cancel.expired',
             'Cancellation request expired',
-            "Order #{$order->id} was already picked up by the courier, so it can no longer be cancelled.",
+            "Order #{$order->order_number} was already picked up by the courier, so it can no longer be cancelled.",
             route('buyer.orders.index', [], false),
-            ['order_id' => $order->id]
+            ['order_id' => $order->order_number, 'waybill_code' => $order->waybill_code]
         );
     }
 
@@ -148,9 +148,9 @@ class Notifier
     {
         $return->loadMissing(['buyer', 'seller']);
 
-        $no = '#'.$return->order_id;
+        $no = '#'.$return->order->order_number;
         $money = '₱'.number_format((float) $return->refund_amount, 2);
-        $meta = ['return_id' => $return->id, 'order_id' => $return->order_id];
+        $meta = ['return_id' => $return->id, 'order_id' => $return->order->order_number];
 
         $buyerUrl = route('buyer.returns.show', $return, false);
         $sellerUrl = route('seller.returns.show', $return, false);
@@ -371,8 +371,8 @@ class Notifier
 
         $order->loadMissing(['buyer', 'seller.sellerProfile', 'logisticsProfile.user', 'deliveryRider.user']);
 
-        $no = "#{$order->id}";
-        $meta = ['order_id' => $order->id, 'status' => $status];
+        $no = "#{$order->order_number}";
+        $meta = ['order_id' => $order->order_number, 'waybill_code' => $order->waybill_code, 'status' => $status];
         $buyerUrl = route('buyer.orders.index', ['tab' => $this->buyerTab($status)], false);
         $sellerUrl = route('seller.orders.show', $order, false);
         $cash = '₱'.number_format($order->grand_total, 2);
@@ -604,9 +604,9 @@ class Notifier
             $actorId,
             'pickup.assigned',
             'Pickup scheduled',
-            "Order #{$order->id}: {$rider->full_name} will collect it on {$order->pickup_date?->format('M d')} ({$slot}).",
+            "Order #{$order->order_number}: {$rider->full_name} will collect it on {$order->pickup_date?->format('M d')} ({$slot}).",
             route('seller.orders.show', $order, false),
-            ['order_id' => $order->id]
+            ['order_id' => $order->order_number, 'waybill_code' => $order->waybill_code]
         );
 
         $rider->loadMissing('user');
@@ -616,10 +616,10 @@ class Notifier
             $actorId,
             'pickup.assigned_rider',
             'New pickup assigned',
-            "Order #{$order->id}: collect from ".($order->seller?->sellerProfile?->business_name ?? $order->seller?->name)
+            "Order #{$order->order_number}: collect from ".($order->seller?->sellerProfile?->business_name ?? $order->seller?->name)
                 ." on {$order->pickup_date?->format('M d')} ({$slot}). Please accept it.",
             null,
-            ['order_id' => $order->id]
+            ['order_id' => $order->order_number, 'waybill_code' => $order->waybill_code]
         );
     }
 
@@ -630,9 +630,9 @@ class Notifier
             $actorId,
             'pickup.declined',
             'Pickup request declined',
-            "Order #{$order->id}: {$hubName} can't collect it ({$reason}). Please choose another sorting center.",
+            "Order #{$order->order_number}: {$hubName} can't collect it ({$reason}). Please choose another sorting center.",
             route('seller.orders.show', $order, false),
-            ['order_id' => $order->id]
+            ['order_id' => $order->order_number, 'waybill_code' => $order->waybill_code]
         );
     }
 
@@ -677,7 +677,7 @@ class Notifier
     {
         $bag->loadMissing(['fromHub.user', 'toHub.user']);
 
-        $codes = $missingOrders->map(fn (Order $order) => "#{$order->id}")->implode(', ');
+        $codes = $missingOrders->map(fn (Order $order) => "#{$order->order_number}")->implode(', ');
         $count = $missingOrders->count();
         $body = "Bag {$bag->code} was received with {$count} missing parcel(s): {$codes}.";
 
@@ -739,9 +739,9 @@ class Notifier
             null,
             'parcel.stale',
             'Parcel needs attention',
-            "Order #{$order->id} has had no tracking update for {$hours} hours.",
+            "Order #{$order->order_number} has had no tracking update for {$hours} hours.",
             route('logistics.incoming.index', [], false),
-            ['order_id' => $order->id]
+            ['order_id' => $order->order_number, 'waybill_code' => $order->waybill_code]
         );
     }
 

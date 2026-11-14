@@ -13,7 +13,7 @@ class PasswordResetOtp extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Reset your Shopleap password');
+        return new Envelope(subject: 'Reset your Shopleap '.($this->role === 'super_admin' ? 'Admin' : ucfirst($this->role)).' account password');
     }
 
     public function content(): Content

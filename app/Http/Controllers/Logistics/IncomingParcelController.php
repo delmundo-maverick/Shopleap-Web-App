@@ -22,7 +22,7 @@ class IncomingParcelController extends Controller
 
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where('id', $search);
+            $query->matchingPublicCode($search);
         }
 
         $orders = $query->paginate(15)->withQueryString();
@@ -57,6 +57,6 @@ class IncomingParcelController extends Controller
             return back()->with('status', 'This order was just updated. Please refresh the page.');
         }
 
-        return back()->with('status', "Order #{$order->id} logged as arrived at the sorting center.");
+        return back()->with('status', "Order #{$order->order_number} logged as arrived at the sorting center.");
     }
 }

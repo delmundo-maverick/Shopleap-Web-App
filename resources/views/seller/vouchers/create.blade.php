@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/pages/seller/voucher-create.js'])
 
     <title>Create Voucher | Shopleap Seller</title>
 </head>
@@ -53,10 +53,11 @@
                                     <input type="text" name="code" id="voucherCode" value="{{ old('code') }}"
                                         placeholder="Leave empty to auto-generate"
                                         class="w-full rounded-lg border border-light-gray px-3 py-2 text-sm uppercase focus:border-primary">
-                                    <button type="button" onclick="generateCode()"
+                                    <button type="button" data-generate-voucher-code="{{ route('seller.vouchers.generate-code') }}"
                                         class="shrink-0 rounded-lg border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5">Generate
                                         Code</button>
                                 </div>
+                                <p data-voucher-code-error role="alert" class="mt-1 text-xs text-sale-red" hidden></p>
                                 @error('code')
                                     <p class="mt-1 text-xs text-sale-red">{{ $message }}</p>
                                 @enderror
@@ -185,22 +186,7 @@
                     </form>
                 </div>
 
-                <script>
-                    function generateCode() {
-                        fetch('{{ route('seller.vouchers.generate-code') }}', {
-                                method: 'POST',
-                                headers: {
-                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute(
-                                        'content'),
-                                    'Content-Type': 'application/json'
-                                }
-                            })
-                            .then(res => res.json())
-                            .then(data => {
-                                document.getElementById('voucherCode').value = data.code;
-                            });
-                    }
-                </script>
+
             </main>
         </div>
     </div>

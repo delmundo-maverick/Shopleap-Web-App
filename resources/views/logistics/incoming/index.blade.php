@@ -41,7 +41,7 @@
                     <tbody>
                         @foreach ($orders as $order)
                             <tr class="transition hover:bg-white/40">
-                                <td class="px-5 py-4 font-semibold text-charcoal">#{{ $order->id }}</td>
+                                <td class="px-5 py-4 font-semibold text-charcoal">#{{ $order->order_number }}</td>
                                 <td class="px-5 py-4 text-charcoal/70">
                                     {{ $order->seller->sellerProfile->business_name ?? $order->seller->name }}
                                 </td>

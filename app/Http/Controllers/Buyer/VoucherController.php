@@ -52,7 +52,7 @@ class VoucherController extends Controller
                     'code' => $r->voucher?->code,
                     'discount_amount' => $r->discount_amount,
                     'status' => $r->status,
-                    'order_id' => $r->order_id,
+                    'order_id' => $r->order?->order_number,
                     'seller_name' => $r->seller?->sellerProfile?->business_name ?? $r->seller?->name,
                     'created_at' => $r->created_at->toIso8601String(),
                 ];

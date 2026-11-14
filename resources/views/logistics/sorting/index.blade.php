@@ -222,7 +222,7 @@
                             </label>
                             <form @submit.prevent="handleManualInput()" class="space-y-3">
                                 <input x-model="manualCode" type="text"
-                                    placeholder="Enter tracking code or order ID"
+                                    placeholder="Enter waybill code or order number"
                                     aria-label="Tracking code or order ID" :disabled="scanning"
                                     class="{{ $field }} w-full disabled:opacity-50">
                                 <button type="submit" :disabled="!manualCode.trim() || scanning"
@@ -408,7 +408,7 @@
 
                                     <td
                                         class="block px-1 pb-1 text-base font-bold text-primary md:table-cell md:px-5 md:py-4 md:text-sm">
-                                        #{{ $order->id }}
+                                        #{{ $order->order_number }}
                                     </td>
 
                                     <td data-label="Destination" class="{{ $cell }} text-charcoal">
@@ -513,7 +513,7 @@
                                 <div
                                     class="flex flex-wrap items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
                                     <div class="min-w-0 flex-1">
-                                        <p class="font-bold text-charcoal">Order #{{ $order->id }}</p>
+                                        <p class="font-bold text-charcoal">Order #{{ $order->order_number }}</p>
                                         <p class="mt-1 text-sm text-charcoal/70">
                                             {{ $dest['name'] }}
                                             · {{ $dest['municipality'] }}, {{ $dest['province'] }}
@@ -649,7 +649,7 @@
                                     @csrf
                                     <input type="hidden" name="rider_id" value="{{ $rider->id }}">
                                     @foreach ($group['orders'] as $groupOrder)
-                                        <input type="hidden" name="order_ids[]" value="{{ $groupOrder->id }}">
+                                        <input type="hidden" name="order_ids[]" value="{{ $groupOrder->order_number }}">
                                     @endforeach
                                     <button type="submit" class="btn btn-secondary w-full sm:w-auto">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -669,7 +669,7 @@
                                 <div
                                     class="flex flex-wrap items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
                                     <div class="min-w-0 flex-1">
-                                        <p class="font-bold text-charcoal">Order #{{ $order->id }}</p>
+                                        <p class="font-bold text-charcoal">Order #{{ $order->order_number }}</p>
                                         <p class="mt-1 text-sm text-charcoal/60">
                                             {{ $order->ship_to['name'] }}
                                             · Brgy. {{ $order->ship_to['barangay'] }}

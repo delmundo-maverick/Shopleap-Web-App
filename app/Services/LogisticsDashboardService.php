@@ -170,7 +170,7 @@ class LogisticsDashboardService
             };
             foreach ($orders->orderByDesc('updated_at')->orderByDesc('id')->limit(10)->get(['id', 'status', 'ship_barangay', 'ship_municipality', 'updated_at']) as $order) {
                 $rows->push([
-                    'reference' => 'Parcel #'.$order->id, 'kind' => 'Parcel', 'status' => $order->status, 'domain' => 'order',
+                    'reference' => 'Parcel #'.$order->order_number, 'kind' => 'Parcel', 'status' => $order->status, 'domain' => 'order',
                     'detail' => collect([$order->ship_barangay, $order->ship_municipality])->filter()->join(', ') ?: 'Destination not recorded',
                     'quantity' => 1, 'updated_at' => $order->updated_at, 'href' => $this->orderLink($order),
                 ]);
@@ -216,14 +216,14 @@ class LogisticsDashboardService
     {
         return match ($order->status) {
             Order::STATUS_READY_FOR_PICKUP => route('logistics.pickups.index'),
-            Order::STATUS_PICKED_UP => route('logistics.incoming.index', ['search' => $order->id]),
+            Order::STATUS_PICKED_UP => route('logistics.incoming.index', ['search' => $order->order_number]),
             Order::STATUS_AT_SORTING_CENTER => route('logistics.sorting.index'),
             Order::STATUS_SORTED => route('logistics.sorting.index', ['tab' => 'to_assign']),
             Order::STATUS_AWAITING_TRANSFER => route('logistics.outbound.index'),
-            Order::STATUS_ASSIGNED_TO_RIDER => route('logistics.deliveries.index', ['tab' => 'assigned', 'search' => $order->id]),
-            Order::STATUS_OUT_FOR_DELIVERY => route('logistics.deliveries.index', ['tab' => 'out', 'search' => $order->id]),
-            Order::STATUS_DELIVERY_FAILED => route('logistics.deliveries.index', ['tab' => 'failed', 'search' => $order->id]),
-            Order::STATUS_DELIVERED => route('logistics.deliveries.index', ['tab' => 'delivered', 'search' => $order->id]),
+            Order::STATUS_ASSIGNED_TO_RIDER => route('logistics.deliveries.index', ['tab' => 'assigned', 'search' => $order->order_number]),
+            Order::STATUS_OUT_FOR_DELIVERY => route('logistics.deliveries.index', ['tab' => 'out', 'search' => $order->order_number]),
+            Order::STATUS_DELIVERY_FAILED => route('logistics.deliveries.index', ['tab' => 'failed', 'search' => $order->order_number]),
+            Order::STATUS_DELIVERED => route('logistics.deliveries.index', ['tab' => 'delivered', 'search' => $order->order_number]),
             Order::STATUS_COMPLETED => route('logistics.reports.index', ['type' => 'delivery_performance', 'status' => $order->status]),
             default => route('logistics.reports.index', ['type' => 'failed_returns', 'status' => $order->status]),
         };

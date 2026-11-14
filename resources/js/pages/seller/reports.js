@@ -1,8 +1,9 @@
+import Chart from 'chart.js/auto';
+
 document.addEventListener('DOMContentLoaded', () => {
     const dataEl = document.getElementById('reportData');
-    if (!dataEl || typeof window.Chart === 'undefined') return;
+    if (!dataEl) return;
 
-    const Chart = window.Chart;
     const { series, statusBreakdown } = JSON.parse(dataEl.textContent);
 
     const PRIMARY = '#1A5FB4';

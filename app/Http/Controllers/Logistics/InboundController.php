@@ -104,11 +104,11 @@ class InboundController extends Controller
         $item = $bag->items()->with('order')->where('order_id', $orderId)->first();
 
         if (! $item) {
-            return $this->scanResponse($request, false, "Order #{$orderId} is not in this bag.");
+            return $this->scanResponse($request, false, 'This parcel is not in this bag.');
         }
 
         if ($item->received_at) {
-            return $this->scanResponse($request, true, "Order #{$orderId} was already scanned.", $orderId);
+            return $this->scanResponse($request, true, "Order #{$item->order->order_number} was already scanned.", $orderId);
         }
 
         $message = $this->receiveItem($bag, $item, $hub->id, $request->user()->id);
@@ -126,11 +126,11 @@ class InboundController extends Controller
         $item = $bag->items()->with('order')->where('order_id', $order->id)->first();
 
         if (! $item) {
-            return back()->withErrors(['parcels' => "Order #{$order->id} is not in this bag."]);
+            return back()->withErrors(['parcels' => "Order #{$order->order_number} is not in this bag."]);
         }
 
         if ($item->received_at) {
-            return back()->with('status', "Order #{$order->id} was already confirmed.");
+            return back()->with('status', "Order #{$order->order_number} was already confirmed.");
         }
 
         $message = $this->receiveItem($bag, $item, $hub->id, $request->user()->id);
@@ -260,11 +260,11 @@ class InboundController extends Controller
         $order = Order::find($orderId);
 
         if (! $order) {
-            return $this->scanResponse($request, false, "Order #{$orderId} was not found.");
+            return $this->scanResponse($request, false, 'Order not found.');
         }
 
         if ((int) $order->destination_hub_id !== $hubId) {
-            return $this->scanResponse($request, false, "Order #{$orderId} is addressed to another hub.");
+            return $this->scanResponse($request, false, "Order #{$order->order_number} is addressed to another hub.");
         }
 
         $bagItem = ShipmentBagItem::with(['bag.toHub'])
@@ -285,19 +285,19 @@ class InboundController extends Controller
                 return $this->scanResponse(
                     $request,
                     false,
-                    "Order #{$orderId} was already received at this hub.",
+                    "Order #{$order->order_number} was already received at this hub.",
                     reference: "#{$orderId}",
                 );
             }
 
-            return $this->scanResponse($request, false, "Order #{$orderId} is not in an incoming bag for this hub.");
+            return $this->scanResponse($request, false, "Order #{$order->order_number} is not in an incoming bag for this hub.");
         }
 
         if ($bagItem->received_at) {
             return $this->scanResponse(
                 $request,
                 false,
-                "Order #{$orderId} was already received.",
+                "Order #{$order->order_number} was already received.",
                 $orderId,
                 reference: "#{$orderId}",
             );
@@ -508,7 +508,7 @@ class InboundController extends Controller
                 ]);
             }
 
-            return "Order #{$order->id} received at {$hubName}.";
+            return "Order #{$order->order_number} received at {$hubName}.";
         });
     }
 
@@ -534,13 +534,19 @@ class InboundController extends Controller
         string $type = 'parcel',
         ?string $reference = null,
     ) {
+        $publicOrder = $orderId ? Order::find($orderId) : null;
+        if ($publicOrder) {
+            $message = str_replace('#'.$orderId, '#'.$publicOrder->order_number, $message);
+            $reference = $reference === '#'.$orderId ? '#'.$publicOrder->order_number : $reference;
+        }
         if ($request->expectsJson()) {
             return response()->json([
                 'success' => $ok,
                 'message' => $message,
-                'order_id' => $orderId,
+                'order_id' => $publicOrder?->order_number,
+                'waybill_code' => $publicOrder?->waybill_code,
                 'type' => $type,
-                'reference' => $reference ?? ($orderId ? "#{$orderId}" : null),
+                'reference' => $reference ?? ($publicOrder ? "#{$publicOrder->order_number}" : null),
             ], $ok ? 200 : 422);
         }
 

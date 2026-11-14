@@ -43,7 +43,7 @@
     <x-slot:utilityActions>                {{-- Notifications --}}
                 <x-notification-bell-script />
 
-                <div id="buyer-notification-feed" class="relative" @click.outside="open = false" @keydown.escape.window="open = false"
+                <div id="buyer-notification-feed" class="relative" :class="{ 'z-[100]': open }" @click.outside="open = false" @keydown.escape.window="open = false"
                     x-data="shopleapBell({
                         unread: {{ (int) ($headerUser?->unreadNotifications()->count() ?? 0) }},
                         feedUrl: @js(route('notifications.feed', [], false)),
@@ -63,7 +63,7 @@
                     </button>
 
                     <div x-show="open" x-cloak x-transition
-                        class="absolute right-0 mt-2 w-80 overflow-hidden rounded-xl border border-line bg-white p-4 text-charcoal shadow-lg">
+                        class="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border border-line bg-white p-4 text-charcoal shadow-lg">
                         <p class="mb-1 text-sm font-bold text-charcoal">Notifications</p>
 
                         {{-- The notifications: click one to open the page it is about --}}

@@ -47,7 +47,7 @@ class EarningsController extends Controller
             ->orderByDesc('delivered_at')->orderByDesc('id')->paginate(20)->withQueryString();
 
         return response()->json(['data' => $orders->getCollection()->map(fn (Order $order) => [
-            'order_id' => $order->id, 'amount' => $order->rider_pay, 'currency' => 'PHP',
+            'order_id' => $order->order_number, 'order_number' => $order->order_number, 'waybill_code' => $order->waybill_code, 'amount' => $order->rider_pay, 'currency' => 'PHP',
             'recorded_at' => $order->earnings_recorded_at?->toIso8601String(), 'delivered_at' => $order->delivered_at->toIso8601String(),
         ]), 'meta' => ['current_page' => $orders->currentPage(), 'last_page' => $orders->lastPage(), 'total' => $orders->total()]]);
     }

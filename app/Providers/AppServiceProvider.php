@@ -9,9 +9,12 @@ use App\Models\ShopVoucher;
 use App\Policies\OrderPolicy;
 use App\Policies\ShopVoucherPolicy;
 use Illuminate\Auth\SessionGuard;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -31,6 +34,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('mutations', fn (Request $request): Limit => $request->isMethodSafe()
+            ? Limit::none()
+            : Limit::perMinute(120)->by('mutations:'.($request->user()?->id ?? $request->ip())));
+
+        RateLimiter::for('courier-reads', fn (Request $request): Limit => $request->isMethodSafe()
+            ? Limit::perMinute(120)->by('courier-reads:'.($request->user()?->id ?? $request->ip()))
+            : Limit::none());
+
+        RateLimiter::for('messaging', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by('messaging:'.($request->user()?->id ?? $request->ip())));
+
         Auth::extend('portal-session', function (Application $app, string $name, array $config): SessionGuard {
             $hostKey = substr(hash('sha256', $app['request']->getHost()), 0, 12);
 

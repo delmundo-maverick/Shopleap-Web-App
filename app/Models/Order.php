@@ -3,8 +3,11 @@
 namespace App\Models;
 
 use App\Services\Notifier;
+use App\Support\OrderCodes;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +15,8 @@ use Illuminate\Support\Facades\DB;
 
 class Order extends Model
 {
+    protected $hidden = ['id'];
+
     protected $fillable = [
         'seller_id',
         'buyer_id',
@@ -20,6 +25,8 @@ class Order extends Model
         'buyer_name',
         'status',
         'total_amount',
+        'items_subtotal',
+        'total',
         'shipping_fee',
         'shipping_zone',
         'buyer_note',
@@ -63,9 +70,67 @@ class Order extends Model
         'cancel_request_resolved_at',
     ];
 
+    public function getRouteKeyName(): string
+    {
+        return 'order_number';
+    }
+
+    protected function performInsert(Builder $query): bool
+    {
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            $this->order_number ??= OrderCodes::generate('SL', 8);
+            $this->waybill_code ??= OrderCodes::generate('WB', 10);
+
+            try {
+                return $this->getConnection()->transaction(fn (): bool => parent::performInsert($query));
+            } catch (UniqueConstraintViolationException $exception) {
+                if (! str_contains($exception->getMessage(), 'orders_order_number_unique')
+                    && ! str_contains($exception->getMessage(), 'orders_waybill_code_unique')
+                    && ! str_contains($exception->getMessage(), 'orders.order_number')
+                    && ! str_contains($exception->getMessage(), 'orders.waybill_code')) {
+                    throw $exception;
+                }
+                $this->order_number = null;
+                $this->waybill_code = null;
+            }
+        }
+
+        throw new \RuntimeException('Could not allocate a unique order reference. Please try again.');
+    }
+
+    public function scopeMatchingPublicCode(Builder $query, string $code): Builder
+    {
+        $code = strtoupper(trim($code));
+
+        return $query->where(function (Builder $references) use ($code): void {
+            $references->where('order_number', $code)->orWhere('waybill_code', $code);
+        });
+    }
+
+    public function canViewWaybill(): bool
+    {
+        return $this->waybill_printed_at !== null || in_array($this->status, self::WAYBILL_STATUSES, true);
+    }
+
+    public function getWaybillOrderNumberAttribute(): string
+    {
+        return ctype_digit((string) $this->waybill_code)
+            ? (string) (int) $this->waybill_code : $this->order_number;
+    }
+
+    public function getWaybillQrCodeAttribute(): string
+    {
+        return ctype_digit((string) $this->waybill_code)
+            ? 'SHOPLEAP:ORDER:'.(int) $this->waybill_code : $this->waybill_code;
+    }
+
     protected function casts(): array
     {
         return [
+            'total_amount' => 'decimal:2',
+            'items_subtotal' => 'decimal:2',
+            'total' => 'decimal:2',
+            'commission_amount' => 'decimal:2',
             'shipping_address' => 'array',
             'shipping_fee' => 'decimal:2',
             'rider_pay' => 'decimal:2',
@@ -502,12 +567,15 @@ class Order extends Model
     }
 
     /**
-     * What the buyer actually pays (COD amount): items + shipping.
-     * total_amount remains items-only.
+     * What the buyer actually pays (COD amount). New checkouts save net merchandise
+     * in total_amount and freeze merchandise plus shipping in total.
+     * Legacy orders have no total snapshot.
      */
     public function getGrandTotalAttribute(): float
     {
-        return (float) $this->total_amount + (float) $this->shipping_fee;
+        return $this->total !== null
+            ? (float) $this->total
+            : round((float) $this->total_amount + (float) $this->shipping_fee, 2);
     }
 
     /**

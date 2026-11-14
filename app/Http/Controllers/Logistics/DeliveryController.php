@@ -61,7 +61,7 @@ class DeliveryController extends Controller
             ->orderBy('id');
 
         if ($request->filled('search')) {
-            $query->where('id', $request->search);
+            $query->matchingPublicCode($request->search);
         }
 
         $orders = $query->paginate(15)->withQueryString();
@@ -95,7 +95,7 @@ class DeliveryController extends Controller
 
         return back()->with(
             'status',
-            "Order #{$order->id} is out for delivery."
+            "Order #{$order->order_number} is out for delivery."
         );
     }
 
@@ -114,7 +114,7 @@ class DeliveryController extends Controller
 
         return back()->with(
             'status',
-            "Order #{$order->id} marked delivered. The buyer can now confirm receipt."
+            "Order #{$order->order_number} marked delivered. The buyer can now confirm receipt."
         );
     }
 
@@ -143,7 +143,7 @@ class DeliveryController extends Controller
 
         return back()->with(
             'status',
-            "Order #{$order->id} recorded as a failed delivery (attempt {$attempt})."
+            "Order #{$order->order_number} recorded as a failed delivery (attempt {$attempt})."
         );
     }
 
@@ -223,7 +223,7 @@ class DeliveryController extends Controller
 
         return back()->with(
             'status',
-            "Order #{$order->id} rescheduled for delivery."
+            "Order #{$order->order_number} rescheduled for delivery."
         );
     }
 
@@ -252,13 +252,13 @@ class DeliveryController extends Controller
         ActivityLogger::log(
             'order.returned',
             'Orders',
-            "Order #{$order->id} returned to seller after {$order->delivery_attempts} failed delivery attempt(s).",
+            "Order #{$order->order_number} returned to seller after {$order->delivery_attempts} failed delivery attempt(s).",
             $order
         );
 
         return back()->with(
             'status',
-            "Order #{$order->id} marked as returned to the seller."
+            "Order #{$order->order_number} marked as returned to the seller."
         );
     }
 

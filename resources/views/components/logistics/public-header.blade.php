@@ -1,9 +1,6 @@
 <header class="portal-header">
     <div class="portal-container">
-        <a class="portal-brand" href="{{ \App\Support\Portal::url('logistics') }}">
-            <img src="{{ asset('images/Shopleap-Logo.png') }}" width="36" height="36" alt="">
-            <span>ShopLeap <strong>Logistics</strong></span>
-        </a>
+        <x-logo :href="\App\Support\Portal::url('logistics')" label="Logistics" class="public-brand" />
         <nav class="portal-sections" aria-label="About the partnership">
             @foreach (['how-it-works' => 'How it works', 'coverage' => 'Coverage', 'requirements' => 'Requirements', 'faq' => 'FAQ'] as $anchor => $label)
                 <a href="{{ \App\Support\Portal::url('logistics') }}#{{ $anchor }}">{{ $label }}</a>

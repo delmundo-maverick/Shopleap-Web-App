@@ -9,7 +9,7 @@ import { notificationBell } from './shared/notifications.js';
 import { navbar, navToggle } from './shared/navigation.js';
 import { voucherCard } from './pages/buyer/vouchers.js';
 import { addressBook } from './shared/buyer-addresses.js';
-import { checkoutPage, voucherCheckout } from './pages/buyer/checkout.js';
+import { checkoutPage } from './pages/buyer/checkout.js';
 import { termsAgreementState } from './shared/terms-modal.js';
 
 window.Alpine = Alpine;
@@ -25,7 +25,6 @@ Alpine.data('navToggle', navToggle);
 Alpine.data('voucherCard', voucherCard);
 Alpine.data('addressBook', addressBook);
 Alpine.data('checkoutPage', checkoutPage);
-Alpine.data('voucherCheckout', voucherCheckout);
 
 Alpine.data('otpRegistration', (config = {}) => ({
     ...termsAgreementState(config),
@@ -54,6 +53,7 @@ Alpine.data('otpRegistration', (config = {}) => ({
     },
 
     async submitRegistration(event) {
+        if (this.submitting) { return; }
         if (!this.termsAccepted) {
             this.openTermsModal();
             this.termsError =

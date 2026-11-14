@@ -48,7 +48,9 @@ class HistoryController extends Controller
                 $earned = in_array($o->status, RiderEarnings::EARNED_STATUSES, true);
 
                 return [
-                    'order_id' => $o->id,
+                    'order_id' => $o->order_number,
+                    'order_number' => $o->order_number,
+                    'waybill_code' => $o->waybill_code,
                     'status' => $o->status,
                     'outcome' => $earned ? 'delivered' : 'returned',
                     'buyer_name' => $ship['name'],

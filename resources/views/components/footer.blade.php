@@ -5,8 +5,8 @@
         </p>
 
         <div class="flex flex-wrap items-center justify-center gap-4 text-xs text-charcoal/60">
-            <a href="{{ route('terms') }}" class="transition hover:text-primary">Terms and Conditions</a>
-            <a href="{{ route('privacy') }}" class="transition hover:text-primary">Privacy Policy</a>
+            <a href="{{ \App\Support\Portal::route('main', 'terms') }}" class="transition hover:text-primary">Terms and Conditions</a>
+            <a href="{{ \App\Support\Portal::route('main', 'privacy') }}" class="transition hover:text-primary">Privacy Policy</a>
             <span>Shop Smart. Shop Simple.</span>
         </div>
     </div>

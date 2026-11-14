@@ -12,7 +12,9 @@ use App\Models\User;
 use App\Services\MessageAttachmentService;
 use App\Services\MessagingPolicy;
 use App\Support\TicketPresenter;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -220,7 +222,7 @@ class MessagingController extends Controller
                 'number' => TicketPresenter::number($conversation),
                 'topic' => TicketPresenter::topic($conversation),
                 'subject' => $conversation->subject,
-                'order_id' => $conversation->order_id,
+                'order_id' => $conversation->order?->order_number,
                 'state' => ['label' => $label, 'class' => $class],
             ];
         }
@@ -299,7 +301,8 @@ class MessagingController extends Controller
         if ($order) {
             $ship = $order->ship_to;
             $orderData = [
-                'id' => $order->id,
+                'id' => $order->order_number,
+                'waybill_code' => $order->waybill_code,
                 'status' => $order->status_label,
                 'placed_at' => $order->created_at?->format('M d, Y g:i A'),
                 'total' => (float) $order->total_amount,
@@ -771,15 +774,21 @@ class MessagingController extends Controller
             ->update(['hidden_at' => null]);
     }
 
-    public function unreadCount(Request $request)
+    public function unreadCount(Request $request): JsonResponse
     {
         $user = $request->user();
 
-        $count = $user->conversations()
-            ->wherePivotNull('hidden_at')
-            ->with('messages')
-            ->get()
-            ->sum(fn ($c) => $c->unreadCountFor($user->id));
+        $count = Message::query()->where('sender_id', '!=', $user->id)
+            ->whereExists(function (QueryBuilder $query) use ($user): void {
+                $query->selectRaw('1')->from('conversation_participants')
+                    ->whereColumn('conversation_participants.conversation_id', 'messages.conversation_id')
+                    ->where('conversation_participants.user_id', $user->id)
+                    ->whereNull('conversation_participants.hidden_at')
+                    ->where(function (QueryBuilder $query): void {
+                        $query->whereNull('conversation_participants.last_read_at')
+                            ->orWhereColumn('messages.created_at', '>', 'conversation_participants.last_read_at');
+                    });
+            })->count();
 
         return response()->json(['count' => $count]);
     }

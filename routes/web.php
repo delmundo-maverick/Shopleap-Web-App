@@ -57,8 +57,8 @@ use App\Http\Controllers\Seller\ShopVoucherController;
 use App\Http\Controllers\Seller\WaybillController;
 use App\Http\Controllers\SupportController;
 use App\Support\Portal;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Schedule;
 
 /*
 |--------------------------------------------------------------------------
@@ -114,18 +114,20 @@ Route::controller(LoginController::class)->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::view('/register', 'auth.register')->name('register');
+Route::get('/register', function (): RedirectResponse {
+    return redirect()->route('register.buyer');
+})->name('register');
 
 Route::prefix('register')->group(function () {
 
     Route::controller(BuyerRegistrationController::class)->group(function () {
         Route::get('/buyer', 'create')->name('register.buyer');
-        Route::post('/buyer', 'store');
+        Route::post('/buyer', 'store')->middleware('throttle:10,1');
     });
 
     Route::controller(SellerRegistrationController::class)->group(function () {
         Route::get('/seller', 'create')->name('register.seller');
-        Route::post('/seller', 'store');
+        Route::post('/seller', 'store')->middleware('throttle:10,1');
     });
 
     // OTP verification (shared by all three roles)
@@ -134,7 +136,7 @@ Route::prefix('register')->group(function () {
         ->controller(LoginController::class)
         ->group(function () {
             Route::get('/verify', 'showOtpForm')->name('register.otp.form');
-            Route::post('/verify', 'verifyOtp')->name('register.otp.verify');
+            Route::post('/verify', 'verifyOtp')->middleware('throttle:10,1')->name('register.otp.verify');
 
             Route::post('/resend-otp', 'resendOtp')
                 ->middleware('throttle:3,1')
@@ -148,10 +150,7 @@ Route::prefix('register')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::middleware('auth')->group(function () {
-
-    Route::view('/registration/pending', 'auth.registration-pending')
-        ->name('registration.pending');
+Route::middleware(['auth', 'throttle:mutations'])->group(function () {
 
     // Help / Support
     Route::prefix('help')
@@ -173,6 +172,7 @@ Route::middleware('auth')->group(function () {
 
     // Messaging
     Route::prefix('messages')
+        ->middleware('throttle:messaging')
         ->name('messages.')
         ->controller(MessagingController::class)
         ->group(function () {
@@ -230,7 +230,7 @@ Route::middleware('auth')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'buyer'])
+Route::middleware(['auth', 'buyer', 'throttle:mutations'])
     ->prefix('buyer')
     ->name('buyer.')
     ->group(function () {
@@ -375,7 +375,7 @@ Route::middleware(['auth', 'buyer'])
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'seller'])
+Route::middleware(['auth', 'seller', 'throttle:mutations'])
     ->prefix('seller')
     ->name('seller.')
     ->group(function () {
@@ -430,6 +430,9 @@ Route::middleware(['auth', 'seller'])
                     Route::post('/{order}/cancel-request/decline', 'declineCancel')
                         ->name('cancel-request.decline');
                 });
+
+                Route::get('/{order}/waybill/view', [WaybillController::class, 'preview'])
+                    ->name('waybill.view');
 
                 Route::get('/{order}/waybill', [WaybillController::class, 'show'])
                     ->name('waybill');
@@ -508,7 +511,7 @@ Route::middleware(['auth', 'seller'])
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'logistics', 'hub.scope'])
+Route::middleware(['auth', 'logistics', 'hub.scope', 'throttle:mutations'])
     ->domain(Portal::host('logistics'))
     ->prefix('logistics')
     ->name('logistics.')
@@ -612,13 +615,11 @@ Route::middleware(['auth', 'logistics', 'hub.scope'])
                 Route::post('/bags', 'store')->name('bags.store');
                 Route::get('/bags/{bag}', 'show')->name('show');
                 Route::post('/bags/{bag}/orders', 'addOrders')->name('orders.store');
-                Route::post('/bags/{bag}/scan', 'scan')
-                    ->middleware('throttle:120,1')
-                    ->name('scan');
                 Route::delete('/bags/{bag}/orders/{order}', 'removeOrder')->name('orders.destroy');
                 Route::post('/bags/{bag}/seal', 'seal')->name('seal');
                 Route::post('/bags/{bag}/dispatch', 'dispatch')->name('dispatch');
                 Route::get('/bags/{bag}/manifest', 'manifest')->name('manifest');
+                Route::post('/bags/{bag}/manifest/printed', 'markManifestPrinted')->name('manifest.printed');
             });
 
         // Inbound hub-to-hub transfer
@@ -664,7 +665,7 @@ Route::middleware(['auth', 'logistics', 'hub.scope'])
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'admin'])
+Route::middleware(['auth', 'admin', 'throttle:mutations'])
     ->domain(Portal::host('admin'))
     ->prefix('admin')
     ->name('admin.')
@@ -766,25 +767,3 @@ Route::middleware(['auth', 'admin'])
                     });
             });
     });
-
-/*
-|--------------------------------------------------------------------------
-| Scheduled Tasks
-|--------------------------------------------------------------------------
-*/
-
-// Automatically complete delivered orders.
-Schedule::command('orders:auto-complete')->dailyAt('02:00');
-
-// Automatically approve eligible pending cancellation requests after 24 hours.
-Schedule::command('orders:auto-approve-cancellations')->hourly();
-
-// Process return/refund deadlines and eligible automatic actions.
-Schedule::command('returns:process-deadlines')->hourly();
-
-// Close stale sorting sessions after 12 hours of inactivity.
-Schedule::command('sorting:close-stale-sessions')->hourly();
-
-// Flag bags that stay in transit too long and parcels with no tracking updates.
-Schedule::command('bags:flag-stale-in-transit')->hourly();
-Schedule::command('parcels:flag-stale-events')->hourly();

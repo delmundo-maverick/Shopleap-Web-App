@@ -30,7 +30,9 @@ function sortingScanner() {
                 const result = {
                     ok: false,
                     result: data.result || 'rejected',
-                    message: data.message || 'Scan failed.',
+                    message: status >= 500
+                        ? 'Unable to process this scan right now. Please try again.'
+                        : data.message || 'Scan failed.',
                     color: colors[data.result] || 'text-sale-red',
                 };
 

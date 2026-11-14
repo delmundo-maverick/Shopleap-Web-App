@@ -6,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    @vite(['resources/css/app.css', 'resources/css/pages/auth-register.css', 'resources/js/app.js', 'resources/js/pages/auth/logistics-register.js'])
+    @vite(['resources/css/app.css', 'resources/css/pages/logistics/portal.css', 'resources/css/pages/auth-register.css', 'resources/js/app.js', 'resources/js/pages/auth/logistics-register.js'])
 
-    @vite('resources/css/pages/logistics/portal.css')
+
     <meta name="robots" content="noindex, nofollow">
     <link rel="icon" type="image/png" href="{{ asset('images/Shopleap-Logo.png') }}">
     <title>Register your company | ShopLeap Logistics</title>
@@ -21,7 +21,7 @@
     termsUrl: '{{ route('terms.content') }}',
     privacyUrl: '{{ route('privacy.content') }}',
     termsAccepted: @js((bool) old('terms_accepted'))
-})" class="logistics-portal min-h-screen bg-ice-blue text-charcoal antialiased">
+})" class="logistics-portal auth-public registration-page min-h-screen text-charcoal antialiased">
 
     @php
         $labelClass = 'mb-2 block text-sm font-semibold text-charcoal';
@@ -38,18 +38,19 @@
     @endphp
 
     <!-- HEADER -->
-    <x-logistics.public-header />
+    <x-registration-header role="logistics" />
 
-    <main class="px-4 py-10 sm:px-6 lg:py-14">
-        <div class="mx-auto max-w-4xl">
+    <main class="registration-main">
+        <div class="site-container registration-workspace">
+            <x-registration-intro role="logistics" />
 
             <form method="POST" action="{{ route('register.logistics') }}" enctype="multipart/form-data"
                 @submit="guardTermsAgreement($event)"
-                class="overflow-hidden rounded-2xl border border-light-gray bg-white shadow-xl shadow-charcoal/5">
+                class="registration-form">
 
                 @csrf
 
-                <div class="mb-8 text-center">
+                <div class="registration-form-heading">
                     <h2 class="mt-5 text-3xl font-bold tracking-tight text-charcoal">
                         Logistics / Sorting Center Registration
                     </h2>
@@ -495,7 +496,7 @@
                     <div class="mt-5 text-center">
                         <a href="{{ \App\Support\Portal::url('logistics') }}"
                             class="text-sm font-semibold text-charcoal/60 transition hover:text-primary">
-                            ← Back to account type selection
+                            &larr; Back to logistics
                         </a>
                     </div>
                 </section>
@@ -505,7 +506,7 @@
     </main>
 
     <footer class="border-t border-light-gray bg-white">
-        <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-5 py-6 sm:flex-row">
+        <div class="site-container registration-footer-inner">
             <p class="text-xs text-charcoal/60">
                 © {{ date('Y') }} Shopleap. All rights reserved.
             </p>

@@ -3,6 +3,12 @@
     $received = $bag->items->whereNotNull('received_at')->count();
     $canEdit = $bag->isOpen();
     $destinationProvince = $bag->toHub?->province;
+    $steps = [
+        'Parcels added' => $bag->items->isNotEmpty(),
+        'Sealed' => $bag->sealed_at !== null || ! $bag->isOpen(),
+        'Manifest printed' => $bag->manifest_printed_at !== null,
+        'In transit' => $bag->dispatched_at !== null || $bag->isInTransit(),
+    ];
 @endphp
 
 <x-logistics.layout title="Bag {{ $bag->code }}" subtitle="{{ $bag->fromHub?->business_name }} → {{ $bag->toHub?->business_name }}"
@@ -13,8 +19,7 @@
             <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-3">
                     <h2 class="text-2xl font-bold tracking-tight text-charcoal">{{ $bag->code }}</h2>
-                    <span
-                        class="rounded-full px-3 py-1 text-xs font-bold {{ $bag->status_color }}">{{ $bag->status_label }}</span>
+                    <x-status-label :status="$bag->status" domain="bag" />
                     @if ($bag->flagged_at)
                         <span class="rounded-full bg-sale-red/10 px-3 py-1 text-xs font-bold text-sale-red">
                             {{ $bag->flag_note }}
@@ -43,8 +48,9 @@
             </div>
 
             <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                @if (! $bag->isOpen())
                 <a href="{{ route('logistics.outbound.manifest', $bag) }}" target="_blank" rel="noopener"
-                    data-print-manifest @if ($bag->isOpen() && ! $bag->manifest_printed_at) data-manifest-reload @endif
+                    data-print-manifest data-manifest-bag="{{ $bag->id }}"
                     class="btn btn-outline text-primary border-primary/30">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -53,6 +59,7 @@
                     </svg>
                     Print Manifest
                 </a>
+                @endif
                 <a href="{{ route('logistics.outbound.index') }}" class="btn btn-outline">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7">
@@ -62,6 +69,18 @@
                 </a>
             </div>
         </div>
+
+        <ol aria-label="Outbound bag progress" class="mt-5 grid grid-cols-1 gap-3 border-t border-white/50 pt-4 min-[400px]:grid-cols-2 lg:grid-cols-4">
+            @foreach ($steps as $label => $done)
+                <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/50 p-3">
+                    <span class="text-xs font-semibold text-charcoal">{{ $label }}</span>
+                    <x-status-label :status="$done ? 'COMPLETED' : 'pending'" />
+                </li>
+            @endforeach
+        </ol>
+        @if ($bag->manifest_printed_at)
+            <p class="mt-3 text-xs text-charcoal/60">Manifest printed {{ $bag->manifest_printed_at->format('M d, Y g:i A') }}.</p>
+        @endif
 
         <div class="mt-5 grid grid-cols-2 gap-3 border-t border-white/50 pt-4 text-sm sm:grid-cols-4">
             <div>
@@ -84,67 +103,6 @@
     </div>
 
     @if ($canEdit)
-        <div class="grid gap-5 lg:grid-cols-2">
-            {{-- SCAN --}}
-            <div class="frost-panel-solid rounded-2xl p-6">
-                <h3 class="text-lg font-bold text-charcoal">Scan a Parcel</h3>
-                <p class="mt-1 text-xs text-charcoal/55">Scan the waybill barcode or type the order number.</p>
-
-                <form method="POST" action="{{ route('logistics.outbound.scan', $bag) }}"
-                    class="mt-4 flex flex-col gap-2 sm:flex-row" data-loading>
-                    @csrf
-                    <input type="text" name="code" required autofocus autocomplete="off" placeholder="Scan or type code…"
-                        class="{{ $field }} min-w-0 flex-1 font-mono">
-                    <button type="submit" class="btn btn-primary w-full sm:w-auto">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 4v16m8-8H4"></path>
-                        </svg>
-                        Add
-                    </button>
-                </form>
-            </div>
-
-            {{-- SEAL --}}
-            <div class="frost-panel-solid rounded-2xl p-6">
-                <h3 class="text-lg font-bold text-charcoal">Seal the Bag</h3>
-                <p class="mt-1 text-xs text-charcoal/55">
-                    Sealing locks the parcel list. Dispatch it afterwards to mark it in transit.
-                </p>
-
-                <form method="POST" action="{{ route('logistics.outbound.seal', $bag) }}" class="mt-4"
-                    data-loading
-                    data-confirm="Seal bag {{ $bag->code }} with {{ $bag->items->count() }} parcel(s)?">
-                    @csrf
-                    <button type="submit" @disabled($bag->items->isEmpty() || ! $bag->manifest_printed_at)
-                        class="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        Seal Bag
-                    </button>
-
-                    @if ($bag->items->isEmpty())
-                        <p class="mt-2 text-xs text-charcoal/55">Add at least one parcel before sealing.</p>
-                    @elseif (! $bag->manifest_printed_at)
-                        <p class="mt-2 text-xs text-charcoal/55">Print the manifest first.</p>
-                    @else
-                        <p class="mt-2 flex items-center gap-1.5 text-xs font-medium text-leaf-green">
-                            <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                                <path fill-rule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                    clip-rule="evenodd"></path>
-                            </svg>
-                            Manifest printed. Ready to seal.
-                        </p>
-                    @endif
-                </form>
-            </div>
-        </div>
-
         {{-- ADD ORDERS --}}
         <div x-data="outboundShow()" class="frost-panel-solid rounded-2xl p-6">
             <div class="flex flex-wrap items-center justify-between gap-3">
@@ -201,14 +159,14 @@
                     <div class="max-h-80 space-y-2 overflow-y-auto pr-1">
                         @foreach ($available as $order)
                             <label data-parcel-row
-                                data-search="#{{ $order->id }} {{ $order->seller?->sellerProfile?->business_name ?? $order->seller?->name }} {{ $order->ship_to['municipality'] ?? '' }} {{ $order->ship_to['barangay'] ?? '' }} {{ $order->ship_to['province'] ?? '' }}"
+                                data-search="#{{ $order->order_number }} {{ $order->waybill_code }} {{ $order->seller?->sellerProfile?->business_name ?? $order->seller?->name }} {{ $order->ship_to['municipality'] ?? '' }} {{ $order->ship_to['barangay'] ?? '' }} {{ $order->ship_to['province'] ?? '' }}"
                                 x-show="matches($el.dataset.search)"
                                 class="flex cursor-pointer items-start gap-3 rounded-lg border border-white/60 bg-white/40 p-3 transition hover:border-primary/40 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                                <input type="checkbox" name="order_ids[]" value="{{ $order->id }}"
+                                <input type="checkbox" name="order_ids[]" value="{{ $order->order_number }}"
                                     data-parcel-checkbox @change="onCheckboxChange()"
                                     class="mt-0.5 h-4 w-4 rounded border-charcoal/30 text-primary focus:ring-primary/30">
                                 <span class="min-w-0 flex-1">
-                                    <span class="block text-sm font-bold text-charcoal">#{{ $order->id }} ·
+                                    <span class="block text-sm font-bold text-charcoal">#{{ $order->order_number }} ·
                                         {{ $order->items->sum('quantity') }} item(s)</span>
                                     <span class="block text-xs text-charcoal/60">
                                         {{ $order->seller?->sellerProfile?->business_name ?? $order->seller?->name }}
@@ -238,26 +196,44 @@
                 </form>
             @endif
         </div>
+        <div class="frost-panel-solid rounded-2xl p-6">
+            <h3 class="text-lg font-bold text-charcoal">Seal the Bag</h3>
+            <p class="mt-1 text-xs text-charcoal/55">
+                Sealing locks the parcel list. Print the manifest after sealing, then put the bag in transit.
+            </p>
+            <form method="POST" action="{{ route('logistics.outbound.seal', $bag) }}" class="mt-4"
+                data-loading data-confirm="Seal bag {{ $bag->code }} with {{ $bag->items->count() }} parcel(s)?">
+                @csrf
+                <button type="submit" @disabled($bag->items->isEmpty())
+                    class="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">Seal Bag</button>
+                @if ($bag->items->isEmpty())
+                    <p class="mt-2 text-xs text-charcoal/55">Add at least one parcel before sealing.</p>
+                @endif
+            </form>
+        </div>
     @elseif ($bag->isSealed())
         <div class="frost-panel-solid rounded-2xl p-6">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h3 class="text-lg font-bold text-charcoal">Ready to dispatch</h3>
+                    <h3 class="text-lg font-bold text-charcoal">{{ $bag->manifest_printed_at ? 'Ready for transit' : 'Print the manifest' }}</h3>
                     <p class="mt-1 text-xs text-charcoal/55">
                         Bag is sealed with {{ $bag->items->count() }} parcel(s). Mark it in transit when it leaves the hub.
                     </p>
                 </div>
-                <form method="POST" action="{{ route('logistics.outbound.dispatch', $bag) }}" data-loading
+                <form method="POST" action="{{ route('logistics.outbound.dispatch', $bag) }}" class="w-full sm:w-auto" data-loading
                     data-confirm="Mark bag {{ $bag->code }} as in transit?">
                     @csrf
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" @disabled(! $bag->manifest_printed_at) class="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                             aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
-                        Mark Dispatched
+                        Put in transit
                     </button>
+                    @if (! $bag->manifest_printed_at)
+                        <p class="mt-2 text-xs text-charcoal/60">Print the manifest first.</p>
+                    @endif
                 </form>
             </div>
         </div>
@@ -272,7 +248,7 @@
         @if ($bag->items->isEmpty())
             <div class="flex h-32 flex-col items-center justify-center text-center">
                 <p class="text-sm font-semibold text-charcoal">The bag is empty</p>
-                <p class="mt-1 text-xs text-charcoal/50">Scan or select parcels above.</p>
+                <p class="mt-1 text-xs text-charcoal/50">Select parcels from the picker above.</p>
             </div>
         @else
             <div class="overflow-x-auto">
@@ -291,7 +267,7 @@
                     <tbody>
                         @foreach ($bag->items as $item)
                             <tr class="transition hover:bg-white/40">
-                                <td class="px-5 py-4 font-bold text-charcoal">#{{ $item->order_id }}</td>
+                                <td class="px-5 py-4 font-bold text-charcoal">#{{ $item->order?->order_number }}</td>
                                 <td class="px-5 py-4 text-charcoal/70">
                                     {{ $item->order?->seller?->sellerProfile?->business_name ?? $item->order?->seller?->name ?? '—' }}
                                 </td>
@@ -309,9 +285,9 @@
                                 @if ($canEdit)
                                     <td class="px-5 py-4 text-right">
                                         <form method="POST"
-                                            action="{{ route('logistics.outbound.orders.destroy', [$bag, $item->order_id]) }}"
+                                            action="{{ route('logistics.outbound.orders.destroy', [$bag, $item->order]) }}"
                                             data-loading
-                                            data-confirm="Remove order #{{ $item->order_id }} from this bag?">
+                                            data-confirm="Remove order #{{ $item->order?->order_number }} from this bag?">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-danger btn-sm">

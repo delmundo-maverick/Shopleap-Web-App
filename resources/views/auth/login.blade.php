@@ -50,13 +50,7 @@
             <div class="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-white/10"></div>
 
             {{-- Desktop logo: same styling as mobile --}}
-            <a href="{{ route('home') }}" class="relative flex items-center gap-3">
-                <span class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden">
-                    <img src="{{ asset('images/Shopleap-Logo-White.png') }}" alt="Shopleap"
-                        class="h-full w-full object-contain">
-                </span>
-                <span class="font-logo text-[1.65rem] font-medium leading-none tracking-tight">Shopleap</span>
-            </a>
+            <x-logo :href="route('home')" class="relative public-brand" />
 
             <div class="relative mx-auto w-full max-w-md">
                 <span
@@ -245,7 +239,7 @@
 
                             <p class="pt-1 text-center text-sm leading-6 text-charcoal/65">
                                 Don't have an account?
-                                <a href="{{ route('register') }}"
+                                <a href="{{ route('register.buyer') }}"
                                     class="font-bold text-primary transition hover:text-sky-blue hover:underline">
                                     Create an account
                                 </a>
@@ -270,6 +264,7 @@
         </section>
     </div>
 
+    <x-footer />
 </body>
 
 </html>

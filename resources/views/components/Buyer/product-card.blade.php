@@ -22,16 +22,14 @@
         <div class="relative aspect-[5/4] w-full overflow-hidden bg-ice-blue">
             @if ($product->main_image_url)
                 <img src="{{ $product->main_image_url }}" alt="{{ $product->name }}" loading="lazy" width="400" height="320"
-                    class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105">
-            @else
+                    class="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" onerror="this.remove()">
+            @endif
                 <div class="flex h-full w-full items-center justify-center text-charcoal/25">
                     <svg class="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                             d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16v14H4V6z" />
                     </svg>
                 </div>
-            @endif
-
             @if ($hasDiscount)
                 <span
                     class="absolute left-2 top-2 rounded-sm bg-sale-red px-1.5 py-1 text-[11px] font-bold leading-none text-white">

@@ -1,4 +1,7 @@
+import { pollingRequest } from '../../shared/polling-request.js';
+
 document.addEventListener('DOMContentLoaded', () => {
+    const fetchStock = pollingRequest(30000);
     const productData = JSON.parse(document.getElementById('productData').textContent);
     const { productId, basePrice, variants, hasOptions, primaryImage, selectedVariantId } = productData;
 
@@ -199,7 +202,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (document.hidden || refreshingStock || !productData.stockUrl) { return; }
         refreshingStock = true;
         try {
-            const response = await fetch(productData.stockUrl, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+            const response = await fetchStock(productData.stockUrl, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+            if (!response) { return; }
             if (response.status === 404) {
                 baseStock = 0;
                 variants.forEach(variant => { variant.stock_quantity = 0; });
@@ -219,12 +223,12 @@ document.addEventListener('DOMContentLoaded', () => {
             refreshingStock = false;
         }
     }
-    let stockTimer = setInterval(refreshStock, 10000);
+    let stockTimer = setInterval(refreshStock, 30000);
     document.addEventListener('visibilitychange', refreshStock);
     window.addEventListener('focus', refreshStock);
     window.addEventListener('pagehide', () => clearInterval(stockTimer));
     window.addEventListener('pageshow', event => {
-        if (event.persisted) { stockTimer = setInterval(refreshStock, 10000); refreshStock(); }
+        if (event.persisted) { clearInterval(stockTimer); stockTimer = setInterval(refreshStock, 30000); refreshStock(); }
     });
     refreshStock();
 

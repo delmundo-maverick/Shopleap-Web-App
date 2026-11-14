@@ -47,7 +47,7 @@
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h1 class="text-lg font-bold text-charcoal">{{ $return->type_label }} · Order
-                        #{{ $return->order_id }}</h1>
+                        #{{ $return->order?->order_number }}</h1>
                     <p class="text-xs text-charcoal/50">{{ $shopName }} · requested
                         {{ $return->created_at->format('M d, Y g:i A') }}</p>
                 </div>

@@ -7,11 +7,18 @@ use App\Models\BuyerProfile;
 use App\Models\LogisticsProfile;
 use App\Models\SellerProfile;
 use App\Models\User;
+use App\Rules\UniqueRoleEmail;
 use App\Services\OtpService;
 use App\Support\Portal;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 
 class LoginController extends Controller
 {
@@ -45,31 +52,61 @@ class LoginController extends Controller
         return view('auth.login');
     }
 
-    public function store(Request $request)
+    public function store(Request $request): View|RedirectResponse
     {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required'],
-        ]);
-
-        $credentials[] = function ($query) use ($request): void {
-            if (Portal::isLogistics($request)) {
-                $query->where('role', 'logistics');
-            } else {
-                $query->where('role', '!=', 'logistics');
-                if (Portal::host('admin') !== Portal::host('main')) {
-                    $query->where('role', $request->getHost() === Portal::host('admin') ? '=' : '!=', 'super_admin');
-                }
-            }
-        };
-
-        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
-            return back()->withErrors([
-                'email' => 'These credentials do not match our records.',
-            ])->onlyInput('email');
+        if (Auth::check()) {
+            throw ValidationException::withMessages(['email' => 'Please log out before signing in to another account.']);
         }
 
-        $user = Auth::user();
+        $roles = Portal::loginRoles($request);
+        if ($request->has('role')) {
+            $data = $request->validate(['role' => ['required', Rule::in($roles)]]);
+            $pending = $request->session()->pull('login_choice');
+            $user = null;
+            if (is_array($pending) && $pending['expires_at'] >= now()->timestamp && $pending['host'] === $request->getHost()) {
+                $candidate = $pending['accounts'][$data['role']] ?? null;
+                if ($candidate) {
+                    $user = User::whereKey($candidate['id'])->where('role', $data['role'])->first();
+                    if ($user && ! hash_equals($candidate['password_hash'], $user->password)) {
+                        $user = null;
+                    }
+                }
+            }
+            if (! $user) {
+                throw ValidationException::withMessages(['email' => 'Please sign in again.']);
+            }
+            $remember = $pending['remember'];
+        } else {
+            $request->session()->forget('login_choice');
+            $credentials = $request->validate([
+                'email' => ['required', 'email', 'max:255'],
+                'password' => ['required', 'string'],
+            ]);
+            $matches = User::withEmail($credentials['email'])->whereIn('role', $roles)->get()
+                ->filter(fn (User $account): bool => Hash::check($credentials['password'], $account->password));
+
+            if ($matches->isEmpty()) {
+                return back()->withErrors(['email' => 'These credentials do not match our records.'])->onlyInput('email');
+            }
+            $remember = $request->boolean('remember');
+            if ($matches->count() > 1) {
+                $request->session()->regenerate();
+                $request->session()->put('login_choice', [
+                    'accounts' => $matches->mapWithKeys(fn (User $account): array => [
+                        $account->role => ['id' => $account->id, 'password_hash' => $account->password],
+                    ])->all(),
+                    'remember' => $remember,
+                    'host' => $request->getHost(),
+                    'expires_at' => now()->addMinutes(5)->timestamp,
+                ]);
+
+                return view('auth.choose-role', ['roles' => $matches->pluck('role')->all()]);
+            }
+            $user = $matches->first();
+            Auth::getProvider()->rehashPasswordIfRequired($user, $credentials);
+        }
+
+        Auth::login($user, $remember);
 
         if (is_null($user->email_verified_at)) {
             Auth::logout();
@@ -193,6 +230,8 @@ class LoginController extends Controller
             'Please start registration again.'
         );
 
+        validator(['email' => $pending['email']], ['email' => [new UniqueRoleEmail($role)]])->validate();
+
         [$ok, $message] = $otpService->verify(
             $pending['email'],
             $role,
@@ -211,21 +250,27 @@ class LoginController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($pending, $role) {
-            $user = User::create(
-                $pending['user'] + ['email_verified_at' => now()]
-            );
+        try {
+            DB::transaction(function () use ($pending, $role) {
+                $user = User::create(
+                    $pending['user'] + ['email_verified_at' => now()]
+                );
 
-            $profileData = $pending['profile'] + [
-                'user_id' => $user->id,
-            ];
+                $profileData = $pending['profile'] + [
+                    'user_id' => $user->id,
+                ];
 
-            match ($role) {
-                'buyer' => BuyerProfile::create($profileData),
-                'seller' => SellerProfile::create($profileData),
-                'logistics' => LogisticsProfile::create($profileData),
-            };
-        });
+                match ($role) {
+                    'buyer' => BuyerProfile::create($profileData),
+                    'seller' => SellerProfile::create($profileData),
+                    'logistics' => LogisticsProfile::create($profileData),
+                };
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            validator(['email' => $pending['user']['email']], ['email' => [new UniqueRoleEmail($role)]])->validate();
+
+            throw $exception;
+        }
 
         session()->forget('pending_registration');
 

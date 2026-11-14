@@ -135,7 +135,7 @@
                     <tbody>
                         @foreach ($bag->items as $item)
                             <tr class="transition hover:bg-white/40">
-                                <td class="px-5 py-4 font-bold text-charcoal">#{{ $item->order_id }}</td>
+                                <td class="px-5 py-4 font-bold text-charcoal">#{{ $item->order?->order_number }}</td>
                                 <td class="px-5 py-4 text-charcoal/70">
                                     {{ $item->order?->seller?->sellerProfile?->business_name ?? $item->order?->seller?->name ?? '—' }}
                                 </td>
@@ -158,7 +158,7 @@
                                     <td class="px-5 py-4 text-right">
                                         @unless ($item->received_at)
                                             <form method="POST"
-                                                action="{{ route('logistics.inbound.parcels.confirm', [$bag, $item->order_id]) }}">
+                                                action="{{ route('logistics.inbound.parcels.confirm', [$bag, $item->order]) }}">
                                                 @csrf
                                                 <button type="submit"
                                                     class="rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5">
