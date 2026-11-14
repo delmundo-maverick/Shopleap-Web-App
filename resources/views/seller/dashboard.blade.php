@@ -351,7 +351,7 @@
 
                                     <div class="min-w-0">
                                         <p class="truncate text-sm font-semibold text-charcoal">
-                                            Order #{{ $order->id }} — {{ $order->buyer_name }}
+                                            Order #{{ $order->order_number }} — {{ $order->buyer_name }}
                                         </p>
 
                                         <p class="text-xs text-charcoal/50">

@@ -56,21 +56,73 @@ class ShopVoucherService
         $voucher = ShopVoucher::where('code', strtoupper(trim($code)))->when($lock, fn ($query) => $query->lockForUpdate())->first();
 
         if (! $voucher) {
-            throw new \Exception('Invalid voucher code.');
+            throw new \DomainException('Invalid voucher code.');
         }
 
+        return $this->validateVoucherForCart($buyer, $voucher, $cartItems);
+    }
+
+    /** @return array<int|string, array<int, array<string, mixed>>> */
+    public function checkoutVouchers(User $buyer, Collection $cartItems): array
+    {
+        $groups = $cartItems->groupBy('product.seller_id');
+        $vouchers = ShopVoucher::whereIn('seller_id', $groups->keys())
+            ->whereHas('claims', fn ($query) => $query->where('user_id', $buyer->id))
+            ->with(['claims' => fn ($query) => $query->where('user_id', $buyer->id)])
+            ->withCount(['redemptions as buyer_uses' => fn ($query) => $query
+                ->where('buyer_id', $buyer->id)->whereIn('status', ['applied', 'used'])])
+            ->orderBy('code')
+            ->get();
+
+        return $vouchers->groupBy('seller_id')->map(function ($shopVouchers, $sellerId) use ($groups): array {
+            return $shopVouchers->map(function (ShopVoucher $voucher) use ($groups, $sellerId): array {
+                $reason = $voucher->claims->first()->used_at ? 'Already used' : $voucher->unavailableReason();
+                if (! $reason && $voucher->per_buyer_limit && $voucher->buyer_uses >= $voucher->per_buyer_limit) {
+                    $reason = 'Your usage limit has been reached.';
+                }
+                $discount = 0.0;
+                if (! $reason) {
+                    try {
+                        $discount = $this->discountForCart($voucher, $groups->get($sellerId))['discount'];
+                    } catch (\DomainException $exception) {
+                        $reason = $exception->getMessage();
+                    }
+                }
+
+                return [
+                    'code' => $voucher->code,
+                    'name' => $voucher->name,
+                    'discount' => $discount,
+                    'reason' => $reason,
+                    'minimum' => (float) $voucher->min_purchase_amount,
+                    'expires_at' => $voucher->expires_at?->toIso8601String(),
+                    'starts_at' => $voucher->starts_at?->toIso8601String(),
+                ];
+            })->values()->all();
+        })->all();
+    }
+
+    /** @return array{voucher: ShopVoucher, discount: float, eligible_subtotal: float, eligible_items: Collection} */
+    private function validateVoucherForCart(User $buyer, ShopVoucher $voucher, Collection $cartItems): array
+    {
         if (! $voucher->hasUnusedClaim($buyer)) {
-            throw new \Exception('Claim this voucher from the shop before using it, or choose an unused claimed voucher.');
+            throw new \DomainException('Claim this voucher from the shop before using it, or choose an unused claimed voucher.');
         }
 
         if (! $voucher->isValidNow()) {
-            throw new \Exception('This voucher is not valid or has expired.');
+            throw new \DomainException('This voucher is '.strtolower($voucher->unavailableReason()).'.');
         }
 
         if (! $voucher->canBeUsedByBuyer($buyer->id)) {
-            throw new \Exception('You have already used this voucher the maximum number of times.');
+            throw new \DomainException('You have already used this voucher the maximum number of times.');
         }
 
+        return $this->discountForCart($voucher, $cartItems);
+    }
+
+    /** @return array{voucher: ShopVoucher, discount: float, eligible_subtotal: float, eligible_items: Collection} */
+    private function discountForCart(ShopVoucher $voucher, Collection $cartItems): array
+    {
         // Group by seller
         $grouped = $cartItems->groupBy(function ($item) {
             return $item->product->seller_id;
@@ -78,7 +130,7 @@ class ShopVoucherService
 
         // Voucher only applies to its issuing seller
         if (! $grouped->has($voucher->seller_id)) {
-            throw new \Exception('This voucher is not applicable to items in your cart.');
+            throw new \DomainException('This voucher is not applicable to items from this shop.');
         }
 
         $sellerItems = $grouped->get($voucher->seller_id);
@@ -94,7 +146,7 @@ class ShopVoucherService
                 return in_array($item->product_id, $eligibleProductIds, true);
             });
             if ($eligibleItems->isEmpty()) {
-                throw new \Exception('This voucher is not applicable to the products in your cart.');
+                throw new \DomainException('This voucher is not applicable to the products in your cart.');
             }
             $eligibleSubtotal = $eligibleItems->sum('line_total');
             $eligibleQuantity = $eligibleItems->sum('quantity');
@@ -109,7 +161,7 @@ class ShopVoucherService
                 return in_array($category, $eligibleCategoryIds, true) || in_array((string) $category, $eligibleCategoryIds, true);
             });
             if ($eligibleItems->isEmpty()) {
-                throw new \Exception('This voucher is not applicable to the product categories in your cart.');
+                throw new \DomainException('This voucher is not applicable to the product categories in your cart.');
             }
             $eligibleSubtotal = $eligibleItems->sum('line_total');
             $eligibleQuantity = $eligibleItems->sum('quantity');
@@ -118,7 +170,8 @@ class ShopVoucherService
         $discount = $voucher->calculateDiscount($eligibleSubtotal, $eligibleQuantity);
 
         if ($discount <= 0) {
-            throw new \Exception('This voucher does not meet the minimum purchase requirements.');
+            throw new \DomainException('This voucher does not meet the minimum purchase requirements. Minimum eligible spend: ₱'.number_format((float) $voucher->min_purchase_amount, 2)
+                .($voucher->min_quantity ? '; minimum quantity: '.$voucher->min_quantity : '').'.');
         }
 
         return [

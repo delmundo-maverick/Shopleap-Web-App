@@ -53,7 +53,7 @@ class HubServiceAreaService
 
     private function hasLocalBarangayData(string $province, string $municipality): bool
     {
-        return PsgcBarangay::forMunicipality($province, $municipality)->isNotEmpty();
+        return PsgcBarangay::hasMunicipality($province, $municipality);
     }
 
     /** Fetches ONE municipality's barangays from PSGC and stores them under the hub's registered spelling. */
@@ -83,7 +83,7 @@ class HubServiceAreaService
     private function downloadOnce(string $province, string $municipality): bool
     {
         // Another request may have filled the table while we waited for the lock.
-        if ($this->hasLocalBarangayData($province, $municipality)) {
+        if (PsgcBarangay::hasMunicipality($province, $municipality, fresh: true)) {
             return true;
         }
 
@@ -117,21 +117,34 @@ class HubServiceAreaService
             return false;
         }
 
-        DB::transaction(function () use ($barangays, $province, $municipality, $place) {
-            foreach ($barangays as $barangay) {
-                PsgcBarangay::updateOrCreate(
-                    [
-                        'province' => $province,
-                        'municipality' => $municipality,
-                        'barangay' => $barangay['name'],
-                    ],
-                    [
-                        'province_code' => $place['province_code'],
-                        'municipality_code' => $place['municipality_code'],
-                        'barangay_code' => $barangay['code'],
-                    ]
-                );
+        DB::transaction(function () use ($barangays, $province, $municipality, $place): void {
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', [
+                    'psgc:import:'.$this->placeKey($province).'|'.$this->placeKey($municipality),
+                ]);
             }
+
+            if (PsgcBarangay::hasMunicipality($province, $municipality, fresh: true)) {
+                return;
+            }
+
+            $now = now();
+            $rows = $barangays->map(fn (array $barangay): array => [
+                'province' => $province,
+                'municipality' => $municipality,
+                'barangay' => $barangay['name'],
+                'province_code' => $place['province_code'],
+                'municipality_code' => $place['municipality_code'],
+                'barangay_code' => $barangay['code'],
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+            foreach ($rows->chunk(100) as $chunk) {
+                PsgcBarangay::insert($chunk->all());
+            }
+            DB::afterCommit(fn () => PsgcBarangay::forgetReferenceCache([
+                ...$place, 'province' => $province, 'municipality' => $municipality,
+            ]));
         });
 
         return true;

@@ -63,7 +63,7 @@
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="min-w-0">
                             <p class="text-sm font-bold text-charcoal">
-                                Order #{{ $order->id }} ·
+                                Order #{{ $order->order_number }} ·
                                 {{ $seller->business_name ?? $order->seller->name }}
                             </p>
 

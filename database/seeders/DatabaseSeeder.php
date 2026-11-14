@@ -15,7 +15,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        if (app()->isProduction()) {
+            throw new \LogicException('Development accounts must not be seeded in production.');
+        }
 
         User::factory()->create([
             'name' => 'Test User',

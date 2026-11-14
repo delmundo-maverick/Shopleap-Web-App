@@ -15,9 +15,9 @@ class DashboardController extends Controller
      * (see the orders_status_check constraint).
      */
     private const STATUS_GROUPS = [
-        'pending'   => ['PLACED'],
-        'to_ship'   => ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP'],
-        'shipped'   => ['PICKED_UP', 'AT_SORTING_CENTER', 'SORTED', 'ASSIGNED_TO_RIDER', 'OUT_FOR_DELIVERY'],
+        'pending' => ['PLACED'],
+        'to_ship' => ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP'],
+        'shipped' => ['PICKED_UP', 'AT_SORTING_CENTER', 'SORTED', 'ASSIGNED_TO_RIDER', 'OUT_FOR_DELIVERY'],
         'delivered' => ['DELIVERED', 'COMPLETED'],
         'cancelled' => ['CANCELLED', 'DELIVERY_FAILED', 'RETURNED'],
     ];
@@ -39,22 +39,22 @@ class DashboardController extends Controller
         */
 
         $months = collect(range(5, 0))
-            ->map(fn($i) => now()->startOfMonth()->subMonths($i));
+            ->map(fn ($i) => now()->startOfMonth()->subMonths($i));
 
         $monthlyTotals = Order::where('seller_id', $user->id)
             ->whereNotIn('status', self::NON_REVENUE_STATUSES)
             ->where('created_at', '>=', $months->first())
             ->get(['created_at', 'total_amount'])
-            ->groupBy(fn($order) => $order->created_at->format('Y-m'))
-            ->map(fn($orders) => (float) $orders->sum('total_amount'));
+            ->groupBy(fn ($order) => $order->created_at->format('Y-m'))
+            ->map(fn ($orders) => (float) $orders->sum('total_amount'));
 
         $salesTrend = [
             'labels' => $months
-                ->map(fn($month) => $month->format('M'))
+                ->map(fn ($month) => $month->format('M'))
                 ->values(),
 
             'totals' => $months
-                ->map(fn($month) => (float) $monthlyTotals->get($month->format('Y-m'), 0))
+                ->map(fn ($month) => (float) $monthlyTotals->get($month->format('Y-m'), 0))
                 ->values(),
         ];
 
@@ -72,7 +72,7 @@ class DashboardController extends Controller
             ->selectRaw('COUNT(*) AS total')
             ->groupBy('status')
             ->pluck('total', 'status')
-            ->mapWithKeys(fn($total, $status) => [
+            ->mapWithKeys(fn ($total, $status) => [
                 strtoupper(trim((string) $status)) => (int) $total,
             ]);
 
@@ -90,7 +90,7 @@ class DashboardController extends Controller
 
         if ($unknownStatuses->isNotEmpty()) {
             logger()->warning(
-                'Unmapped order statuses for seller ' . $user->id,
+                'Unmapped order statuses for seller '.$user->id,
                 $unknownStatuses->all()
             );
         }
@@ -121,20 +121,20 @@ class DashboardController extends Controller
             $ratingDistribution[$star] = (int) ($distributionRows[$star] ?? 0);
         }
 
-        $recentReviews = Review::with(['media', 'orderItem', 'product', 'buyer'])
+        $recentReviews = Review::with(['media', 'orderItem', 'product', 'buyer', 'order'])
             ->where('seller_id', $user->id)
             ->latest()
             ->take(5)
             ->get()
-            ->map(fn($review) => [
-                'rating'     => $review->rating,
-                'comment'    => $review->comment,
-                'product'    => $review->orderItem?->product_name ?? $review->product?->name ?? 'Product',
-                'buyer'      => $this->maskName($review->buyer?->name),
-                'order_id'   => $review->order_id,
+            ->map(fn ($review) => [
+                'rating' => $review->rating,
+                'comment' => $review->comment,
+                'product' => $review->orderItem?->product_name ?? $review->product?->name ?? 'Product',
+                'buyer' => $this->maskName($review->buyer?->name),
+                'order_id' => $review->order?->order_number,
                 'created_at' => $review->created_at,
-                'media'      => $review->media->map(fn($m) => [
-                    'url'      => $m->url,
+                'media' => $review->media->map(fn ($m) => [
+                    'url' => $m->url,
                     'is_video' => $m->is_video,
                 ])->values(),
             ]);
@@ -198,11 +198,11 @@ class DashboardController extends Controller
         $length = mb_strlen($name);
 
         if ($length <= 2) {
-            return mb_substr($name, 0, 1) . '*';
+            return mb_substr($name, 0, 1).'*';
         }
 
         return mb_substr($name, 0, 1)
-            . str_repeat('*', min($length - 2, 5))
-            . mb_substr($name, -1);
+            .str_repeat('*', min($length - 2, 5))
+            .mb_substr($name, -1);
     }
 }

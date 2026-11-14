@@ -2,28 +2,18 @@
 
 namespace App\Support;
 
-/**
- * Parses the codes printed on waybills and bag manifests.
- *
- * Waybill QR:  SHOPLEAP:ORDER:42
- * Waybill 1D:  0000000042
- * Bag QR:      SHOPLEAP:BAG:SB-261031-ABCDE
- */
+use App\Models\Order;
+
 class ScanCode
 {
     public static function orderId(string $code): ?int
     {
-        $code = trim($code);
-
-        if (preg_match('/^SHOPLEAP:ORDER:(\d+)$/i', $code, $matches)) {
-            return (int) $matches[1];
+        $code = strtoupper(trim($code));
+        if (preg_match('/^SHOPLEAP:ORDER:(\d+)$/', $code, $matches)) {
+            $code = str_pad((string) (int) $matches[1], 10, '0', STR_PAD_LEFT);
         }
 
-        if (preg_match('/^0*(\d+)$/', $code, $matches)) {
-            return (int) $matches[1];
-        }
-
-        return null;
+        return Order::matchingPublicCode($code)->value('id');
     }
 
     public static function bagCode(string $code): ?string

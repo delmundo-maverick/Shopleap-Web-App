@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\HubServiceArea;
 use App\Models\PsgcBarangay;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 
@@ -20,10 +19,10 @@ class BuyerAddressLocations
         };
 
         try {
-            $rows = Cache::remember('buyer-address-psgc:'.$path, 86400, fn (): array => Http::connectTimeout(3)->timeout(10)->get('https://psgc.gitlab.io/api/'.$path)->throw()->json());
+            $rows = PsgcBarangay::referenceCache()->remember('buyer-address-psgc:'.$path, 86400, fn (): array => Http::connectTimeout(3)->timeout(10)->get('https://psgc.gitlab.io/api/'.$path)->throw()->json());
             if ($level === 'province') {
-                $local = PsgcBarangay::select('province as name', 'province_code as code')->distinct()->get()->toArray();
-                $regions = Cache::remember('buyer-address-psgc:regions/', 86400, fn (): array => Http::connectTimeout(3)->timeout(10)->get('https://psgc.gitlab.io/api/regions/')->throw()->json());
+                $local = PsgcBarangay::locationOptions('province');
+                $regions = PsgcBarangay::referenceCache()->remember('buyer-address-psgc:regions/', 86400, fn (): array => Http::connectTimeout(3)->timeout(10)->get('https://psgc.gitlab.io/api/regions/')->throw()->json());
                 $ncr = collect($regions)->filter(fn (array $region): bool => str_starts_with($region['code'], '13'))->all();
                 $rows = collect(array_merge($rows, $local, $ncr))->unique('code')->values()->all();
             }
@@ -31,19 +30,7 @@ class BuyerAddressLocations
             return $rows;
         } catch (\Throwable $exception) {
             report($exception);
-            $query = PsgcBarangay::query();
-            [$nameField, $codeField] = match ($level) {
-                'municipality' => ['municipality', 'municipality_code'],
-                'barangay' => ['barangay', 'barangay_code'],
-                default => ['province', 'province_code'],
-            };
-            if ($level === 'municipality') {
-                $query->where('province_code', $code);
-            }
-            if ($level === 'barangay') {
-                $query->where('municipality_code', $code);
-            }
-            $rows = $query->select($nameField.' as name', $codeField.' as code')->distinct()->get()->toArray();
+            $rows = PsgcBarangay::locationOptions($level, $code);
             if (! $rows) {
                 throw ValidationException::withMessages(['province' => 'Location data is temporarily unavailable. Please try again.']);
             }

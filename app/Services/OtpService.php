@@ -6,10 +6,12 @@ use App\Mail\PasswordResetOtp;
 use App\Models\OtpVerification;
 use App\Notifications\OtpNotification;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
 class OtpService
@@ -23,6 +25,16 @@ class OtpService
         string $role,
         string $purpose = 'registration'
     ): void {
+        $email = strtolower(trim($email));
+        $key = 'otp-send:'.hash('sha256', $email.'|'.$role.'|'.$purpose);
+        if (RateLimiter::tooManyAttempts($key, 5)
+            || ! Cache::store(config('cache.limiter'))->add($key.':cooldown', true, 60)) {
+            throw ValidationException::withMessages([
+                'email' => 'Please wait before requesting another verification code.',
+            ]);
+        }
+        RateLimiter::hit($key, 3600);
+
         $otp = (string) random_int(100000, 999999);
 
         $record = OtpVerification::updateOrCreate(

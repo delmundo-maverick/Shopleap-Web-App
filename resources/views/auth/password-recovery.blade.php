@@ -33,12 +33,22 @@
             <form method="POST" action="{{ route('password.email') }}" data-recovery-form class="space-y-4">
                 @csrf
                 <label for="email" class="block text-sm font-semibold">Email address</label>
-                <input id="email" name="email" type="email" autocomplete="email" required maxlength="255" value="{{ old('email') }}" class="w-full rounded border border-charcoal/25 px-3 py-3">
+                <input id="email" name="email" type="email" autocomplete="email" required maxlength="255" value="{{ old('email', $email ?? '') }}" class="w-full rounded border border-charcoal/25 px-3 py-3">
                 @error('email') <p role="alert" class="text-sm text-sale-red">{{ $message }}</p> @enderror
+                @if (! empty($roles))
+                    <label for="role" class="block text-sm font-semibold">Which account do you want to reset?</label>
+                    <select id="role" name="role" required class="w-full rounded-md border border-line bg-surface px-3 py-3">
+                        <option value="">Choose an account</option>
+                        @foreach ($roles as $accountRole)
+                            <option value="{{ $accountRole }}">{{ ucfirst($accountRole) }}</option>
+                        @endforeach
+                    </select>
+                @endif
+                @error('role') <p role="alert" class="text-sm text-sale-red">{{ $message }}</p> @enderror
                 <button class="btn btn-primary w-full" data-loading="Sending?">Send OTP</button>
             </form>
         @elseif ($step === 2)
-            <p class="mb-5 text-sm">Enter the six-digit code sent to {{ $maskedEmail }}. It expires in 10 minutes.</p>
+            <p class="mb-5 text-sm">Enter the six-digit code sent to {{ $maskedEmail }} for your {{ $role === 'super_admin' ? 'Admin' : ucfirst($role) }} account. It expires in 10 minutes.</p>
             <form method="POST" action="{{ route('password.verify.store') }}" data-recovery-form class="space-y-4">
                 @csrf
                 <label for="otp" class="block text-sm font-semibold">Verification code</label>
@@ -72,5 +82,6 @@
         <a href="{{ route('login') }}" class="mt-6 block text-center text-sm font-semibold text-primary">Back to login</a>
     </section>
 </main>
+    <x-footer />
 </body>
 </html>

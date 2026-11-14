@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Courier;
 
 use App\Http\Controllers\Controller;
+use App\Support\OrderCodes;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,9 +16,11 @@ class NotificationController extends Controller
 
         $page = ($unreadOnly ? $user->unreadNotifications() : $user->notifications())->paginate(20);
 
+        OrderCodes::presentNotifications($page->getCollection());
+
         return response()->json([
             'unread' => $user->unreadNotifications()->count(),
-            'data' => $page->getCollection()->map(fn($n) => [
+            'data' => $page->getCollection()->map(fn ($n) => [
                 'id' => $n->id,
                 'kind' => $n->data['kind'] ?? '',
                 'title' => $n->data['title'] ?? 'Update',

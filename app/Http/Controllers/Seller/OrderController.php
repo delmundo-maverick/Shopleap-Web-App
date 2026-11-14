@@ -26,7 +26,7 @@ class OrderController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('id', $search)
+                $q->matchingPublicCode($search)
                     ->orWhere('buyer_name', 'ilike', "%{$search}%");
             });
         }
@@ -123,7 +123,7 @@ class OrderController extends Controller
         if ($to === $from) {
             return response()->json([
                 'success' => true,
-                'message' => "Order #{$order->id} is already marked as {$order->status_label}.",
+                'message' => "Order #{$order->order_number} is already marked as {$order->status_label}.",
                 'status' => $order->status,
             ]);
         }
@@ -158,7 +158,7 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "Order #{$order->id} is now marked as {$order->status_label}.",
+            'message' => "Order #{$order->order_number} is now marked as {$order->status_label}.",
             'status' => $order->status,
         ]);
     }
@@ -194,7 +194,7 @@ class OrderController extends Controller
 
         return redirect()
             ->route('seller.orders.show', $order)
-            ->with('status', "Order #{$order->id} was cancelled and the stock was returned.");
+            ->with('status', "Order #{$order->order_number} was cancelled and the stock was returned.");
     }
 
     public function approveCancel(Request $request, Order $order, OrderCancellation $cancellation)

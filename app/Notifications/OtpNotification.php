@@ -25,12 +25,13 @@ class OtpNotification extends Notification
     public function toMail($notifiable): MailMessage
     {
         $reset = $this->purpose === 'reset';
+        $role = in_array($this->role, ['courier', 'courier_reset'], true) ? 'Rider' : ucfirst($this->role);
 
         return (new MailMessage)
             ->subject(
                 $reset
-                    ? 'Reset your password'
-                    : 'Your Verification Code'
+                    ? "Reset your {$role} account password"
+                    : "Verify your {$role} account"
             )
             ->view('emails.otp', [
                 'loginUrl' => Portal::url(in_array($this->role, ['logistics', 'courier', 'courier_reset']) ? 'logistics' : 'main', in_array($this->role, ['courier', 'courier_reset']) ? '' : 'login'),

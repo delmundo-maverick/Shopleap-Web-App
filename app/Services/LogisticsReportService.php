@@ -186,7 +186,7 @@ class LogisticsReportService
     {
         $orders = $this->scopedOrders($hubId, $filters, true)->whereBetween('delivered_at', [$from, $to])->with('deliveryRider')->get();
         $first = $orders->where('delivery_attempts', 0)->count();
-        $rows = $orders->map(fn (Order $order) => ['order' => '#'.$order->id, 'date' => $order->delivered_at->format('Y-m-d H:i'), 'rider' => $order->deliveryRider?->full_name ?? 'Unassigned', 'attempts' => (int) $order->delivery_attempts, 'time' => $this->averageDays(collect([$order]))])->all();
+        $rows = $orders->map(fn (Order $order) => ['order' => '#'.$order->order_number, 'date' => $order->delivered_at->format('Y-m-d H:i'), 'rider' => $order->deliveryRider?->full_name ?? 'Unassigned', 'attempts' => (int) $order->delivery_attempts, 'time' => $this->averageDays(collect([$order]))])->all();
         $daily = $orders->groupBy(fn (Order $order) => $order->delivered_at->format('Y-m-d'))->sortKeys()->map->count();
         $daily = $this->days($from, $to, $daily);
 
@@ -222,7 +222,7 @@ class LogisticsReportService
         $details = (clone $query)->with(['earningCourier', 'deliveryRider'])->orderByDesc('delivered_at')->orderByDesc('id');
         $paginator = $paginate ? $details->paginate(25)->withQueryString() : null;
         $rows = ($paginator ? $paginator->getCollection() : $details->lazy(250))->map(fn (Order $order) => [
-            'date' => $order->delivered_at->format('Y-m-d H:i'), 'order' => '#'.$order->id,
+            'date' => $order->delivered_at->format('Y-m-d H:i'), 'order' => '#'.$order->order_number,
             'rider' => ($order->earnings_recorded_at ? $order->earningCourier : $order->deliveryRider)?->full_name ?? 'Unassigned',
             'fees' => $order->delivered_shipping_fee === null ? '-' : $this->currency((float) $order->delivered_shipping_fee),
             'pay' => $order->rider_pay === null ? '-' : $this->currency((float) $order->rider_pay),
@@ -256,7 +256,7 @@ class LogisticsReportService
         }
         $orders = $orders->get();
         $total = (float) $orders->sum($cash ? 'cod_collected_amount' : 'shipping_fee');
-        $rows = $orders->sortBy($date)->map(fn (Order $order) => ['order' => '#'.$order->id, 'date' => $order->{$date}->format('Y-m-d H:i'), 'amount' => $this->currency((float) ($cash ? $order->cod_collected_amount : $order->shipping_fee)), 'status' => $order->status, 'rider' => $order->delivery_rider_id ?? 'Unassigned'])->values()->all();
+        $rows = $orders->sortBy($date)->map(fn (Order $order) => ['order' => '#'.$order->order_number, 'date' => $order->{$date}->format('Y-m-d H:i'), 'amount' => $this->currency((float) ($cash ? $order->cod_collected_amount : $order->shipping_fee)), 'status' => $order->status, 'rider' => $order->delivery_rider_id ?? 'Unassigned'])->values()->all();
         $daily = $orders->groupBy(fn (Order $order) => $order->{$date}->format('Y-m-d'))->sortKeys()->map(fn (Collection $group) => round((float) $group->sum($cash ? 'cod_collected_amount' : 'shipping_fee'), 2));
         $daily = $this->days($from, $to, $daily);
         $notes = $cash ? ['Based on cod_collected_at and cash actually recorded. Order completion does not prove remittance; remittance transactions are not tracked by this application.']
@@ -303,12 +303,12 @@ class LogisticsReportService
     private function incidents(int $hubId, Carbon $from, Carbon $to, array $filters, bool $damage): array
     {
         $types = $damage ? [ParcelEvent::TYPE_BAG_MISSING] : [ParcelEvent::TYPE_DELIVERY_ATTEMPT, ParcelEvent::TYPE_RETURNED];
-        $events = $this->events($hubId, $from, $to, $filters)->whereIn('event_type', $types)->orderByDesc('created_at')->get();
-        $rows = $events->map(fn (ParcelEvent $event) => ['order' => '#'.$event->order_id, 'incident' => ParcelEvent::TYPE_LABELS[$event->event_type], 'reason' => $event->note ?: 'No note recorded', 'date' => $event->created_at->format('Y-m-d H:i')])->all();
+        $events = $this->events($hubId, $from, $to, $filters)->with('order')->whereIn('event_type', $types)->orderByDesc('created_at')->get();
+        $rows = $events->map(fn (ParcelEvent $event) => ['order' => '#'.$event->order?->order_number, 'incident' => ParcelEvent::TYPE_LABELS[$event->event_type], 'reason' => $event->note ?: 'No note recorded', 'date' => $event->created_at->format('Y-m-d H:i')])->all();
         if ($damage) {
-            $claims = OrderReturn::where('reason', 'damaged')->whereBetween('created_at', [$from, $to])->whereIn('order_id', $this->scopedOrders($hubId, $filters)->select('orders.id'))->get();
+            $claims = OrderReturn::with('order')->where('reason', 'damaged')->whereBetween('created_at', [$from, $to])->whereIn('order_id', $this->scopedOrders($hubId, $filters)->select('orders.id'))->get();
             foreach ($claims as $claim) {
-                $rows[] = ['order' => '#'.$claim->order_id, 'incident' => 'Buyer-reported damage', 'reason' => $claim->details.' ('.$claim->status.')', 'date' => $claim->created_at->format('Y-m-d H:i')];
+                $rows[] = ['order' => '#'.$claim->order?->order_number, 'incident' => 'Buyer-reported damage', 'reason' => $claim->details.' ('.$claim->status.')', 'date' => $claim->created_at->format('Y-m-d H:i')];
             }
         }
         $grouped = collect($rows)->groupBy('incident')->map->count();

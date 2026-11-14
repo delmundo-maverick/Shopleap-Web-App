@@ -1,5 +1,5 @@
 <x-seller.product-layout title="All Products">
-    <x-slot:actions><a class="btn-primary" href="{{ route('seller.products.create') }}">Add Product</a></x-slot:actions>
+    <x-slot:actions><x-notification-bell /></x-slot:actions>
     <div x-data="productList(@js(['ids' => $products->modelKeys(), 'discounts' => route('seller.products.discounts.index')]))" class="space-y-5">
         <div class="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
             @foreach ($summary as $label => $count)<x-seller.stat-card :label="$label" :value="$count" />@endforeach

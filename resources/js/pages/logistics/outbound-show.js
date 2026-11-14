@@ -63,34 +63,12 @@ function outboundShow() {
 }
 
 function initManifestPrint() {
-    // Only sync when printing is what unlocks Seal Bag on this page.
-    const link = document.querySelector('[data-print-manifest][data-manifest-reload]');
+    const link = document.querySelector('[data-print-manifest][data-manifest-bag]');
     if (!link) return;
 
-    const flag = 'logistics.manifest.opened';
-
-    const reloadWhenMarked = () => {
-        if (window.sessionStorage.getItem(flag) !== '1') return;
-
-        // Remove first so focus and the fallback timer cannot reload twice.
-        window.sessionStorage.removeItem(flag);
-        window.location.reload();
-    };
-
-    const scheduleReload = (delay) => window.setTimeout(reloadWhenMarked, delay);
-
-    link.addEventListener('click', () => {
-        window.sessionStorage.setItem(flag, '1');
-
-        // The manifest opens in another tab and marks the bag server-side on
-        // render. Reload when the user comes back so Seal Bag reflects it. The
-        // timer is only a fallback for browsers that do not fire focus.
-        scheduleReload(10000);
-    });
-
-    window.addEventListener('focus', () => scheduleReload(500));
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') scheduleReload(500);
+    const key = `logistics.manifest.printed.${link.dataset.manifestBag}`;
+    window.addEventListener('storage', (event) => {
+        if (event.key === key && event.newValue) { window.location.reload(); }
     });
 }
 

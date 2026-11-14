@@ -19,6 +19,7 @@
                     $selected = request()->routeIs($link['route'] === 'admin.settings.index' ? $link['route'] : $pattern);
                     if (isset($link['params']['status'])) { $selected = request()->routeIs($link['route']) && (request('status', 'new') === $link['params']['status']); }
                     if ($link['route'] === 'messages.support') { $selected = $active === 'help'; }
+                    $selected = $link['selected'] ?? $selected;
                 @endphp
                 <x-nav.link :href="route($link['route'], $link['params'] ?? [])" :active="$selected" :icon="\App\Support\NavigationIcons::forRoute($link['route']) ?? ($link['icon'] ?? null)" :badge="$link['count'] ?? null" :message="!empty($link['badge'])" :title="$link['title'] ?? $link['label']">{{ $link['label'] }}</x-nav.link>
             @endforeach
@@ -26,6 +27,10 @@
         @endforeach
     </x-slot:desktopLinks>
     <x-slot:actions>
+        <nav aria-label="Policies" class="flex flex-wrap gap-3 px-3 py-2 text-xs text-charcoal/65">
+            <a href="{{ \App\Support\Portal::route('main', 'terms') }}" class="hover:text-primary">Terms and Conditions</a>
+            <a href="{{ \App\Support\Portal::route('main', 'privacy') }}" class="hover:text-primary">Privacy Policy</a>
+        </nav>
         <x-nav.user-menu id="workspace-user-menu" />
     </x-slot:actions>
 </x-nav.shell>

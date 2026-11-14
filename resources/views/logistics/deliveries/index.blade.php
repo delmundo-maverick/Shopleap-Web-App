@@ -50,7 +50,7 @@
                 <div class="frost-panel-solid rounded-2xl p-5">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="min-w-0">
-                            <p class="text-sm font-bold text-charcoal">Order #{{ $order->id }} · {{ $ship['name'] }}
+                            <p class="text-sm font-bold text-charcoal">Order #{{ $order->order_number }} · {{ $ship['name'] }}
                             </p>
                             <p class="mt-0.5 text-xs text-charcoal/60">
                                 {{ $ship['street'] }}, {{ $ship['barangay'] }}, {{ $ship['municipality'] }},

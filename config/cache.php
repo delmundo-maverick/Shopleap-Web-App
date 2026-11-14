@@ -17,6 +17,10 @@ return [
 
     'default' => env('CACHE_STORE', 'database'),
 
+    'limiter' => env('CACHE_LIMITER_STORE', env('CACHE_STORE', 'database')),
+
+    'psgc_store' => env('PSGC_CACHE_STORE', 'file'),
+
     /*
     |--------------------------------------------------------------------------
     | Cache Stores

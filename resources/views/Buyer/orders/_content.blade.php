@@ -221,15 +221,21 @@
                                 <div>
                                     <p class="text-card-label">Order details</p>
                                     <p class="mt-1 text-xs text-charcoal/70">
-                                        Order #{{ $order->id }} · {{ $order->created_at->format('M d, Y') }}
+                                        Order #{{ $order->order_number }} · {{ $order->created_at->format('M d, Y') }}
                                     </p>
                                 </div>
 
                                 <dl class="w-full space-y-1.5 text-xs text-charcoal/70 sm:w-72">
                                     <div class="flex justify-between gap-4">
                                         <dt>Merchandise Subtotal</dt>
-                                        <dd class="tabular-nums">₱{{ number_format($order->total_amount, 2) }}</dd>
+                                        <dd class="tabular-nums">₱{{ number_format($order->items_subtotal ?? $order->total_amount, 2) }}</dd>
                                     </div>
+                                    @if ($order->voucher_discount > 0)
+                                        <div class="flex justify-between gap-4 text-leaf-green">
+                                            <dt>Voucher discount ({{ $order->voucher_code }})</dt>
+                                            <dd class="tabular-nums">− ₱{{ number_format($order->voucher_discount, 2) }}</dd>
+                                        </div>
+                                    @endif
                                     <div class="flex justify-between gap-4">
                                         <dt>Shipping Fee</dt>
                                         <dd class="tabular-nums">₱{{ number_format($order->shipping_fee, 2) }}</dd>
@@ -288,7 +294,7 @@
                             @if ($cancelMode)
                                 <button type="button" class="cancel-order-btn {{ $btnDanger }}"
                                     data-action="{{ route('buyer.orders.cancel', $order) }}"
-                                    data-mode="{{ $cancelMode }}" data-order-id="{{ $order->id }}">
+                                    data-mode="{{ $cancelMode }}" data-order-id="{{ $order->order_number }}">
                                     {{ $cancelMode === 'request' ? 'Request Cancellation' : 'Cancel Order' }}
                                 </button>
                             @endif

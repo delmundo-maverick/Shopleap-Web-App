@@ -4,42 +4,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    @vite(['resources/css/app.css'])
+    @vite(['resources/css/app.css', 'resources/css/pages/logistics/outbound-manifest.css', 'resources/js/pages/logistics/outbound-manifest.js'])
 
     <title>Manifest {{ $bag->code }} | Shopleap Logistics</title>
-    <style>
-        @media print {
-            .no-print {
-                display: none !important;
-            }
-
-            body {
-                background: #fff !important;
-            }
-
-            .print-card {
-                box-shadow: none !important;
-                border: 1px solid #d1d5db !important;
-            }
-        }
-    </style>
 </head>
 
-<body class="min-h-screen bg-light-gray/40 p-6 text-charcoal">
+<body class="min-h-screen bg-light-gray/40 p-3 text-charcoal sm:p-6">
     <div class="mx-auto max-w-4xl space-y-4">
         <div class="no-print flex flex-wrap items-center justify-between gap-3">
             <a href="{{ route('logistics.outbound.show', $bag) }}"
                 class="rounded-xl border border-charcoal/15 px-4 py-2 text-sm font-semibold text-charcoal/70 transition hover:bg-charcoal/5">
                 Back to bag
             </a>
-            <button type="button" onclick="window.print()"
-                class="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-white transition hover:bg-sky-blue">
+            <button type="button" id="manifest-print-button"
+                data-record-url="{{ route('logistics.outbound.manifest.printed', $bag) }}"
+                data-bag-id="{{ $bag->id }}" data-order-ids="{{ $bag->items->pluck('order.order_number')->values()->toJson() }}"
+                class="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-white transition hover:bg-sky-blue disabled:cursor-wait disabled:opacity-60">
                 Print Manifest
             </button>
         </div>
+        <p id="manifest-print-status" class="no-print text-sm" role="status" aria-live="polite"></p>
 
-        <div class="print-card rounded-2xl border border-white/60 bg-white p-8 shadow-sm">
+        <div class="print-card rounded-2xl border border-white/60 bg-white p-4 shadow-sm sm:p-8">
             <div class="flex flex-wrap items-start justify-between gap-6 border-b border-charcoal/10 pb-6">
                 <div>
                     <p class="text-xs font-bold uppercase tracking-[0.2em] text-primary">Shopleap Logistics</p>
@@ -86,27 +74,24 @@
                     <p class="text-sm font-semibold">{{ $bag->items->count() }} parcel(s)</p>
                 </div>
 
-                <table class="app-table mt-3 w-full text-left text-sm">
+                <table class="manifest-table mt-3 w-full table-fixed text-left text-xs sm:text-sm">
                     <thead>
                         <tr>
-                            <th class="py-2 font-semibold text-charcoal/60">Order</th>
-                            <th class="py-2 font-semibold text-charcoal/60">Seller</th>
-                            <th class="py-2 font-semibold text-charcoal/60">Destination</th>
-                            <th class="py-2 text-right font-semibold text-charcoal/60">Items</th>
+                            <th class="py-2 pr-3 font-semibold text-charcoal/60">Waybill / tracking number</th>
+                            <th class="py-2 pr-3 font-semibold text-charcoal/60">Receiver barangay</th>
+                            <th class="py-2 font-semibold text-charcoal/60">Municipality</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ($bag->items as $item)
                             <tr>
-                                <td class="py-2 font-mono font-bold">#{{ $item->order_id }}</td>
-                                <td class="py-2">
-                                    {{ $item->order?->seller?->sellerProfile?->business_name ?? $item->order?->seller?->name ?? '—' }}
+                                <td class="py-2 pr-3 font-mono font-bold">{{ $item->order?->waybill_code }}</td>
+                                <td class="py-2 pr-3">
+                                    {{ $item->order?->ship_to['barangay'] ?? '—' }}
                                 </td>
                                 <td class="py-2">
-                                    {{ $item->order?->ship_to['municipality'] ?? '—' }},
-                                    {{ $item->order?->ship_to['province'] ?? '' }}
+                                    {{ $item->order?->ship_to['municipality'] ?? '—' }}
                                 </td>
-                                <td class="py-2 text-right">{{ $item->order?->items?->sum('quantity') ?? '—' }}</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -131,7 +116,7 @@
             </div>
 
             <p class="mt-6 border-t border-charcoal/10 pt-4 text-center text-xs text-charcoal/50">
-                Scan the bag QR/barcode at dispatch and receipt · Printed {{ now()->format('M d, Y g:i A') }}
+                Manifest generated {{ now()->format('M d, Y g:i A') }} · Keep this manifest with the bag for the receiving hub.
             </p>
         </div>
     </div>

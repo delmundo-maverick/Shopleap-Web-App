@@ -9,3 +9,11 @@ public/hot
 public/build
 storage/logs
 tests
+*.dump
+phpinfo_dump.txt
+docs
+.ai
+AGENTS.md
+bootstrap/cache/*.php
+storage/framework/views/*.php
+storage/framework/cache/data

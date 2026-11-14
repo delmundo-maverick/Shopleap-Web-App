@@ -37,7 +37,7 @@
                         </a>
                         <div>
                             <h1 class="text-xl font-bold text-charcoal">{{ $return->type_label }} · Order
-                                #{{ $return->order_id }}</h1>
+                                #{{ $return->order?->order_number }}</h1>
                             <p class="text-sm text-charcoal/55">Requested
                                 {{ $return->created_at->format('M d, Y \a\t g:i A') }}
                             </p>
@@ -292,9 +292,9 @@
                                 </ol>
                             </section>
 
-                            <a href="{{ route('seller.orders.show', $return->order_id) }}"
+                            <a href="{{ route('seller.orders.show', $return->order) }}"
                                 class="block text-center text-xs font-semibold text-primary hover:underline">
-                                View order #{{ $return->order_id }}
+                                View order #{{ $return->order?->order_number }}
                             </a>
                         </div>
                     </div>

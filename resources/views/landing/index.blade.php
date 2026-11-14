@@ -3,31 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shopleap | Browse Categories &amp; Products</title>
+    <title>Shopleap | Shop Smart. Shop Simple.</title>
     <meta name="description" content="Discover products from Shopleap sellers. Browse categories, shop with Cash on Delivery, or start selling on Shopleap.">
     <link rel="canonical" href="{{ route('home') }}">
-    <meta property="og:title" content="Shopleap | Browse Categories &amp; Products">
+    <meta property="og:title" content="Shopleap | Shop Smart. Shop Simple.">
     <meta property="og:description" content="Browse categories and discover products from Shopleap sellers.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ route('home') }}">
     <meta property="og:image" content="{{ asset('images/Shopleap-Logo.png') }}">
     <link rel="icon" href="{{ asset('images/Shopleap-Logo.png') }}">
-    @vite(['resources/css/app.css', 'resources/css/landing.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/css/landing.css', 'resources/js/app.js', 'resources/js/shared/landing-viewport.js'])
 </head>
 <body x-data class="landing-page font-sans text-charcoal">
     <x-nav.guest :landing="true" class="landing-navigation" />
     <main id="home">
-        <div class="site-container landing-content">
-            <section class="landing-hero" aria-labelledby="hero-heading">
+        <section class="landing-hero" aria-labelledby="hero-heading">
+            <div class="site-container landing-hero-inner">
     <div class="landing-hero-copy">
         <p class="landing-eyebrow">A little discovery. An everyday delight.</p>
-        <h1 id="hero-heading">Good finds.<br>For your <em>everyday.</em></h1>
+        <h1 id="hero-heading">Shop Smart.<br><em>Shop Simple.</em></h1>
         <p class="landing-intro">The things you need. The finds you didn't know you loved. Discover something for every corner of your life, all in one place.</p>
-        <div class="landing-hero-actions"><a href="#discover" class="btn btn-primary">Explore the finds &rarr;</a><a href="#categories" class="landing-text-link">Browse categories &#8599;</a></div>
+        <div class="landing-hero-actions"><a href="#discover" class="btn btn-primary">Explore the finds &rarr;</a><a href="#categories" class="landing-text-link">Browse categories</a></div>
         <p class="landing-hero-note">From your next favorite outfit to a happier home.</p>
     </div>
-    <div class="landing-hero-art" aria-hidden="true"><span class="landing-art-caption">GOOD FINDS. EVERYDAY JOY.</span><div class="landing-art-orbit"></div><span class="landing-art-spark">&#10035;</span><div class="landing-bag landing-bag-back"><span>the little<br>things.</span></div><div class="landing-bag landing-bag-front"><strong>s.</strong><span>shopleap</span></div><div class="landing-art-tag"><span>Made for your everyday</span><strong>Find your next favorite &#8599;</strong></div><span class="landing-art-bottom">A fresh way to find your kind of thing.</span></div>
-</section>
+    <x-landing.hero-art :products="$bestSellers" />
+            </div>
+        </section>
+        <div class="site-container landing-content">
 <div class="landing-benefits" aria-label="Shopping on Shopleap">
     @foreach ([['01', 'Discover more', 'Find something for every part of your day.'], ['02', 'Pay on delivery', 'Cash on Delivery at checkout.'], ['03', 'Stay in the loop', 'Track orders from your account.'], ['04', 'Make it yours', 'Sign up to save your favorites.']] as [$number, $title, $description])
         <div class="landing-benefit"><span>{{ $number }}</span><div><h2>{{ $title }}</h2><p>{{ $description }}</p></div></div>
@@ -69,7 +71,7 @@
 
         </div>
     </main>
-        <footer class="landing-footer"><div class="site-container"><div class="landing-footer-main"><div class="landing-footer-brand"><x-nav.brand /><p>A little discovery. An everyday delight.<br>Your next favorite starts here.</p></div><nav aria-label="Explore"><h2>Explore</h2><a href="#categories">Shop by category</a><a href="#deals">Featured products</a><a href="#discover">Daily Discover</a></nav><nav aria-label="Join Shopleap"><h2>Grow with us</h2><a href="{{ route('register.buyer') }}">Create an account</a><a href="{{ route('register.seller') }}">Become a seller</a><a href="{{ \App\Support\Portal::url('logistics') }}">Logistics partner</a></nav><nav aria-label="Information"><h2>Good to know</h2><a href="#how-it-works">How it works</a><a href="{{ route('terms') }}">Terms and Conditions</a><a href="{{ route('privacy') }}">Privacy Policy</a></nav></div><div class="landing-footer-bottom"><p>&copy; {{ now()->year }} Shopleap. All rights reserved.</p><a href="#home">Back to top &uarr;</a></div></div></footer>
+        <footer class="landing-footer"><div class="site-container"><div class="landing-footer-main"><div class="landing-footer-brand"><x-logo :href="route('home')" image="images/Shopleap-Logo.png" class="public-brand text-primary" /><p>A little discovery. An everyday delight.<br>Your next favorite starts here.</p></div><nav aria-label="Explore"><h2>Explore</h2><a href="#categories">Shop by category</a><a href="#deals">Featured products</a><a href="#discover">Daily Discover</a></nav><nav aria-label="Join Shopleap"><h2>Grow with us</h2><a href="{{ route('register.buyer') }}">Create an account</a><a href="{{ route('register.seller') }}">Become a seller</a><a href="{{ \App\Support\Portal::url('logistics') }}">Logistics partner</a></nav><nav aria-label="Information"><h2>Good to know</h2><a href="#how-it-works">How it works</a><a href="{{ route('terms') }}">Terms and Conditions</a><a href="{{ route('privacy') }}">Privacy Policy</a></nav></div><div class="landing-footer-bottom"><p>&copy; {{ now()->year }} Shopleap. All rights reserved.</p><a href="#home">Back to top &uarr;</a></div></div></footer>
 </body>
 </html>
 

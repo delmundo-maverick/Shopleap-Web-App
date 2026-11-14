@@ -7,6 +7,7 @@ use App\Models\CourierProfile;
 use App\Models\Order;
 use App\Services\OrderTransitions;
 use App\Services\RiderCoverage;
+use App\Support\ScanCode;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -36,7 +37,7 @@ class PickupController extends Controller
             ->get();
 
         return response()->json([
-            'data' => $orders->map(fn ($o) => $this->payload($o)),
+            'data' => $orders->map(fn ($o) => $this->payload($o, $courier)),
         ]);
     }
 
@@ -62,7 +63,7 @@ class PickupController extends Controller
         if ($order->pickup_status === 'accepted') {
             return response()->json([
                 'message' => 'Pickup already accepted.',
-                'data' => $this->payload($order),
+                'data' => $this->payload($order, $courier),
             ]);
         }
 
@@ -88,7 +89,7 @@ class PickupController extends Controller
 
         return response()->json([
             'message' => 'Pickup accepted.',
-            'data' => $this->payload($order),
+            'data' => $this->payload($order, $courier),
         ]);
     }
 
@@ -149,12 +150,7 @@ class PickupController extends Controller
             'scan' => ['required', 'string', 'max:100'],
         ]);
 
-        $valid = [
-            'SHOPLEAP:ORDER:'.$order->id,
-            str_pad((string) $order->id, 10, '0', STR_PAD_LEFT),
-        ];
-
-        if (! in_array(trim($data['scan']), $valid, true)) {
+        if (ScanCode::orderId($data['scan']) !== $order->id) {
             return response()->json([
                 'message' => 'This is not the right parcel.',
             ], 422);
@@ -179,7 +175,8 @@ class PickupController extends Controller
                     'items',
                     'seller.sellerProfile',
                     'logisticsProfile',
-                ])
+                ]),
+                $courier
             ),
         ]);
     }
@@ -232,12 +229,23 @@ class PickupController extends Controller
     /**
      * Format an order for the courier app.
      */
-    private function payload(Order $o): array
+    private function payload(Order $o, CourierProfile $courier): array
     {
-        $seller = $o->seller->sellerProfile;
+        $o->loadMissing(['items', 'seller.sellerProfile', 'logisticsProfile']);
+        $seller = $o->seller?->sellerProfile;
+        $sellerPhone = null;
+
+        if ($o->status === Order::STATUS_READY_FOR_PICKUP
+            && (int) $o->pickup_rider_id === (int) $courier->id
+            && (int) ($o->origin_hub_id ?? $o->logistics_profile_id) === (int) $courier->logistics_profile_id) {
+            $sellerPhone = trim((string) $seller?->contact_no);
+            $sellerPhone = $sellerPhone === '' ? null : $sellerPhone;
+        }
 
         return [
-            'order_id' => $o->id,
+            'order_id' => $o->order_number,
+            'order_number' => $o->order_number,
+            'waybill_code' => $o->waybill_code,
             'status' => $o->status,
             'pickup_status' => $o->pickup_status,
             'hub_id' => $o->origin_hub_id ?? $o->logistics_profile_id,
@@ -247,7 +255,8 @@ class PickupController extends Controller
 
             'seller' => [
                 'name' => $seller->business_name ?? $o->seller->name,
-                'contact_no' => $seller?->contact_no,
+                'contact_no' => $sellerPhone,
+                'seller_phone' => $sellerPhone,
                 'address' => trim(implode(', ', array_filter([
                     $seller?->street_address,
                     $seller?->barangay,

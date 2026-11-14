@@ -1,6 +1,8 @@
+import Chart from 'chart.js/auto';
+
 document.addEventListener('DOMContentLoaded', () => {
     const dataEl = document.getElementById('transactionsData');
-    if (!dataEl || typeof window.Chart === 'undefined') return;
+    if (!dataEl) return;
 
     const { series, statusBreakdown } = JSON.parse(dataEl.textContent);
     const peso = (v) => '₱' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });

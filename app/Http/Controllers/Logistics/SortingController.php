@@ -126,14 +126,14 @@ class SortingController extends Controller
         $result = $this->sortOrder($order, $hub, $coverage);
 
         if ($result === null) {
-            return back()->withErrors(['action' => "Order #{$order->id} has no destination hub in your company for Brgy. {$order->ship_to['barangay']}, {$order->ship_to['municipality']}."]);
+            return back()->withErrors(['action' => "Order #{$order->order_number} has no destination hub in your company for Brgy. {$order->ship_to['barangay']}, {$order->ship_to['municipality']}."]);
         }
 
         if ($result === 'transferred') {
-            return back()->with('status', "Order #{$order->id} sorted and awaiting transfer to {$order->destinationHub?->business_name}.");
+            return back()->with('status', "Order #{$order->order_number} sorted and awaiting transfer to {$order->destinationHub?->business_name}.");
         }
 
-        return back()->with('status', "Order #{$order->id} sorted for {$order->delivery_area}.");
+        return back()->with('status', "Order #{$order->order_number} sorted for {$order->delivery_area}.");
     }
 
     public function sortAll(Request $request, HubCoverage $coverage)
@@ -203,13 +203,13 @@ class SortingController extends Controller
         $destination = $this->destinationFor($order, $hub, $coverage);
 
         if (! $destination) {
-            return back()->withErrors(['action' => "Order #{$order->id} has no destination hub in your company."]);
+            return back()->withErrors(['action' => "Order #{$order->order_number} has no destination hub in your company."]);
         }
 
         if ((int) $destination->id !== (int) $hub->id) {
             $this->markAwaitingTransfer($order, $destination);
 
-            return back()->withErrors(['action' => "Order #{$order->id} is awaiting transfer to {$destination->business_name} and cannot be assigned to a rider here."]);
+            return back()->withErrors(['action' => "Order #{$order->order_number} is awaiting transfer to {$destination->business_name} and cannot be assigned to a rider here."]);
         }
 
         $validated = $request->validate(['rider_id' => ['required', 'integer']]);
@@ -223,7 +223,7 @@ class SortingController extends Controller
 
         DB::transaction(fn () => $this->assignRider($order, $rider));
 
-        return back()->with('status', "Order #{$order->id} assigned to {$rider->full_name}.");
+        return back()->with('status', "Order #{$order->order_number} assigned to {$rider->full_name}.");
     }
 
     /** Assign a whole group of sorted parcels (the order ids sent by the page) to one rider. */
@@ -333,7 +333,7 @@ class SortingController extends Controller
             : '';
 
         throw ValidationException::withMessages([
-            'rider_id' => "{$rider->full_name} does not cover the buyer's address{$place} for order #{$order->id}. Assign a rider who covers it, or update Service Areas.",
+            'rider_id' => "{$rider->full_name} does not cover the buyer's address{$place} for order #{$order->order_number}. Assign a rider who covers it, or update Service Areas.",
         ]);
     }
 

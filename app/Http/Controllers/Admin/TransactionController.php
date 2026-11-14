@@ -32,11 +32,11 @@ class TransactionController extends Controller
             $search = $request->search;
 
             $query->where(function ($q) use ($search) {
-                $q->where('id', $search)
+                $q->matchingPublicCode($search)
                     ->orWhere('buyer_name', 'ilike', "%{$search}%")
                     ->orWhereHas(
                         'seller.sellerProfile',
-                        fn($s) => $s->where(
+                        fn ($s) => $s->where(
                             'business_name',
                             'ilike',
                             "%{$search}%"
@@ -60,7 +60,7 @@ class TransactionController extends Controller
     public function exportCsv(Request $request, AdminTransactionService $service)
     {
         [$from, $to] = $this->resolveRange($request);
-        $filename = 'shopleap-transactions_' . $from->format('Y-m-d') . '_to_' . $to->format('Y-m-d') . '.csv';
+        $filename = 'shopleap-transactions_'.$from->format('Y-m-d').'_to_'.$to->format('Y-m-d').'.csv';
 
         return response()->streamDownload(function () use ($service, $from, $to) {
             $out = fopen('php://output', 'w');
@@ -101,7 +101,7 @@ class TransactionController extends Controller
                 }
 
                 fputcsv($out, [
-                    $order->id,
+                    $order->order_number,
                     $order->created_at->format('Y-m-d H:i'),
                     $this->csvSafe($order->buyer_name),
                     $this->csvSafe($order->seller->sellerProfile->business_name ?? $order->seller->name ?? ''),
@@ -201,7 +201,7 @@ class TransactionController extends Controller
         $value = (string) $value;
 
         return preg_match('/^[=+\-@\t\r]/', $value)
-            ? "'" . $value
+            ? "'".$value
             : $value;
     }
 }

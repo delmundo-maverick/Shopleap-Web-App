@@ -29,7 +29,7 @@ class ReportController extends Controller
         [$from, $to] = $this->resolveRange($request);
         $tab = $this->resolveTab($request);
         $sellerId = $request->user()->id;
-        $filename = $this->filename($tab, $from, $to) . '.csv';
+        $filename = $this->filename($tab, $from, $to).'.csv';
 
         return response()->streamDownload(function () use ($service, $tab, $sellerId, $from, $to) {
             $out = fopen('php://output', 'w');
@@ -68,7 +68,7 @@ class ReportController extends Controller
                     }
 
                     fputcsv($out, [
-                        $order->id,
+                        $order->order_number,
                         $order->created_at->format('Y-m-d H:i'),
                         $this->csvSafe($order->buyer_name),
                         $order->status_label,
@@ -111,7 +111,7 @@ class ReportController extends Controller
 
         return Pdf::loadView('seller.reports.pdf', compact('report', 'from', 'to', 'tab', 'shopName'))
             ->setPaper('a4')
-            ->download($this->filename($tab, $from, $to) . '.pdf');
+            ->download($this->filename($tab, $from, $to).'.pdf');
     }
 
     private function resolveTab(Request $request): string
@@ -163,6 +163,6 @@ class ReportController extends Controller
     {
         $value = (string) $value;
 
-        return preg_match('/^[=+\-@\t\r]/', $value) ? "'" . $value : $value;
+        return preg_match('/^[=+\-@\t\r]/', $value) ? "'".$value : $value;
     }
 }

@@ -27,7 +27,7 @@ class AutoApproveCancellationRequests extends Command
                             $order,
                             null,
                             "Cancelled at the buyer's request. The seller did not respond within {$hours} hours. Reason: "
-                                . ($order->cancel_request_reason ?? 'Changed my mind') . '.'
+                                .($order->cancel_request_reason ?? 'Changed my mind').'.'
                         );
 
                     if ($done) {

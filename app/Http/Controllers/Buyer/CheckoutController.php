@@ -7,7 +7,6 @@ use App\Models\BuyerAddress;
 use App\Models\CartItem;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\PlatformSetting;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ShopVoucher;
@@ -16,6 +15,10 @@ use App\Services\HubCoverage;
 use App\Services\ParcelLifecycle;
 use App\Services\ShippingFeeCalculator;
 use App\Services\ShopVoucherService;
+use App\Support\OrderCodes;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -27,11 +30,16 @@ class CheckoutController extends Controller
         Request $request,
         ShippingFeeCalculator $shipping,
         HubCoverage $coverage
-    ) {
+    ): View|JsonResponse|RedirectResponse {
         $address = $this->selectedAddress($request);
         $cartItems = $this->selectedCartItems($request);
 
         if ($cartItems->isEmpty()) {
+            if ($request->expectsJson()) {
+                return response()->json(['shipping' => [], 'shippingTotal' => 0,
+                    'grandTotal' => 0, 'blocked' => [], 'shops' => []]);
+            }
+
             return redirect()->route('buyer.cart.index');
         }
 
@@ -53,6 +61,18 @@ class CheckoutController extends Controller
         );
 
         $shippingTotal = collect($shippingBySeller)->sum('fee');
+        $voucherOptions = ! $request->expectsJson() || $request->boolean('include_vouchers')
+            ? app(ShopVoucherService::class)->checkoutVouchers($request->user(), $cartItems)
+            : [];
+        $shops = $groupedBySeller->map(fn ($items, $sellerId) => [
+            'subtotal' => round((float) $items->sum('line_total'), 2),
+            'items' => $items->mapWithKeys(fn (CartItem $item) => [$item->id => [
+                'quantity' => $item->quantity,
+                'unit_price' => $item->unit_price,
+                'subtotal' => round($item->line_total, 2),
+            ]])->all(),
+            'vouchers' => $voucherOptions[$sellerId] ?? [],
+        ])->all();
 
         // Sellers whose pickup hub and delivery hub can't be paired under one
         // logistics company.
@@ -72,13 +92,13 @@ class CheckoutController extends Controller
 
         if ($request->expectsJson()) {
             return response()->json(['shipping' => $shippingBySeller, 'shippingTotal' => $shippingTotal,
-                'grandTotal' => $subtotal + $shippingTotal, 'blocked' => $blockedSellerIds]);
+                'grandTotal' => $subtotal + $shippingTotal, 'blocked' => $blockedSellerIds, 'shops' => $shops]);
         }
 
         return view('Buyer.checkout.index', [
             'addresses' => $request->user()->addresses()->orderByDesc('is_default')->latest('id')->get(),
             'selectedAddress' => $address,
-            'claimedVouchers' => app(ShopVoucherService::class)->getAvailableVouchersForBuyer($request->user()),
+            'shops' => $shops,
             'groupedBySeller' => $groupedBySeller,
             'total' => $subtotal,
             'weightBySeller' => $weightBySeller,
@@ -97,13 +117,17 @@ class CheckoutController extends Controller
         HubCoverage $coverage,
         ShopVoucherService $voucherService,
         ParcelLifecycle $lifecycle
-    ) {
+    ): RedirectResponse {
         $buyer = $request->user();
 
         // Validate optional buyer notes for each seller's order.
         $request->validate([
             'notes' => ['nullable', 'array'],
             'notes.*' => ['nullable', 'string', 'max:255'],
+            'vouchers' => ['nullable', 'array'],
+            'vouchers.*' => ['nullable', 'string', 'max:255'],
+            'voucher_code' => ['nullable', 'string', 'max:255'],
+            'payment_method' => ['nullable', 'in:cod'],
         ]);
 
         $request->validate(['address_id' => ['required', 'integer']]);
@@ -139,7 +163,7 @@ class CheckoutController extends Controller
                 ->sort()
                 ->values();
 
-            $products = Product::whereIn('id', $productIds)
+            $products = Product::with(['seller.sellerProfile', 'liveDiscount'])->whereIn('id', $productIds)
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get()
@@ -181,7 +205,7 @@ class CheckoutController extends Controller
                     || $product->status !== 'active'
                     || (
                         $item->product_variant_id
-                        && (! $variant || ! $variant->is_active)
+                        && (! $variant || ! $variant->is_active || $variant->product_id !== $product->id)
                     )
                     || (
                         ! $item->product_variant_id
@@ -202,6 +226,9 @@ class CheckoutController extends Controller
                         "\"{$name}\" no longer has enough stock. Please update your cart."
                     );
                 }
+
+                $item->setRelation('product', $product);
+                $item->setRelation('variant', $variant);
             }
 
             // 3b. Resolve the pickup hub and delivery hub for each seller.
@@ -230,39 +257,44 @@ class CheckoutController extends Controller
                 $routes[$sellerId] = $route;
             }
 
-            // 4. Create one order per seller and deduct stock.
-            $touchedVariantProducts = [];
-            $voucherOrder = null;
-
-            // Handle voucher if applied
-            $appliedVoucher = null;
-            $voucherDiscountTotal = 0;
+            $groupedBySeller = $cartItems->groupBy('product.seller_id');
+            $appliedVouchers = [];
+            $voucherSelections = collect($request->input('vouchers', []))->filter();
             if ($request->filled('voucher_code')) {
+                if ($voucherSelections->isNotEmpty()) {
+                    $this->fail('Select vouchers using each shop section. Only one voucher per shop is allowed.');
+                }
+                $sellerId = ShopVoucher::where('code', strtoupper(trim($request->string('voucher_code'))))->value('seller_id');
+                if (! $sellerId) {
+                    $this->fail('Invalid shop voucher code.');
+                }
+                $voucherSelections->put($sellerId, $request->input('voucher_code'));
+            }
+            foreach ($voucherSelections->sortKeys() as $sellerId => $code) {
+                if (! $groupedBySeller->has($sellerId)) {
+                    $this->fail('A selected voucher does not match a shop in this checkout. Please select your vouchers again.');
+                }
                 try {
-                    $appliedVoucher = $voucherService->validateAndApplyForCart($buyer, $request->voucher_code, $cartItems, lock: true);
-                } catch (\Throwable $e) {
-                    $this->fail($e->getMessage());
+                    $appliedVouchers[$sellerId] = $voucherService->validateAndApplyForCart(
+                        $buyer, $code, $groupedBySeller->get($sellerId), lock: true
+                    );
+                } catch (\DomainException $exception) {
+                    $seller = $groupedBySeller->get($sellerId)->first()->product->seller;
+                    $this->fail(($seller->sellerProfile?->business_name ?? $seller->name).': '.$exception->getMessage().' No orders were placed.');
                 }
             }
 
+            // 4. Create one order per seller and deduct stock.
+            $touchedVariantProducts = [];
+
             foreach (
-                $cartItems->groupBy('product.seller_id') as $sellerId => $items
+                $groupedBySeller as $sellerId => $items
             ) {
-                $orderTotal = $items->sum('line_total');
-                $sellerVoucherDiscount = 0;
-                $voucherModel = null;
-                if ($appliedVoucher && $appliedVoucher['voucher']->seller_id == $sellerId) {
-                    $voucherModel = $appliedVoucher['voucher'];
-                    // Re-validate under lock
-                    $voucherModel = ShopVoucher::where('id', $voucherModel->id)->lockForUpdate()->first();
-                    if (! $voucherModel || ! $voucherModel->isValidNow() || ! $voucherModel->canBeUsedByBuyer($buyer->id) || ! $voucherModel->hasUnusedClaim($buyer)) {
-                        $this->fail('Voucher is no longer valid.');
-                    }
-                    $eligibleSubtotal = $appliedVoucher['eligible_items']->sum('line_total');
-                    $eligibleQuantity = $appliedVoucher['eligible_items']->sum('quantity');
-                    $sellerVoucherDiscount = $voucherModel->calculateDiscount($eligibleSubtotal, $eligibleQuantity);
-                    $voucherDiscountTotal += $sellerVoucherDiscount;
-                }
+                $itemsSubtotal = round((float) $items->sum('line_total'), 2);
+                $appliedVoucher = $appliedVouchers[$sellerId] ?? null;
+                $voucherModel = $appliedVoucher['voucher'] ?? null;
+                $sellerVoucherDiscount = min($itemsSubtotal, $appliedVoucher['discount'] ?? 0);
+                $orderTotal = round($itemsSubtotal - $sellerVoucherDiscount, 2);
 
                 // Recalculate shipping on the server using the current address.
                 $quote = $shipping->calculate(
@@ -271,19 +303,20 @@ class CheckoutController extends Controller
                     $address->city_municipality
                 );
 
-                // Commission calculated on order total (items subtotal) as per existing policy
                 $route = $routes[$sellerId];
 
-                $order = Order::create([
+                $order = new Order([
                     'seller_id' => $sellerId,
                     'buyer_id' => $buyer->id,
                     'buyer_name' => $buyer->name,
                     'status' => Order::STATUS_PLACED,
                     'total_amount' => $orderTotal,
+                    'items_subtotal' => $itemsSubtotal,
+                    'total' => round($orderTotal + $quote['fee'], 2),
                     'shipping_fee' => $quote['fee'],
                     'shipping_zone' => $quote['zone'],
                     'commission_amount' => round(
-                        $orderTotal * PlatformSetting::commissionRate(),
+                        $orderTotal * 0.10,
                         2
                     ),
                     'shop_voucher_id' => $voucherModel?->id,
@@ -304,26 +337,33 @@ class CheckoutController extends Controller
                         (string) $request->input("notes.{$sellerId}")
                     ) ?: null,
                 ]);
+                $order->order_number = OrderCodes::generate('SL', 8);
+                $order->waybill_code = OrderCodes::generate('WB', 10);
+                $order->save();
 
-                if ($voucherModel) {
-                    $voucherOrder = $order;
-                }
                 $lifecycle->placed($order, $buyer->id);
 
                 // Allocate voucher discount proportionally to eligible items
                 $eligibleItemsForVoucher = collect();
-                if ($voucherModel && isset($appliedVoucher)) {
+                if ($voucherModel) {
                     $eligibleItemsForVoucher = $appliedVoucher['eligible_items']->pluck('id')->flip();
                 }
                 $eligibleSubtotalForAlloc = 0;
                 if ($voucherModel && $eligibleItemsForVoucher->isNotEmpty()) {
                     $eligibleSubtotalForAlloc = $items->filter(fn ($it) => $eligibleItemsForVoucher->has($it->id))->sum('line_total');
                 }
+                $eligibleSubtotalCents = (int) round($eligibleSubtotalForAlloc * 100);
+                $discountCents = (int) round($sellerVoucherDiscount * 100);
+                $eligibleRunningCents = 0;
+                $allocatedCents = 0;
 
                 foreach ($items as $item) {
                     $itemVoucherDiscount = 0;
                     if ($voucherModel && $sellerVoucherDiscount > 0 && $eligibleSubtotalForAlloc > 0 && $eligibleItemsForVoucher->has($item->id)) {
-                        $itemVoucherDiscount = round($sellerVoucherDiscount * ($item->line_total / $eligibleSubtotalForAlloc), 2);
+                        $eligibleRunningCents += (int) round($item->line_total * 100);
+                        $cumulativeCents = (int) round($discountCents * $eligibleRunningCents / $eligibleSubtotalCents);
+                        $itemVoucherDiscount = ($cumulativeCents - $allocatedCents) / 100;
+                        $allocatedCents = $cumulativeCents;
                     }
 
                     OrderItem::create([
@@ -363,36 +403,29 @@ class CheckoutController extends Controller
                         );
                     }
                 }
-            }
 
-            // Record voucher redemption if used
-            if (isset($appliedVoucher) && $appliedVoucher['voucher'] && $voucherDiscountTotal > 0) {
-                $voucherModelFinal = ShopVoucher::where('id', $appliedVoucher['voucher']->id)->lockForUpdate()->first();
-                if ($voucherModelFinal && $voucherModelFinal->canBeUsedByBuyer($buyer->id)) {
-                    $orderForRedemption = $voucherOrder;
-                    $claim = $voucherModelFinal->claims()->where('user_id', $buyer->id)->lockForUpdate()->first();
-                    if ($voucherModelFinal->isShopVoucher() && (! $claim || $claim->used_at)) {
+                if ($voucherModel) {
+                    $claim = $voucherModel->claims()->where('user_id', $buyer->id)->lockForUpdate()->first();
+                    if (! $claim || $claim->used_at || ! $voucherModel->isValidNow() || ! $voucherModel->canBeUsedByBuyer($buyer->id)) {
                         $this->fail('This voucher has not been claimed or has already been used.');
                     }
-                    $claim?->update(['used_at' => now(), 'order_id' => $orderForRedemption->id]);
+                    $claim->update(['used_at' => now(), 'order_id' => $order->id]);
                     ShopVoucherRedemption::create([
-                        'shop_voucher_id' => $voucherModelFinal->id,
+                        'shop_voucher_id' => $voucherModel->id,
                         'buyer_id' => $buyer->id,
-                        'seller_id' => $voucherModelFinal->seller_id,
-                        'order_id' => $orderForRedemption?->id,
-                        'discount_amount' => $voucherDiscountTotal,
-                        'order_subtotal' => $cartItems->sum('line_total'),
+                        'seller_id' => $sellerId,
+                        'order_id' => $order->id,
+                        'discount_amount' => $sellerVoucherDiscount,
+                        'order_subtotal' => $itemsSubtotal,
                         'status' => 'used',
                         'used_at' => now(),
                     ]);
-                    $voucherModelFinal->increment('used_quantity');
-                    if (! is_null($voucherModelFinal->total_quantity) && $voucherModelFinal->used_quantity >= $voucherModelFinal->total_quantity) {
-                        $voucherModelFinal->status = 'exhausted';
-                        $voucherModelFinal->is_active = false;
-                        $voucherModelFinal->save();
+                    $voucherModel->increment('used_quantity');
+                    if (! is_null($voucherModel->total_quantity) && $voucherModel->used_quantity >= $voucherModel->total_quantity) {
+                        $voucherModel->status = 'exhausted';
+                        $voucherModel->is_active = false;
+                        $voucherModel->save();
                     }
-                } else {
-                    $this->fail('Voucher is no longer available.');
                 }
             }
 
@@ -485,7 +518,7 @@ class CheckoutController extends Controller
     private function selectedCartItems(
         Request $request,
         bool $withLock = false
-    ) {
+    ): Collection {
         $query = $request->user()->cartItems()->with([
             'product.seller.sellerProfile',
             'product.liveDiscount',

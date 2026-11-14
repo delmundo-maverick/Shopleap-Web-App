@@ -165,7 +165,7 @@ class PickupController extends Controller
 
         return back()->with(
             'status',
-            "Order #{$order->id} assigned to {$rider->full_name} for pickup."
+            "Order #{$order->order_number} assigned to {$rider->full_name} for pickup."
         );
     }
 
@@ -229,7 +229,7 @@ class PickupController extends Controller
 
         return back()->with(
             'status',
-            "Order #{$order->id} returned to the seller."
+            "Order #{$order->order_number} returned to the seller."
         );
     }
 
@@ -269,7 +269,7 @@ class PickupController extends Controller
 
         return back()->with(
             'status',
-            "Order #{$order->id} confirmed picked up."
+            "Order #{$order->order_number} confirmed picked up."
         );
     }
 

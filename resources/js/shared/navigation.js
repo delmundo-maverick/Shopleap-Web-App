@@ -1,3 +1,5 @@
+import { pollingRequest } from './polling-request.js';
+
 const locks = new Set();
 let previousOverflow = '';
 let previousBodyOverflow = '';
@@ -14,6 +16,7 @@ function scrollLock(id, enabled) {
 }
 
 export function navbar(config = {}) {
+    const fetchUnread = pollingRequest(30000);
     return {
         id: config.id, desktop: window.innerWidth >= 1024, open: false, collapsed: false, activeDropdown: null, logoutOpen: false,
         logoutSubmitting: false, logoutTrigger: null, logoutFromMenu: false, returnFocus: null, dropdownTrigger: null, unread: 0, poll: null,
@@ -23,7 +26,7 @@ export function navbar(config = {}) {
             this.$watch('logoutOpen', () => this.syncLock());
             if (config.unreadUrl) {
                 this.refreshUnread();
-                this.poll = setInterval(() => this.refreshUnread(), 20000);
+                this.poll = setInterval(() => this.refreshUnread(), 30000);
             }
         },
         destroy() { clearInterval(this.poll); scrollLock(this.id, false); },
@@ -108,8 +111,8 @@ export function navbar(config = {}) {
         async refreshUnread() {
             if (document.hidden) { return; }
             try {
-                const response = await fetch(config.unreadUrl, { headers: { Accept: 'application/json' } });
-                if (response.ok) { this.unread = Number((await response.json()).count) || 0; }
+                const response = await fetchUnread(config.unreadUrl, { headers: { Accept: 'application/json' } });
+                if (response?.ok) { this.unread = Number((await response.json()).count) || 0; }
             } catch { /* Retain the last known count during a temporary network failure. */ }
         },
     };

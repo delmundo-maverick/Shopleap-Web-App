@@ -41,7 +41,7 @@
 
         <h1 class="mb-1 text-xl font-bold text-charcoal">Return / Refund</h1>
         <p class="mb-5 text-sm text-charcoal/60">
-            Order #{{ $order->id }} · {{ $order->seller->sellerProfile->business_name ?? $order->seller->name }}.
+            Order #{{ $order->order_number }} · {{ $order->seller->sellerProfile->business_name ?? $order->seller->name }}.
             You can send a request until {{ $order->returnWindowEndsAt()->format('M d, Y') }}.
         </p>
 

@@ -16,6 +16,24 @@ class Portal
         return ($request ?? request())->getHost() === self::host('logistics');
     }
 
+    /** @return list<string> */
+    public static function loginRoles(?Request $request = null): array
+    {
+        $request ??= request();
+
+        if (self::isLogistics($request)) {
+            return ['logistics'];
+        }
+
+        if (self::host('admin') !== self::host('main') && $request->getHost() === self::host('admin')) {
+            return ['super_admin'];
+        }
+
+        return self::host('admin') === self::host('main')
+            ? ['buyer', 'seller', 'super_admin']
+            : ['buyer', 'seller'];
+    }
+
     public static function url(string $portal, string $path = ''): string
     {
         return config("portals.{$portal}").'/'.ltrim($path, '/');

@@ -1,9 +1,11 @@
 import { loadBuyerContacts, openConversation } from '../shared/buyerContacts.js';
+import { pollingRequest } from '../shared/polling-request.js';
 
 export function initializeMessaging(root = document) {
     const app = root.querySelector('#messagingApp');
     if (!app) return;
     const embedded = root !== document;
+    const fetchPoll = pollingRequest();
     const lifecycle = new AbortController();
     if (embedded) {
         root.addEventListener('account-panel-destroy', () => {
@@ -322,13 +324,13 @@ export function initializeMessaging(root = document) {
     // forceScroll = true on first load of a thread; polling only scrolls
     // when the reader is already near the bottom.
     async function fetchNewMessages(forceScroll = false) {
-        if (!activeConversationId) return;
+        if (!activeConversationId || document.hidden || (embedded && !root.getClientRects().length)) return;
         const requestedId = activeConversationId;
         try {
-            const res = await fetch(`/messages/${requestedId}/messages?after=${lastMessageId}`, {
+            const res = await fetchPoll(`/messages/${requestedId}/messages?after=${lastMessageId}`, {
                 headers: { 'Accept': 'application/json' },
             });
-            if (!res.ok) return;
+            if (!res?.ok) return;
             const data = await res.json();
 
             // Ignore a stale response if the user switched threads meanwhile.
@@ -352,7 +354,7 @@ export function initializeMessaging(root = document) {
 
     function restartPolling() {
         if (pollTimer) clearInterval(pollTimer);
-        pollTimer = setInterval(() => { if (!embedded || root.getClientRects().length) { fetchNewMessages(); } }, 4000);
+        pollTimer = setInterval(() => { if (!embedded || root.getClientRects().length) { fetchNewMessages(); } }, 10000);
     }
 
     // ---------------------------------------------------
@@ -521,6 +523,7 @@ export function initializeMessaging(root = document) {
         if ((!body && pendingFiles.length === 0) || !activeConversationId) return;
 
         const submitBtn = messageForm.querySelector('button[type="submit"]');
+        if (submitBtn.disabled) return;
         const form = new FormData();
         if (body) form.append('body', body);
         pendingFiles.forEach(file => form.append('images[]', file));
@@ -983,7 +986,8 @@ export function initializeMessaging(root = document) {
 
     sendBtn?.addEventListener('click', async () => {
         const body = newMessageBody.value.trim();
-        if (!selectedContact || !body) return;
+        if (sendBtn.disabled || !selectedContact || !body) return;
+        sendBtn.disabled = true;
 
         try {
             const res = await fetch('/messages', {
@@ -1010,6 +1014,8 @@ export function initializeMessaging(root = document) {
                 }
         } catch (err) {
             console.error(err);
+        } finally {
+            sendBtn.disabled = false;
         }
     });
 

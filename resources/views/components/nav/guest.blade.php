@@ -1,15 +1,15 @@
-@props(['landing' => false, 'links' => null])
+@props(['landing' => false, 'links' => null, 'image' => null])
 @php
     $links = $links ?? array_merge(config('landing.nav', []), [
         ['href' => route('register.seller'), 'label' => 'Become a seller'],
         ['href' => \App\Support\Portal::url('logistics'), 'label' => 'Logistics partner'],
-        ['href' => route('terms'), 'label' => 'Terms'],
-        ['href' => route('privacy'), 'label' => 'Privacy'],
+        ['href' => \App\Support\Portal::route('main', 'terms'), 'label' => 'Terms'],
+        ['href' => \App\Support\Portal::route('main', 'privacy'), 'label' => 'Privacy'],
     ]);
     $links = array_map(fn ($link) => array_merge($link, ['href' => !$landing && str_starts_with($link['href'], '#') ? route('home').$link['href'] : $link['href']]), $links);
 @endphp
 <x-nav.shell id="guest-navigation" variant="buyer" label="Main navigation" {{ $attributes }}>
-    <x-slot:brand><x-nav.brand :image="$landing ? 'images/Shopleap-Logo-White.png' : 'images/Shopleap-Logo.png'" /></x-slot:brand>
+    <x-slot:brand><x-logo :href="route('home')" :image="$image ?? ($landing ? 'images/Shopleap-Logo-White.png' : 'images/Shopleap-Logo.png')" class="public-brand" /></x-slot:brand>
     <x-slot:desktopLinks><x-nav.dropdown id="guest-explore" label="Explore Shopleap">@foreach ($links as $link)<x-nav.link :href="$link['href']">{{ $link['label'] }}</x-nav.link>@endforeach</x-nav.dropdown></x-slot:desktopLinks>
     <x-slot:utilityActions><a href="{{ route('register.seller') }}" class="text-xs text-white">Become a seller</a><a href="{{ \App\Support\Portal::url('logistics') }}" class="ml-4 text-xs text-white">Logistics partner</a></x-slot:utilityActions>
     <x-slot:search><x-nav.search /></x-slot:search>

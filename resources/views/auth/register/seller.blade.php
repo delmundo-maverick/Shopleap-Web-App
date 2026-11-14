@@ -16,7 +16,7 @@
     termsUrl: '{{ route('terms.content') }}',
     privacyUrl: '{{ route('privacy.content') }}',
     termsAccepted: @js((bool) old('terms_accepted'))
-})" class="min-h-screen bg-ice-blue text-charcoal">
+})" class="auth-public registration-page min-h-screen text-charcoal">
 
     @php
         // Shared Tailwind class strings so every field stays visually consistent
@@ -43,19 +43,20 @@
     @endphp
 
     <!-- ===================== HEADER ===================== -->
-    <x-nav.guest />
+    <x-registration-header role="seller" />
 
     <!-- ===================== MAIN ===================== -->
-    <main class="px-4 py-10 sm:px-6 lg:py-14">
+    <main class="registration-main">
 
-        <div class="mx-auto max-w-4xl">
+        <div class="site-container registration-workspace">
+            <x-registration-intro role="seller" />
 
             <form @submit="guardTermsAgreement($event)" method="POST" action="{{ route('register.seller') }}"
                 enctype="multipart/form-data"
-                class="overflow-hidden rounded-2xl border border-light-gray bg-white shadow-xl shadow-charcoal/5">
+                class="registration-form">
 
                 <!-- PAGE TITLE & HERO: SELLER -->
-                <div class="mb-8 text-center">
+                <div class="registration-form-heading">
                     <h2 class="mt-5 text-3xl font-bold tracking-tight text-charcoal">
                         Seller Registration
                     </h2>
@@ -480,15 +481,15 @@
                     </button>
 
                     <div class="mt-5 text-center">
-                        <a href="{{ route('register') }}"
+                        <a href="{{ route('home') }}"
                             class="text-sm font-semibold text-charcoal/60 transition hover:text-primary">
-                            ← Back to account type selection
+                            &larr; Back to home
                         </a>
                     </div>
                 </section>
             </form>
 
-            <div class="mt-8 text-center">
+            <div class="registration-login-note">
                 <p class="text-sm text-charcoal/65">
                     Already have a Shopleap account?
                     <a href="{{ route('login') }}"
@@ -503,7 +504,7 @@
 
     <!-- ===================== FOOTER ===================== -->
     <footer class="border-t border-light-gray bg-white">
-        <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-5 py-6 sm:flex-row">
+        <div class="site-container registration-footer-inner">
             <p class="text-xs text-charcoal/60">© {{ date('Y') }} Shopleap. All rights reserved.</p>
             <p class="text-xs text-charcoal/60">Shop Smart. Shop Simple.</p>
         </div>

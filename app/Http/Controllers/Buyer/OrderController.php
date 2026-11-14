@@ -62,7 +62,7 @@ class OrderController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
             $ordersQuery->where(function ($q) use ($search) {
-                $q->where('id', $search)
+                $q->matchingPublicCode($search)
                     ->orWhereHas('seller.sellerProfile', function ($sq) use ($search) {
                         $sq->where('business_name', 'ilike', "%{$search}%");
                     });
@@ -108,7 +108,7 @@ class OrderController extends Controller
             if ($done) {
                 return redirect()
                     ->route('buyer.orders.index', ['tab' => 'cancelled'])
-                    ->with('status', "Order #{$order->id} was cancelled.");
+                    ->with('status', "Order #{$order->order_number} was cancelled.");
             }
 
             return back()->withErrors(['cancel' => 'The seller just confirmed your order, so it can no longer be cancelled right away. Please send a cancellation request instead.']);

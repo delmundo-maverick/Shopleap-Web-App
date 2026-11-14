@@ -1,4 +1,7 @@
+import { pollingRequest } from '../../shared/polling-request.js';
+
 document.addEventListener('DOMContentLoaded', () => {
+    const fetchPoll = pollingRequest();
     const toggleBtn = document.getElementById('buyerMessageWidgetToggle');
     const panel = document.getElementById('buyerMessageWidgetPanel');
     const badge = document.getElementById('buyerMessageWidgetBadge');
@@ -348,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
         threadView.classList.add('flex');
 
         fetchMessages();
-        pollTimer = setInterval(fetchMessages, 4000);
+        pollTimer = setInterval(fetchMessages, 10000);
     }
 
     function stopPolling() {
@@ -371,14 +374,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     async function fetchMessages() {
-        if (!activeConversationId) return;
+        if (!activeConversationId || document.hidden || !panel.getClientRects().length) return;
         const requestedFor = activeConversationId;
 
         try {
-            const res = await fetch(`/messages/${requestedFor}/messages?after=${lastMessageId}`, {
+            const res = await fetchPoll(`/messages/${requestedFor}/messages?after=${lastMessageId}`, {
                 headers: { Accept: 'application/json' },
             });
-            if (!res.ok) return;
+            if (!res?.ok) return;
             const data = await res.json();
 
             // The user may have switched chats while this request was in flight.
@@ -439,7 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
 
         const body = threadInput.value.trim();
-        if ((!body && pendingFiles.length === 0) || !activeConversationId) return;
+        if (sendBtn.disabled || (!body && pendingFiles.length === 0) || !activeConversationId) return;
 
         const fd = new FormData();
         if (body) fd.append('body', body);

@@ -122,7 +122,9 @@ class DeliveryController extends Controller
         $ship = $o->ship_to;
 
         return [
-            'order_id' => $o->id,
+            'order_id' => $o->order_number,
+            'order_number' => $o->order_number,
+            'waybill_code' => $o->waybill_code,
             'status' => $o->status,
             'hub_id' => $o->current_hub_id ?? $o->logistics_profile_id,
             'delivery_area' => $o->delivery_area,

@@ -6,13 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/css/app.css', 'resources/css/pages/seller/order-show.css', 'resources/js/pages/seller/order-show.js', 'resources/js/app.js'])
-    <title>Order #{{ $order->id }} | Shopleap Seller</title>
+    <title>Order #{{ $order->order_number }} | Shopleap Seller</title>
 </head>
 
 <body class="seller-order-show min-h-screen overflow-x-hidden text-charcoal" x-data="orderShowPage({
     status: @js($order->status),
     statusLabels: @js(\App\Models\Order::STATUS_LABELS),
-    orderId: @js($order->id)
+    orderId: @js($order->order_number)
 })">
     <div class="frost-surface"></div>
 
@@ -48,7 +48,7 @@
 
                     <div class="min-w-0">
                         <h1 class="break-words text-lg font-bold text-charcoal sm:text-xl">
-                            Order #{{ $order->id }}
+                            Order #{{ $order->order_number }}
                         </h1>
                         <p class="text-sm text-charcoal/55">
                             Placed {{ $order->created_at->format('M d, Y \a\t g:i A') }}
@@ -160,11 +160,22 @@
 
                                 <div class="mt-4 space-y-2 border-t border-white/50 pt-4 text-sm">
                                     <div class="seller-order-summary-row flex justify-between text-charcoal/70">
-                                        <span>Items Total</span>
+                                        <span>Items subtotal</span>
                                         <span class="shrink-0 font-semibold text-charcoal">
-                                            ₱{{ number_format($order->total_amount, 2) }}
+                                            ₱{{ number_format($order->items_subtotal ?? $order->total_amount, 2) }}
                                         </span>
                                     </div>
+
+                                    @if ($order->voucher_discount > 0)
+                                        <div class="seller-order-summary-row flex justify-between gap-3 text-leaf-green">
+                                            <span>Voucher discount ({{ $order->voucher_code }})</span>
+                                            <span class="shrink-0">− ₱{{ number_format($order->voucher_discount, 2) }}</span>
+                                        </div>
+                                        <div class="seller-order-summary-row flex justify-between text-charcoal/70">
+                                            <span>Items after voucher</span>
+                                            <span class="shrink-0">₱{{ number_format($order->total_amount, 2) }}</span>
+                                        </div>
+                                    @endif
 
                                     @if (($order->total_weight_kg ?? 0) > 0)
                                         <div class="seller-order-summary-row flex justify-between text-charcoal/50">
@@ -324,10 +335,14 @@
                             @endif
 
                             {{-- Shipping label --}}
-                            @if (in_array($order->status, \App\Models\Order::WAYBILL_STATUSES, true))
+                            @if ($order->canViewWaybill())
                                 <section class="frost-panel min-w-0 rounded-2xl p-4 sm:p-5">
                                     <h2 class="mb-3 text-section-label">Shipping Label</h2>
 
+                                    <a href="{{ route('seller.orders.waybill.view', $order) }}" target="_blank" rel="noopener"
+                                        class="mb-3 flex w-full items-center justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-bold text-surface">
+                                        View Waybill
+                                    </a>
                                     <a href="{{ route('seller.orders.waybill', $order) }}" target="_blank"
                                         rel="noopener"
                                         class="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-primary px-4 py-2.5 text-sm font-bold text-primary transition hover:bg-primary/5">

@@ -98,7 +98,7 @@
                                             class="block rounded-xl border border-white/50 bg-white/30 p-3 transition hover:bg-white/40 md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0">
                                             <td
                                                 class="block px-1 pb-1 text-base font-semibold md:table-cell md:px-5 md:py-4 md:text-sm">
-                                                #{{ $return->order_id }}</td>
+                                                #{{ $return->order?->order_number }}</td>
                                             <td data-label="Reason" class="{{ $cell }} text-charcoal/80">
                                                 <span
                                                     class="min-w-0 text-right md:text-left">{{ $return->reason_label }}</span>

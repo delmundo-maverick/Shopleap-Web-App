@@ -9,12 +9,14 @@ use App\Models\ShopVoucher;
 use App\Models\ShopVoucherRedemption;
 use App\Models\User;
 use App\Services\HubCoverage;
+use App\Services\Notifier;
 use App\Services\ParcelLifecycle;
 use App\Services\ShippingFeeCalculator;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 
@@ -46,6 +48,13 @@ beforeEach(function () {
         $table->timestamps();
     });
     (require database_path('migrations/2026_11_04_191245_add_address_snapshot_to_orders_table.php'))->up();
+    foreach ([
+        '2026_11_11_231744_add_checkout_snapshots_to_orders_table.php',
+        '2026_11_12_233426_add_public_identifiers_to_orders_table.php',
+        '2026_11_12_233530_require_public_order_identifiers.php',
+    ] as $migration) {
+        (require database_path('migrations/'.$migration))->up();
+    }
     Http::preventStrayRequests();
     Http::fake([
         '*/provinces/' => Http::response([['name' => 'Cebu', 'code' => '072200000']]),
@@ -150,6 +159,7 @@ function addressCheckoutCart(User $buyer): array
     (require database_path('migrations/2026_09_05_161506_create_products_table.php'))->up();
     (require database_path('migrations/2026_09_12_030731_create_cart_items_table.php'))->up();
     (require database_path('migrations/2026_09_20_152710_create_product_variants_table.php'))->up();
+    (require database_path('migrations/2026_10_27_002245_add_image_path_to_product_variants_table.php'))->up();
     Schema::table('products', function (Blueprint $table) {
         $table->decimal('weight_kg')->nullable();
     });
@@ -192,6 +202,31 @@ function addressCheckoutCart(User $buyer): array
 
     return [$seller, $item];
 }
+
+it('opens checkout with cart items and renders claimed vouchers', function (bool $hasAddress) {
+    $buyer = addressBuyer();
+    [$seller, $item] = addressCheckoutCart($buyer);
+    if ($hasAddress) {
+        BuyerAddress::factory()->for($buyer)->create();
+    }
+    foreach ([
+        '2026_10_27_152854_create_shop_vouchers_table.php',
+        '2026_10_27_152858_create_shop_voucher_redemptions_table.php',
+        '2026_11_04_194657_create_voucher_claims_table.php',
+        '2026_11_04_194658_add_claim_limit_to_shop_vouchers_table.php',
+    ] as $migration) {
+        (require database_path('migrations/'.$migration))->up();
+    }
+    $voucher = ShopVoucher::factory()->create(['seller_id' => $seller->id]);
+    $buyer->voucherClaims()->create(['voucher_id' => $voucher->id, 'claimed_at' => now()]);
+    $this->mock(ShippingFeeCalculator::class, fn ($mock) => $mock->shouldReceive('calculate')->andReturn(['fee' => 45.0, 'zone' => 'same_municipality']));
+    $this->mock(HubCoverage::class, fn ($mock) => $mock->shouldReceive('isCovered')->andReturn($hasAddress));
+
+    $this->actingAs($buyer)->get(route('buyer.checkout.index', ['items' => $item->id]))
+        ->assertOk()->assertSee('Test product')->assertSee('checkoutPage(', false)
+        ->assertSee('Delivery address')->assertSee($voucher->code);
+    expect($buyer->cartItems()->count())->toBe(1);
+})->with([true, false]);
 
 it('requotes shipping and coverage for the selected address without changing the cart', function () {
     $buyer = addressBuyer();
@@ -238,6 +273,62 @@ it('places an order using only the owned address and snapshots every destination
     expect($order->fresh()->ship_to['province'])->toBe('Cebu');
     expect($buyer->cartItems()->count())->toBe(0);
 });
+
+it('places an order with tracking and does not duplicate it when submitted again', function (bool $notificationFails) {
+    $buyer = addressBuyer();
+    [$seller, $item] = addressCheckoutCart($buyer);
+    $address = BuyerAddress::factory()->for($buyer)->create();
+    foreach (['logistics_profiles', 'courier_profiles'] as $tableName) {
+        Schema::create($tableName, function (Blueprint $table): void {
+            $table->id();
+        });
+    }
+    foreach ([
+        '2026_10_02_171814_create_order_events_table.php',
+        '2026_10_31_030000_create_parcel_events_table.php',
+    ] as $migration) {
+        (require database_path('migrations/'.$migration))->up();
+    }
+    Exceptions::fake();
+    $this->mock(ShippingFeeCalculator::class, fn ($mock) => $mock->shouldReceive('calculate')->andReturn(['fee' => 45.0, 'zone' => 'same_municipality']));
+    $this->mock(HubCoverage::class, fn ($mock) => $mock->shouldReceive('routeFor')->andReturn([
+        'origin' => (object) ['id' => 1], 'destination' => (object) ['id' => 2],
+    ]));
+    $this->mock(Notifier::class, function ($mock) use ($notificationFails): void {
+        $expectation = $mock->shouldReceive('orderStatusChanged')->once();
+        if ($notificationFails) {
+            $expectation->andThrow(new RuntimeException('Notification delivery failed'));
+        } else {
+            $expectation->andReturnNull();
+        }
+    });
+
+    $payload = ['items' => $item->id, 'address_id' => $address->id];
+    $referencesBeforeSave = [];
+    Order::saving(function (Order $order) use (&$referencesBeforeSave): void {
+        $referencesBeforeSave[] = [$order->order_number, $order->waybill_code];
+    });
+    $this->actingAs($buyer)->post(route('buyer.checkout.store'), $payload)->assertRedirect(route('buyer.orders.index'));
+    expect($referencesBeforeSave)->toHaveCount(1)
+        ->and($referencesBeforeSave[0][0])->toBeString()->toMatch('/^SL-[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/')
+        ->and($referencesBeforeSave[0][1])->toBeString()->toMatch('/^WB-[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/');
+    $order = Order::firstOrFail();
+    expect((float) $order->items_subtotal)->toBe(200.0)
+        ->and((float) $order->total)->toBe(245.0)
+        ->and($order->order_number)->toStartWith('SL-')
+        ->and($order->waybill_code)->toStartWith('WB-')
+        ->and($order->events()->count())->toBe(1)
+        ->and($order->parcelEvents()->count())->toBe(1)
+        ->and($item->product->fresh()->stock_quantity)->toBe(8);
+    $this->post(route('buyer.checkout.store'), $payload)->assertRedirect(route('buyer.cart.index'));
+    expect(Order::count())->toBe(1)
+        ->and($item->product->fresh()->stock_quantity)->toBe(8);
+    if ($notificationFails) {
+        Exceptions::assertReported(RuntimeException::class);
+    } else {
+        Exceptions::assertNothingReported();
+    }
+})->with([true, false]);
 
 it('uses the existing local PSGC mirror when the location API is unavailable', function () {
     PsgcBarangay::create(['province_code' => '072200000', 'province' => 'Cebu', 'municipality_code' => '072217000', 'municipality' => 'Cebu City', 'barangay_code' => '072217001', 'barangay' => 'Lahug']);

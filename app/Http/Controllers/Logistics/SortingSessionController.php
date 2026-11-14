@@ -12,6 +12,7 @@ use App\Services\ActivityLogger;
 use App\Services\HubContext;
 use App\Services\HubCoverage;
 use App\Services\ParcelLifecycle;
+use App\Support\ScanCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -86,7 +87,7 @@ class SortingSessionController extends Controller
                 return response()->json([
                     'result' => 'rejected',
                     'message' => 'Unknown or invalid code format.',
-                    'scan' => $scan,
+                    'scan' => $this->publicScan($scan, $order ?? null),
                     'progress' => $this->getProgress($session),
                 ]);
             }
@@ -105,7 +106,7 @@ class SortingSessionController extends Controller
                 return response()->json([
                     'result' => 'rejected',
                     'message' => $scan->message,
-                    'scan' => $scan,
+                    'scan' => $this->publicScan($scan, $order ?? null),
                     'progress' => $this->getProgress($session),
                 ]);
             }
@@ -122,7 +123,7 @@ class SortingSessionController extends Controller
                     'scanned_code' => $code,
                     'order_id' => $order->id,
                     'result' => SortingScan::RESULT_DUPLICATE,
-                    'message' => "Order #{$order->id} was already scanned in this session.",
+                    'message' => "Order #{$order->order_number} was already scanned in this session.",
                     'destination_municipality' => $existingScan->destination_municipality,
                     'destination_province' => $existingScan->destination_province,
                     'destination_barangay' => $existingScan->destination_barangay,
@@ -132,8 +133,8 @@ class SortingSessionController extends Controller
                 return response()->json([
                     'result' => 'duplicate',
                     'message' => $scan->message,
-                    'order_reference' => "#$order->id",
-                    'scan' => $scan,
+                    'order_reference' => "#$order->order_number",
+                    'scan' => $this->publicScan($scan, $order ?? null),
                     'progress' => $this->getProgress($session),
                 ]);
             }
@@ -147,14 +148,14 @@ class SortingSessionController extends Controller
                     'scanned_code' => $code,
                     'order_id' => $order->id,
                     'result' => SortingScan::RESULT_REJECTED,
-                    'message' => "Order #{$order->id} is {$statusLabel}. {$reason}",
+                    'message' => "Order #{$order->order_number} is {$statusLabel}. {$reason}",
                 ]);
 
                 return response()->json([
                     'result' => 'rejected',
                     'message' => $scan->message,
-                    'order_reference' => "#$order->id",
-                    'scan' => $scan,
+                    'order_reference' => "#$order->order_number",
+                    'scan' => $this->publicScan($scan, $order ?? null),
                     'progress' => $this->getProgress($session),
                 ]);
             }
@@ -174,7 +175,7 @@ class SortingSessionController extends Controller
                     'scanned_code' => $code,
                     'order_id' => $order->id,
                     'result' => SortingScan::RESULT_NEEDS_REVIEW,
-                    'message' => "Order #{$order->id}: No destination hub in your company serves Brgy. {$dest['barangay']}, {$dest['municipality']}.",
+                    'message' => "Order #{$order->order_number}: No destination hub in your company serves Brgy. {$dest['barangay']}, {$dest['municipality']}.",
                     'destination_municipality' => $dest['municipality'],
                     'destination_province' => $dest['province'],
                     'destination_barangay' => $dest['barangay'],
@@ -184,9 +185,9 @@ class SortingSessionController extends Controller
                 return response()->json([
                     'result' => 'needs_review',
                     'message' => $scan->message,
-                    'order_reference' => "#$order->id",
+                    'order_reference' => "#$order->order_number",
                     'destination' => $dest['municipality'].', '.$dest['province'],
-                    'scan' => $scan,
+                    'scan' => $this->publicScan($scan, $order ?? null),
                     'progress' => $this->getProgress($session),
                 ]);
             }
@@ -219,14 +220,14 @@ class SortingSessionController extends Controller
                     'scanned_code' => $code,
                     'order_id' => $order->id,
                     'result' => SortingScan::RESULT_REJECTED,
-                    'message' => "Order #{$order->id} was just updated. Please scan it again.",
+                    'message' => "Order #{$order->order_number} was just updated. Please scan it again.",
                 ]);
 
                 return response()->json([
                     'result' => 'rejected',
                     'message' => $scan->message,
-                    'order_reference' => "#$order->id",
-                    'scan' => $scan,
+                    'order_reference' => "#$order->order_number",
+                    'scan' => $this->publicScan($scan, $order ?? null),
                     'progress' => $this->getProgress($session),
                 ]);
             }
@@ -236,8 +237,8 @@ class SortingSessionController extends Controller
                 'order_id' => $order->id,
                 'result' => SortingScan::RESULT_SORTED,
                 'message' => $sameHub
-                    ? "Order #{$order->id} sorted for {$label}."
-                    : "Order #{$order->id} sorted and awaiting transfer to {$destination->business_name}.",
+                    ? "Order #{$order->order_number} sorted for {$label}."
+                    : "Order #{$order->order_number} sorted and awaiting transfer to {$destination->business_name}.",
                 'destination_municipality' => $dest['municipality'],
                 'destination_province' => $dest['province'],
                 'destination_barangay' => $dest['barangay'],
@@ -251,11 +252,11 @@ class SortingSessionController extends Controller
             return response()->json([
                 'result' => 'sorted',
                 'message' => $scan->message,
-                'order_reference' => "#$order->id",
+                'order_reference' => "#$order->order_number",
                 'destination' => $label,
                 'destination_hub' => $destination->business_name,
                 'group' => $destination->business_name.' · '.($dest['barangay'] ?: $dest['municipality']),
-                'scan' => $scan,
+                'scan' => $this->publicScan($scan, $order ?? null),
                 'progress' => $this->getProgress($session),
             ]);
         });
@@ -310,19 +311,18 @@ class SortingSessionController extends Controller
         return view('logistics.sorting.sessions.index', compact('sessions'));
     }
 
+    /** @return array<string, mixed> */
+    private function publicScan(SortingScan $scan, ?Order $order): array
+    {
+        $data = $scan->toArray();
+        $data['order_id'] = $order?->order_number;
+
+        return $data;
+    }
+
     private function parseCode(string $code): ?int
     {
-        // QR code format: SHOPLEAP:ORDER:42
-        if (preg_match('/^SHOPLEAP:ORDER:(\d+)$/i', $code, $matches)) {
-            return (int) $matches[1];
-        }
-
-        // Barcode format: 0000000042 (10-digit zero-padded)
-        if (preg_match('/^0*(\d+)$/', $code, $matches)) {
-            return (int) $matches[1];
-        }
-
-        return null;
+        return ScanCode::orderId($code);
     }
 
     private function getIneligibilityReason(string $status): string
@@ -384,7 +384,7 @@ class SortingSessionController extends Controller
      *     hub_name: string,
      *     company: string|null,
      *     total: int,
-     *     barangays: array<int, array{barangay: string, count: int, order_ids: array<int, int>}>
+     *     barangays: array<int, array{barangay: string, count: int, order_ids: array<int, string>}>
      * }>
      */
     private function summaryGroups(SortingSession $session): array
@@ -409,7 +409,7 @@ class SortingSessionController extends Controller
                                 ?: $scan->order->ship_to['barangay']
                                 ?: 'Unknown barangay',
                             'count' => $group->count(),
-                            'order_ids' => $group->pluck('order_id')->filter()->values()->all(),
+                            'order_ids' => $group->pluck('order.order_number')->filter()->values()->all(),
                         ];
                     })
                     ->values()

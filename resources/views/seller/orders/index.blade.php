@@ -132,7 +132,7 @@
 
                                             <td
                                                 class="block px-1 pb-1 text-base font-semibold text-charcoal md:table-cell md:px-5 md:py-4 md:text-sm">
-                                                #{{ $order->id }}
+                                                #{{ $order->order_number }}
                                             </td>
 
                                             <td data-label="Buyer" class="{{ $cell }} text-charcoal/80">
@@ -177,6 +177,12 @@
                                                     class="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 py-2.5 text-xs font-semibold text-white transition hover:bg-sky-blue md:inline-flex md:w-auto md:py-2">
                                                     View
                                                 </a>
+                                                @if ($order->canViewWaybill())
+                                                    <a href="{{ route('seller.orders.waybill.view', $order) }}" target="_blank" rel="noopener"
+                                                        class="mt-2 flex w-full items-center justify-center rounded-md border border-primary bg-surface px-3.5 py-2 text-xs font-semibold text-primary md:inline-flex md:w-auto">
+                                                        View Waybill
+                                                    </a>
+                                                @endif
                                             </td>
 
                                         </tr>

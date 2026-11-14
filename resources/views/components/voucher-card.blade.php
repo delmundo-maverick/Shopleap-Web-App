@@ -52,7 +52,7 @@
         @elseif ($redemption)
             <div class="flex flex-wrap items-center justify-between gap-1 text-[10px] text-charcoal/55">
                 <span>{{ ($redemption->used_at ?? $redemption->created_at)->format('M d, Y') }}</span>
-                @if ($redemption->order_id) <a href="{{ route('buyer.orders.show', $redemption->order_id) }}" class="font-semibold text-primary hover:underline">Order #{{ $redemption->order_id }} &rarr;</a> @endif
+                @if ($redemption->order_id) <a href="{{ route('buyer.orders.index', ['search' => $redemption->order?->order_number]) }}" class="font-semibold text-primary hover:underline">Order #{{ $redemption->order?->order_number }} &rarr;</a> @endif
             </div>
         @endif
     </div>
