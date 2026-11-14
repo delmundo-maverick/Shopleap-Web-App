@@ -109,8 +109,18 @@
             font-weight: bold;
         }
 
+        .codes {
+            table-layout: fixed;
+            page-break-inside: avoid;
+        }
+
         .codes td {
             vertical-align: middle;
+        }
+
+        .barcode {
+            width: 240px;
+            height: 44px;
         }
 
         .footer {
@@ -226,7 +236,7 @@
     <table class="codes" style="margin-top: 6px;">
         <tr>
             <td style="width: 72%; text-align: center;">
-                <img src="data:image/png;base64,{{ $barcodeBase64 }}">
+                <img src="data:image/png;base64,{{ $barcodeBase64 }}" class="barcode">
                 <div style="font-size: 7px; letter-spacing: 1px;">{{ $orderCode }}</div>
             </td>
             <td style="width: 28%; text-align: right;">
