@@ -38,8 +38,6 @@ class OrderReturns
 
         $itemsAmount = round($orderItems->sum(fn ($item) => (float) $item->subtotal
             - ($order->items_subtotal !== null ? (float) $item->voucher_discount_allocated : 0)), 2);
-        $wholeOrder = $orderItems->count() === $order->items()->count();
-        $shipping = $wholeOrder ? round((float) $order->shipping_fee, 2) : 0.0;
         $commission = (float) $order->total_amount > 0
             ? round((float) $order->commission_amount * $itemsAmount / (float) $order->total_amount, 2)
             : 0.0;
@@ -47,7 +45,7 @@ class OrderReturns
         $uploaded = [];
 
         try {
-            return DB::transaction(function () use ($order, $buyerId, $data, $orderItems, $files, $meta, $disputed, $itemsAmount, $shipping, $commission, &$uploaded) {
+            return DB::transaction(function () use ($order, $buyerId, $data, $orderItems, $files, $meta, $disputed, $itemsAmount, $commission, &$uploaded) {
                 $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
 
                 if (! $locked->canRequestReturn()) {
@@ -66,12 +64,12 @@ class OrderReturns
                     'details' => $data['details'],
                     'status' => $disputed ? OrderReturn::STATUS_DISPUTED : OrderReturn::STATUS_REQUESTED,
                     'items_amount' => $itemsAmount,
-                    'shipping_amount' => $shipping,
-                    'refund_amount' => round($itemsAmount + $shipping, 2),
+                    'shipping_amount' => 0,
+                    'refund_amount' => $itemsAmount,
                     'commission_reversal' => $commission,
                     'refund_method' => $data['refund_method'],
                     'refund_account_name' => $data['refund_account_name'],
-                    'refund_account_number' => $data['refund_account_number'],
+                    'refund_account_number' => substr(preg_replace('/\D/', '', $data['refund_account_number']), -4),
                     'response_due_at' => $disputed ? null : now()->addDays(OrderReturn::RESPONSE_DAYS),
                     'escalated_by' => $disputed ? 'system' : null,
                     'escalation_reason' => $disputed ? 'The courier marked this parcel as delivered, but the buyer says it was not received.' : null,
@@ -289,27 +287,21 @@ class OrderReturns
         );
     }
 
-    public function markRefunded(OrderReturn $return, string $reference, int $adminId): bool
+    public function markRefunded(OrderReturn $return, int $adminId): bool
     {
-        $done = $this->move(
-            $return,
-            [OrderReturn::STATUS_REFUND_PENDING],
-            [
-                'status' => OrderReturn::STATUS_REFUNDED,
-                'refund_reference' => $reference,
-                'refunded_by' => $adminId,
-                'refunded_at' => now(),
-            ],
-            'Refund sent',
-            '₱'.number_format($return->refund_amount, 2)." · Ref {$reference}",
-            $adminId
-        );
+        return DB::transaction(function () use ($return, $adminId): bool {
+            Order::whereKey($return->order_id)->lockForUpdate()->firstOrFail();
+            $locked = OrderReturn::whereKey($return->id)->lockForUpdate()->firstOrFail();
+            $payouts = app(Payouts::class);
+            $record = $payouts->prepareRefund($locked);
+            if (! $record) {
+                return false;
+            }
+            $payouts->payRefund($record->reference_no, $adminId);
+            $return->refresh();
 
-        if ($done) {
-            $return->order->logInternalEvent('Refund sent to the buyer', '₱'.number_format($return->refund_amount, 2), $adminId);
-        }
-
-        return $done;
+            return true;
+        }, 3);
     }
 
     // ── Deadlines (run hourly by returns:process-deadlines) ──
@@ -383,6 +375,7 @@ class OrderReturns
         ?Closure $extraWhere = null,
     ): bool {
         $done = DB::transaction(function () use ($return, $from, $values, $title, $note, $actorId, $extraWhere) {
+            Order::whereKey($return->order_id)->lockForUpdate()->firstOrFail();
             $query = OrderReturn::whereKey($return->id)->whereIn('status', $from);
 
             if ($extraWhere) {
@@ -394,6 +387,9 @@ class OrderReturns
             }
 
             $return->refresh();
+            $return->unsetRelation('order');
+            app(OrderLedger::class)->returnChanged($return);
+            app(Payouts::class)->prepareRefund($return);
             $this->log($return, $title, $note, $actorId);
 
             return true;

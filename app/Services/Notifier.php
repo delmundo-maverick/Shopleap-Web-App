@@ -3,15 +3,86 @@
 namespace App\Services;
 
 use App\Models\CourierProfile;
+use App\Models\LogisticsProfile;
 use App\Models\Order;
 use App\Models\OrderReturn;
 use App\Models\ShipmentBag;
 use App\Models\User;
 use App\Notifications\ActivityNotification;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class Notifier
 {
+    public function moneyChanged(string $type, object $record): void
+    {
+        DB::afterCommit(function () use ($type, $record): void {
+            try {
+                match ($type) {
+                    'cash_handover' => $this->cashHandover($record),
+                    'remittance' => $this->remittanceReviewed($record),
+                    'rider_payout' => $this->riderPaid($record),
+                    'seller_payout' => $this->sellerPayoutChanged($record),
+                    default => throw new \InvalidArgumentException('Unsupported money notification.'),
+                };
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        });
+    }
+
+    private function cashHandover(object $record): void
+    {
+        $hub = LogisticsProfile::with('user')->find($record->hub_id);
+        $rider = CourierProfile::with('user')->find($record->rider_id);
+        $amount = '₱'.number_format((float) $record->amount_received, 2);
+        $body = "Cash handover {$record->reference_no} of {$amount} has been confirmed.";
+        if ($record->status === 'short') {
+            $body = "Cash handover {$record->reference_no} recorded {$amount}. Outstanding shortage: ₱".number_format((float) $record->short_amount, 2).'.';
+        }
+        $meta = ['reference_no' => $record->reference_no, 'amount' => LedgerService::decimal(LedgerService::cents((string) $record->amount_received)), 'currency' => 'PHP', 'status' => $record->status];
+        $title = $record->status === 'short' ? 'Cash handover short' : 'Cash handover confirmed';
+        $this->send($hub?->user, null, 'cash.handover.'.$record->status, $title, $body,
+            route('logistics.movements.index', ['section' => 'cash'], false), $meta);
+        $this->send($rider?->user, null, 'cash.handover.'.$record->status, $title, $body,
+            route('api.courier.cash.history', [], false), $meta + ['screen' => 'cash']);
+    }
+
+    private function remittanceReviewed(object $record): void
+    {
+        $hub = LogisticsProfile::with('user')->find($record->hub_id);
+        $amount = '₱'.number_format((float) $record->total_amount, 2);
+        $body = "Remittance {$record->reference_no} of {$amount} has been {$record->status}.";
+        if ($record->status === 'rejected') {
+            $body .= ' Reason: '.$record->rejection_reason;
+        }
+        $this->send($hub?->user, null, 'remittance.'.$record->status, 'Remittance '.$record->status, $body,
+            route('logistics.movements.index', ['section' => 'remittances'], false),
+            ['reference_no' => $record->reference_no, 'amount' => LedgerService::decimal(LedgerService::cents((string) $record->total_amount)), 'currency' => 'PHP', 'status' => $record->status, 'reason' => $record->rejection_reason]);
+    }
+
+    private function riderPaid(object $record): void
+    {
+        $rider = CourierProfile::with('user')->find($record->rider_id);
+        $amount = '₱'.number_format((float) $record->amount, 2);
+        $this->send($rider?->user, null, 'rider.payout.paid', 'Earnings paid', "Your earnings payout {$record->reference_no} of {$amount} has been paid.",
+            route('api.courier.earnings.history', ['period' => 'all'], false),
+            ['screen' => 'earnings', 'reference_no' => $record->reference_no, 'amount' => LedgerService::decimal(LedgerService::cents((string) $record->amount)), 'currency' => 'PHP', 'status' => 'paid']);
+    }
+
+    private function sellerPayoutChanged(object $record): void
+    {
+        $amount = '₱'.number_format((float) $record->amount, 2);
+        $description = match ($record->status) {
+            'processing' => 'is being processed.',
+            'paid' => 'has been paid.',
+            'rejected' => 'has been rejected. Reason: '.$record->rejection_reason,
+        };
+        $this->send(User::find($record->seller_id), null, 'seller.payout.'.$record->status, 'Payout '.ucfirst($record->status),
+            "Your payout {$record->reference_no} of {$amount} {$description}", route('seller.payouts.index', [], false),
+            ['reference_no' => $record->reference_no, 'amount' => LedgerService::decimal(LedgerService::cents((string) $record->amount)), 'currency' => 'PHP', 'status' => $record->status, 'reason' => $record->rejection_reason]);
+    }
+
     // ── Cancellation ──
 
     public function orderCancelled(Order $order, string $by, bool $fromRequest, ?int $actorId, bool $pickupWasScheduled): void
@@ -146,11 +217,14 @@ class Notifier
 
     public function returnChanged(OrderReturn $return, ?int $actorId): void
     {
-        $return->loadMissing(['buyer', 'seller']);
+        $return->loadMissing(['buyer', 'seller', 'order']);
 
         $no = '#'.$return->order->order_number;
         $money = '₱'.number_format((float) $return->refund_amount, 2);
         $meta = ['return_id' => $return->id, 'order_id' => $return->order->order_number];
+        if ($return->status === OrderReturn::STATUS_REFUNDED) {
+            $meta += ['reference_no' => $return->refund_reference, 'amount' => $return->refund_amount, 'currency' => 'PHP', 'status' => 'paid'];
+        }
 
         $buyerUrl = route('buyer.returns.show', $return, false);
         $sellerUrl = route('seller.returns.show', $return, false);

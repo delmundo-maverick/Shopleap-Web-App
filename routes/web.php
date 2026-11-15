@@ -43,7 +43,11 @@ use App\Http\Controllers\Logistics\ServiceAreaController;
 use App\Http\Controllers\Logistics\SortingController;
 use App\Http\Controllers\Logistics\SortingSessionController as LogisticsSortingSessionController;
 use App\Http\Controllers\MessagingController;
+use App\Http\Controllers\MoneyController;
+use App\Http\Controllers\MoneyMovementController;
+use App\Http\Controllers\MoneyReceiptController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PayoutController;
 use App\Http\Controllers\PolicyController;
 use App\Http\Controllers\ReturnMediaController;
 use App\Http\Controllers\Seller\AccountController as SellerAccountController;
@@ -57,9 +61,13 @@ use App\Http\Controllers\Seller\ReviewController as SellerReviewController;
 use App\Http\Controllers\Seller\ShopVoucherController;
 use App\Http\Controllers\Seller\WaybillController;
 use App\Http\Controllers\SupportController;
+use App\Services\MoneyReceipts;
 use App\Support\Portal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/money/receipts/{type}/{reference}', [MoneyReceiptController::class, 'show'])
+    ->middleware('auth')->whereIn('type', MoneyReceipts::TYPES)->name('money.receipts.show');
 
 /*
 |--------------------------------------------------------------------------
@@ -384,6 +392,12 @@ Route::middleware(['auth', 'seller', 'throttle:mutations'])
         Route::get('/dashboard', [SellerDashboardController::class, 'index'])
             ->name('dashboard');
 
+        Route::get('/earnings', [MoneyController::class, 'index'])->name('earnings.index');
+        Route::get('/payouts', [PayoutController::class, 'index'])->name('payouts.index');
+        Route::post('/payouts', [PayoutController::class, 'requestSeller'])->name('payouts.store');
+        Route::post('/payout-methods', [PayoutController::class, 'addMethod'])->name('payouts.methods.store');
+        Route::delete('/payout-methods/{method}', [PayoutController::class, 'removeMethod'])->whereNumber('method')->name('payouts.methods.destroy');
+
         // Products
         Route::prefix('products')->name('products.')->group(function (): void {
             Route::controller(SellerProductDiscountController::class)->prefix('discounts')->name('discounts.')->group(function (): void {
@@ -648,6 +662,16 @@ Route::middleware(['auth', 'logistics', 'hub.scope', 'throttle:mutations'])
         Route::get('/rider-rate', [RiderRateController::class, 'index'])->name('rider-rate.index');
         Route::post('/rider-rate', [RiderRateController::class, 'store'])->name('rider-rate.store');
 
+        Route::get('/reports/ledger', [MoneyController::class, 'index'])->name('money.index');
+        Route::get('/receipts/{type}/{reference}', [MoneyReceiptController::class, 'show'])->whereIn('type', MoneyReceipts::TYPES)->name('receipts.show');
+        Route::get('/money/rider-payouts', [PayoutController::class, 'index'])->name('payouts.index');
+        Route::post('/money/rider-payouts', [PayoutController::class, 'payRider'])->name('payouts.store');
+        Route::get('/money/{section}', [MoneyMovementController::class, 'index'])->whereIn('section', ['cash', 'remittances'])->name('movements.index');
+        Route::post('/money/cash', [MoneyMovementController::class, 'handover'])->name('movements.cash.store');
+        Route::post('/money/cash/{reference}/settle', [MoneyMovementController::class, 'settle'])->name('movements.cash.settle');
+        Route::post('/money/remittances', [MoneyMovementController::class, 'submitRemittance'])->name('movements.remittances.store');
+        Route::get('/money/remittances/{reference}/proof', [MoneyMovementController::class, 'proof'])->name('money.proof');
+
         // Reports
         Route::prefix('reports')
             ->name('reports.')
@@ -674,6 +698,16 @@ Route::middleware(['auth', 'admin', 'throttle:mutations'])
 
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])
             ->name('dashboard');
+
+        Route::get('/ledger', [MoneyController::class, 'index'])->name('ledger.index');
+        Route::get('/money/seller-payouts', [PayoutController::class, 'index'])->name('payouts.index');
+        Route::post('/money/seller-payouts/{reference}/{decision}', [PayoutController::class, 'decideSeller'])->whereIn('decision', ['approve', 'pay', 'reject'])->name('payouts.decide');
+        Route::get('/money/refunds', [PayoutController::class, 'index'])->name('refunds.index');
+        Route::post('/money/refunds/{reference}/pay', [PayoutController::class, 'payRefund'])->name('refunds.pay');
+        Route::get('/money/{section}', [MoneyMovementController::class, 'index'])->whereIn('section', ['remittances', 'settings'])->name('movements.index');
+        Route::post('/money/remittances/{reference}/{decision}', [MoneyMovementController::class, 'decideRemittance'])->whereIn('decision', ['verify', 'reject'])->name('movements.remittances.decide');
+        Route::post('/money/settings', [MoneyMovementController::class, 'settings'])->name('movements.settings');
+        Route::get('/money/remittances/{reference}/proof', [MoneyMovementController::class, 'proof'])->name('money.proof');
 
         // Registration management: type => [controller, route parameter]
         $registrations = [

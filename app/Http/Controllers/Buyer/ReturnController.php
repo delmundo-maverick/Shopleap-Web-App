@@ -41,15 +41,15 @@ class ReturnController extends Controller
             'items.*' => ['integer'],
             'refund_method' => ['required', Rule::in(array_keys(OrderReturn::REFUND_METHODS))],
             'refund_account_name' => ['required', 'string', 'max:150'],
-            'refund_account_number' => ['required', 'string', 'max:60', 'regex:/^[0-9 \-]+$/'],
-            'media' => ['nullable', 'array', 'max:' . OrderReturn::MAX_MEDIA],
+            'refund_account_number' => ['required', 'string', 'regex:/^[0-9]{4}$/'],
+            'media' => ['nullable', 'array', 'max:'.OrderReturn::MAX_MEDIA],
             'media.*' => [
                 'file',
                 'mimetypes:image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime',
                 'max:20480', // KB
             ],
         ], [
-            'refund_account_number.regex' => 'The account number may only contain digits, spaces and dashes.',
+            'refund_account_number.regex' => 'Enter only the last four digits of the account number.',
         ]);
 
         $files = $request->file('media', []);
@@ -76,7 +76,7 @@ class ReturnController extends Controller
 
         $message = $return->status === OrderReturn::STATUS_DISPUTED
             ? 'Your request was sent to Shopleap, who will check the delivery. You can follow it here.'
-            : 'Your request was sent to the seller. They have ' . OrderReturn::RESPONSE_DAYS . ' days to respond.';
+            : 'Your request was sent to the seller. They have '.OrderReturn::RESPONSE_DAYS.' days to respond.';
 
         return redirect()->route('buyer.returns.show', $return)->with('status', $message);
     }
@@ -137,7 +137,7 @@ class ReturnController extends Controller
         }
 
         if (now()->greaterThan($order->returnWindowEndsAt())) {
-            return 'The ' . Order::returnWindowDays() . '-day return window for this order has ended.';
+            return 'The '.Order::returnWindowDays().'-day return window for this order has ended.';
         }
 
         return 'You already have a return/refund request for this order.';

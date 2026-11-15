@@ -8,6 +8,7 @@ use App\Models\CartItem;
 use App\Models\Order;
 use App\Models\ParcelEvent;
 use App\Models\ProductVariant;
+use App\Services\MoneyReport;
 use App\Services\OrderCancellation;
 use App\Services\ParcelLifecycle;
 use Illuminate\Http\Request;
@@ -70,11 +71,12 @@ class OrderController extends Controller
         }
 
         $orders = $ordersQuery->paginate(10)->withQueryString();
+        $moneyRefunds = app(MoneyReport::class)->buyerRefunds($request->user()->id, $orders->getCollection()->pluck('id')->all());
 
         $isAccountPanel = $request->header('X-Account-Panel') === 'true';
 
         return view($isAccountPanel ? 'Buyer.orders._content' : 'Buyer.orders.index', array_merge(
-            compact('orders', 'tab', 'counts'),
+            compact('orders', 'tab', 'counts', 'moneyRefunds'),
             $isAccountPanel ? [] : $this->cartSummary($request)
         ));
     }

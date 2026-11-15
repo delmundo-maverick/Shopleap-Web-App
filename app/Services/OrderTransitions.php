@@ -130,6 +130,8 @@ class OrderTransitions
                     throw new \RuntimeException('Delivery could not be recorded.');
                 }
 
+                app(OrderLedger::class)->delivered($order);
+
                 return true;
             });
         } catch (\Throwable $exception) {

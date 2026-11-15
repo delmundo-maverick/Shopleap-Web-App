@@ -278,7 +278,7 @@ class LogisticsReportService
         $rows = $orders->sortBy($date)->map(fn (Order $order) => ['order' => '#'.$order->order_number, 'date' => $order->{$date}->format('Y-m-d H:i'), 'amount' => $this->currency((float) ($cash ? $order->cod_collected_amount : $order->shipping_fee)), 'status' => $order->status, 'rider' => $order->delivery_rider_id ?? 'Unassigned'])->values()->all();
         $daily = $orders->groupBy(fn (Order $order) => $order->{$date}->format('Y-m-d'))->sortKeys()->map(fn (Collection $group) => round((float) $group->sum($cash ? 'cod_collected_amount' : 'shipping_fee'), 2));
         $daily = $this->days($from, $to, $daily);
-        $notes = $cash ? ['Based on cod_collected_at and cash actually recorded. Order completion does not prove remittance; remittance transactions are not tracked by this application.']
+        $notes = $cash ? ['Based on cod_collected_at and cash actually recorded. Collection does not prove remittance; verified remittances and cash held are shown under Money.']
             : ['Based on delivered_at for destination-hub deliveries with cash collected, matching the deliveries earnings page. Only recorded shipping fees are counted; no estimated reattempt surcharge is added.'];
 
         return $this->report($cash ? 'COD Collections' : 'Shipping Fees & Earnings', $this->cards([$cash ? 'Cash collected' : 'Shipping fees earned' => $this->currency($total), 'Parcels' => $orders->count(), 'Average per parcel' => $this->currency($orders->count() ? $total / $orders->count() : 0)]),

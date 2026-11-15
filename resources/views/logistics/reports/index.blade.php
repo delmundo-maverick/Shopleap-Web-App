@@ -64,4 +64,5 @@
     <aside class="rounded-lg border border-line bg-white p-4 text-xs leading-relaxed text-charcoal/65"><h2 class="mb-2 font-bold text-charcoal">How this report is calculated</h2><ul class="list-inside list-disc space-y-1">@foreach ($report['notes'] as $note)<li>{{ $note }}</li>@endforeach<li>All filters also apply to CSV and PDF exports. Exports include all matching rows.</li></ul></aside>
     <script id="reportData" type="application/json">@json(['chart' => $report['chart']])</script>
     <x-logistics.proof-modal />
+    @include('money.history')
 </x-logistics.layout>

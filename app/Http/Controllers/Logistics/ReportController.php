@@ -7,6 +7,7 @@ use App\Models\LogisticsProfile;
 use App\Models\Order;
 use App\Services\HubContext;
 use App\Services\LogisticsReportService;
+use App\Services\MoneyReport;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -31,7 +32,8 @@ class ReportController extends Controller
 
         return view('logistics.reports.index', ['report' => $report, 'rows' => $rows, 'from' => $from, 'to' => $to,
             'preset' => $params['preset'], 'type' => $params['type'], 'hub' => $hub, 'types' => $service->types(),
-            'params' => $params, 'options' => $service->filterOptions($hub->id), 'statuses' => $this->statuses()]);
+            'params' => $params, 'options' => $service->filterOptions($hub->id), 'statuses' => $this->statuses()]
+            + app(MoneyReport::class)->page($request, 'hub', $hub->id));
     }
 
     public function exportCsv(Request $request, LogisticsReportService $service): StreamedResponse

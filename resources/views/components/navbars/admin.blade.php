@@ -15,5 +15,13 @@
             ['route' => 'admin.settings.announcements.index', 'label' => 'Announcements', 'icon' => 'M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 00-4-5.7V5a2 2 0 00-4 0v.3A6 6 0 006 11v3.2a2 2 0 01-.6 1.4L4 17h5m2 0v1a2 2 0 004 0v-1m-4-11V4', 'key' => ''],
             ['route' => 'admin.settings.policies.index', 'label' => 'Policies', 'icon' => 'M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5M9 13h6m-6 4h6', 'key' => '']],
     ];
+    array_unshift($sections['Financials & Logs'], ['route' => 'admin.ledger.index', 'label' => 'Platform ledger', 'key' => 'ledger']);
+    $sections['Money'] = [
+        ['route' => 'admin.payouts.index', 'label' => 'Seller payouts'],
+        ['route' => 'admin.refunds.index', 'label' => 'Refunds'],
+    ];
+    foreach (['remittances' => 'Remittances', 'settings' => 'Remittance settings'] as $section => $label) {
+        $sections['Money'][] = ['route' => 'admin.movements.index', 'params' => ['section' => $section], 'label' => $label, 'selected' => request()->routeIs('admin.movements.index') && request()->route('section') === $section];
+    }
 @endphp
 <x-nav.workspace label="Admin Control Panel" home="admin.dashboard" :sections="$sections" :active="$active" class="workspace-navigation" />

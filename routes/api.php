@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Courier\AccountController;
 use App\Http\Controllers\Api\Courier\AuthController;
+use App\Http\Controllers\Api\Courier\CashController;
 use App\Http\Controllers\Api\Courier\ChatController;
 use App\Http\Controllers\Api\Courier\DashboardController;
 use App\Http\Controllers\Api\Courier\DeliveryController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\Api\Courier\HistoryController;
 use App\Http\Controllers\Api\Courier\NotificationController;
 use App\Http\Controllers\Api\Courier\PickupController;
 use App\Http\Controllers\Api\HubController;
+use App\Http\Controllers\MoneyReceiptController;
 use Illuminate\Support\Facades\Route;
 
 // Public: sorting centers a rider can apply to.
@@ -81,7 +83,10 @@ Route::prefix('courier')->group(function () {
         Route::get('/earnings', [EarningsController::class, 'index']);
         Route::get('/earnings/rate', [EarningsController::class, 'rate']);
         Route::get('/earnings/summary', [EarningsController::class, 'index']);
-        Route::get('/earnings/history', [EarningsController::class, 'history']);
+        Route::get('/earnings/history', [EarningsController::class, 'history'])->name('api.courier.earnings.history');
+        Route::get('/cash/summary', [CashController::class, 'summary'])->name('api.courier.cash.summary');
+        Route::get('/cash/history', [CashController::class, 'history'])->name('api.courier.cash.history');
+        Route::get('/receipts/{type}/{reference}', [MoneyReceiptController::class, 'show'])->whereIn('type', ['cash-handovers', 'rider-payouts'])->name('api.courier.receipts.show');
 
         // Notifications.
         Route::get('/notifications', [NotificationController::class, 'index']);

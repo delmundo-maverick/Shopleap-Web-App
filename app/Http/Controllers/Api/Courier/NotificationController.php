@@ -25,6 +25,7 @@ class NotificationController extends Controller
                 'kind' => $n->data['kind'] ?? '',
                 'title' => $n->data['title'] ?? 'Update',
                 'body' => $n->data['body'] ?? '',
+                'url' => $n->data['url'] ?? null,
                 'meta' => $n->data['meta'] ?? [],      // order_id etc., for opening the right screen
                 'read' => $n->read_at !== null,
                 'created_at' => $n->created_at->toIso8601String(),

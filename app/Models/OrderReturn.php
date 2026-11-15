@@ -30,17 +30,27 @@ class OrderReturn extends Model
     }
 
     const TYPE_REFUND_ONLY = 'refund_only';
+
     const TYPE_RETURN_AND_REFUND = 'return_and_refund';
 
     const STATUS_REQUESTED = 'requested';
+
     const STATUS_APPROVED = 'approved';
+
     const STATUS_SHIPPED_BACK = 'shipped_back';
+
     const STATUS_REFUND_PENDING = 'refund_pending';
+
     const STATUS_REFUNDED = 'refunded';
+
     const STATUS_DECLINED = 'declined';
+
     const STATUS_DISPUTED = 'disputed';
+
     const STATUS_REJECTED = 'rejected';
+
     const STATUS_CANCELLED = 'cancelled';
+
     const STATUS_EXPIRED = 'expired';
 
     /** Still in progress: pauses the order's auto-complete. */
@@ -67,8 +77,11 @@ class OrderReturn extends Model
 
     // Days
     const RESPONSE_DAYS = 3;   // seller answers, or it is approved automatically
+
     const ESCALATE_DAYS = 3;   // buyer may ask Shopleap to review a declined request
+
     const SHIP_BACK_DAYS = 7;  // buyer ships the item back
+
     const RECEIPT_DAYS = 3;    // seller confirms receipt, or it is confirmed automatically
 
     const MAX_MEDIA = 5;
@@ -182,12 +195,17 @@ class OrderReturn extends Model
         return self::REFUND_METHODS[$this->refund_method] ?? $this->refund_method;
     }
 
-    /** •••••1234: only the last four digits are ever shown outside the admin payout screen. */
+    public function setRefundAccountNumberAttribute(string $value): void
+    {
+        $this->attributes['refund_account_number'] = substr(preg_replace('/\D/', '', $value), -4);
+    }
+
+    /** Only the last four digits are retained and displayed. */
     public function getMaskedAccountAttribute(): string
     {
         $number = preg_replace('/\D/', '', (string) $this->refund_account_number);
 
-        return str_repeat('•', max(0, strlen($number) - 4)) . substr($number, -4);
+        return '•••• '.substr($number, -4);
     }
 
     /** What changes in the seller's earnings: the items refunded, minus the commission handed back. */

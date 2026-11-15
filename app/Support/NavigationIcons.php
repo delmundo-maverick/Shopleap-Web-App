@@ -35,6 +35,8 @@ class NavigationIcons
     {
         foreach ([
             'logistics.rider-rate.*' => 'rider-rate',
+            'seller.earnings.*' => 'rider-rate', 'admin.ledger.*' => 'rider-rate', 'logistics.money.*' => 'rider-rate',
+            '*.movements.*' => 'rider-rate', '*.payouts.*' => 'rider-rate', 'admin.refunds.*' => 'returns',
             '*.dashboard' => 'dashboard', '*.reports.*' => 'reports', 'messages.support' => 'support',
             'messages.*' => 'messages', '*.account.*' => 'account', '*.orders.*' => 'orders',
             '*.returns.*' => 'returns', 'logistics.riders.*' => 'riders', 'logistics.areas.*' => 'areas',

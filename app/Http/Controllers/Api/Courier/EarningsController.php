@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Courier;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Services\PayoutQueries;
 use App\Services\RiderEarnings;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -13,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 
 class EarningsController extends Controller
 {
-    public function __construct(private RiderEarnings $earnings) {}
+    public function __construct(private RiderEarnings $earnings, private PayoutQueries $payouts) {}
 
     public function rate(Request $request): JsonResponse
     {
@@ -28,6 +29,7 @@ class EarningsController extends Controller
         $courier = $request->attributes->get('courier');
         $query = $this->earnings->deliveries(null, $courier->id, $from, $to);
         $totals = $this->earnings->totals($query);
+        $payoutTotals = $this->payouts->riderTotals($courier->id, $from, $to);
         $daily = (clone $query)->toBase()->selectRaw('DATE(delivered_at) AS day, COUNT(*) AS deliveries, SUM(rider_pay) AS earned, COALESCE(SUM(cod_collected_amount), 0) AS cod')
             ->groupByRaw('DATE(delivered_at)')->orderByDesc('day')->get()->map(fn ($row) => [
                 'date' => $row->day, 'deliveries' => (int) $row->deliveries,
@@ -37,7 +39,8 @@ class EarningsController extends Controller
         return response()->json(['period' => $period, 'currency' => 'PHP',
             'fee_per_delivery' => $this->earnings->currentRate($courier->logistics_profile_id)?->amount,
             'deliveries' => $totals['deliveries'], 'total_earned' => $totals['rider_pay'] ?? '0.00',
-            'recorded_earnings' => $totals['paid_snapshots'], 'cod_collected' => $totals['cod_collected'], 'daily' => $daily]);
+            'recorded_earnings' => $totals['paid_snapshots'], 'cod_collected' => $totals['cod_collected'], 'daily' => $daily,
+            'accrued_unpaid' => $payoutTotals['accrued_unpaid'], 'paid' => $payoutTotals['paid']]);
     }
 
     public function history(Request $request): JsonResponse
@@ -45,11 +48,13 @@ class EarningsController extends Controller
         [$from, $to] = $this->range($request);
         $orders = $this->earnings->deliveries(null, $request->attributes->get('courier')->id, $from, $to)
             ->with('deliveryProof')->orderByDesc('delivered_at')->orderByDesc('id')->paginate(20)->withQueryString();
+        $paidOrderIds = $this->payouts->paidRiderOrderIds($request->attributes->get('courier')->id, $orders->getCollection()->pluck('id')->all())->flip();
 
         return response()->json(['data' => $orders->getCollection()->map(fn (Order $order) => [
             'order_id' => $order->order_number, 'order_number' => $order->order_number, 'waybill_code' => $order->waybill_code, 'amount' => $order->rider_pay, 'currency' => 'PHP',
             'recorded_at' => $order->earnings_recorded_at?->toIso8601String(), 'delivered_at' => $order->delivered_at->toIso8601String(),
             'proof' => $order->deliveryProof?->riderSummary() ?? ['uploaded' => false, 'captured_at' => null],
+            'payout_status' => $paidOrderIds->has($order->id) ? 'paid' : 'accrued',
         ]), 'meta' => ['current_page' => $orders->currentPage(), 'last_page' => $orders->lastPage(), 'total' => $orders->total()]]);
     }
 
