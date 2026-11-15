@@ -29,3 +29,4 @@ Schedule::command('sorting:close-stale-sessions')->hourly();
 // Flag bags that stay in transit too long and parcels with no tracking updates.
 Schedule::command('bags:flag-stale-in-transit')->hourly();
 Schedule::command('parcels:flag-stale-events')->hourly();
+Schedule::command('delivery-proofs:expire')->dailyAt('03:00')->withoutOverlapping();

@@ -1,3 +1,4 @@
+import './delivery-proofs.js';
 import Chart from 'chart.js/auto';
 
 export function chartOptions(config) {

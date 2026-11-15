@@ -48,13 +48,27 @@ class DeliveryController extends Controller
     public function delivered(Request $request, Order $order, OrderTransitions $transitions, RiderEarnings $earnings): JsonResponse
     {
         $courier = $this->owned($request, $order);
-        $data = $request->validate(['amount' => ['required', 'numeric', 'min:0']]);
+        if (! in_array($order->status, RiderEarnings::EARNED_STATUSES, true) && $order->status !== Order::STATUS_OUT_FOR_DELIVERY) {
+            return response()->json(['message' => 'This order is not at the right stage for that action.'], 409);
+        }
+        $retry = in_array($order->status, RiderEarnings::EARNED_STATUSES, true);
+        if (! $retry && (int) $request->server('CONTENT_LENGTH', 0) > 6 * 1024 * 1024) {
+            return response()->json(['message' => 'The upload request is too large. Send a proof photo of at most 5 MB.'], 413);
+        }
+        $data = $retry ? [] : $request->validate([
+            'amount' => ['required', 'numeric', 'min:0'],
+            'proof_image' => ['bail', 'required', 'file', 'image', 'mimetypes:image/jpeg,image/png,image/webp', 'max:5120', 'dimensions:min_width=640,min_height=640'],
+            'captured_at' => ['nullable', 'date', 'regex:/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'notes' => ['nullable', 'string', 'max:255'],
+        ], ['proof_image.required' => 'A proof of delivery photo is required.']);
 
-        if (! $transitions->delivered($order, $request->user()->id, (float) $data['amount'], expectedCourierId: $courier->id, expectedHubId: in_array($order->status, RiderEarnings::EARNED_STATUSES, true) ? null : $courier->logistics_profile_id)) {
-            return $this->wrongStage();
+        if (! $transitions->delivered($order, $request->user()->id, isset($data['amount']) ? (float) $data['amount'] : null, expectedCourierId: $courier->id, expectedHubId: in_array($order->status, RiderEarnings::EARNED_STATUSES, true) ? null : $courier->logistics_profile_id, proofImage: $retry ? null : $request->file('proof_image'), proofData: $data)) {
+            return response()->json(['message' => 'This order is not at the right stage for that action.'], 409);
         }
 
-        return response()->json(['message' => 'Delivery recorded. Thank you.', 'earning' => $earnings->earning($order)]);
+        return response()->json(['message' => 'Delivery recorded. Thank you.', 'earning' => $earnings->earning($order), 'proof' => $order->deliveryProof?->riderSummary() ?? ['uploaded' => false, 'captured_at' => null]]);
     }
 
     public function failed(Request $request, Order $order, OrderTransitions $transitions): JsonResponse

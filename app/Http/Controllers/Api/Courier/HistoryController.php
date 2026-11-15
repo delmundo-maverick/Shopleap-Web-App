@@ -34,7 +34,7 @@ class HistoryController extends Controller
 
         $when = 'COALESCE(delivered_at, updated_at)';
 
-        $orders = Order::with(['items', 'buyer.buyerProfile'])
+        $orders = Order::with(['items', 'buyer.buyerProfile', 'deliveryProof'])
             ->whereRaw('COALESCE(earning_courier_id, delivery_rider_id) = ?', [$courier->id])
             ->whereIn('status', $statuses)
             ->when($data['from'] ?? null, fn ($q, $d) => $q->whereRaw("$when >= ?", [Carbon::parse($d)->startOfDay()]))
@@ -53,6 +53,7 @@ class HistoryController extends Controller
                     'waybill_code' => $o->waybill_code,
                     'status' => $o->status,
                     'outcome' => $earned ? 'delivered' : 'returned',
+                    'proof' => $o->deliveryProof?->riderSummary() ?? ['uploaded' => false, 'captured_at' => null],
                     'buyer_name' => $ship['name'],
                     'barangay' => $ship['barangay'],
                     'municipality' => $ship['municipality'],

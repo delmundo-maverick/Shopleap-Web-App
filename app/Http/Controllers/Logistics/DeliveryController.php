@@ -57,7 +57,7 @@ class DeliveryController extends Controller
 
         $query = (clone $base)
             ->whereIn('status', self::TABS[$tab])
-            ->with(['items', 'seller.sellerProfile', 'buyer.buyerProfile', 'deliveryRider'])
+            ->with(['items', 'seller.sellerProfile', 'buyer.buyerProfile', 'deliveryRider', 'deliveryProof'])
             ->orderBy('id');
 
         if ($request->filled('search')) {
@@ -106,16 +106,7 @@ class DeliveryController extends Controller
     ) {
         $this->authorize('actAsHoldingHub', $order);
 
-        // Stand-in: records the expected COD amount.
-        // The app sends the cash actually collected.
-        if (! $transitions->delivered($order, $request->user()->id, expectedHubId: HubContext::id($request))) {
-            return $this->wrongStage();
-        }
-
-        return back()->with(
-            'status',
-            "Order #{$order->order_number} marked delivered. The buyer can now confirm receipt."
-        );
+        return back()->withErrors(['action' => 'The assigned rider must submit a proof photo through the rider app.']);
     }
 
     public function failed(
