@@ -379,6 +379,16 @@
                                 </ol>
                             </div>
                         @endif
+                        @if (($moneyRefunds[$order->id] ?? collect())->isNotEmpty())
+                            <section class="space-y-2 border-t border-line bg-surface px-4 py-3 text-xs text-charcoal sm:px-5" aria-label="Order refunds">
+                                <h3 class="font-semibold">Items refunds</h3>
+                                @foreach ($moneyRefunds[$order->id] as $refund)
+                                    <p class="break-all">{{ $refund->direction === 'credit' ? 'Refund issued' : 'Refund reversed' }} · ₱{{ number_format((float) $refund->amount, 2) }} · {{ \App\Support\LedgerPresentation::dateTime($refund->posted_at) }} · {{ \App\Support\LedgerPresentation::reference($refund->reference_no) }}</p>
+                                    <x-status-label :status="$refund->direction === 'credit' ? 'completed' : 'reversed'" domain="ledger" class="rounded-sm! border border-line" />
+                                @endforeach
+                                <p>Refund amounts exclude shipping.</p>
+                            </section>
+                        @endif
                         @if ($canReturn)
                             <div class="border-t border-line bg-ice-blue px-4 py-3 text-xs text-charcoal/70 sm:px-5">
                                 Something wrong with your order? You can request a return or refund until

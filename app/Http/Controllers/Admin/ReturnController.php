@@ -106,9 +106,7 @@ class ReturnController extends Controller
     /** After sending the money by GCash, Maya or bank transfer. */
     public function markRefunded(Request $request, OrderReturn $orderReturn, OrderReturns $returns)
     {
-        $data = $request->validate(['reference' => ['required', 'string', 'max:100']]);
-
-        if (! $returns->markRefunded($orderReturn, trim($data['reference']), $request->user()->id)) {
+        if (! $returns->markRefunded($orderReturn, $request->user()->id)) {
             return back()->withErrors(['return' => 'This refund was just updated. Please refresh the page.']);
         }
 

@@ -39,6 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->dontFlash(['account_number', 'account_number_masked', 'refund_account_number']);
         $exceptions->render(function (PostTooLargeException $exception, Request $request): ?JsonResponse {
             if ($request->is('api/courier/deliveries/*/delivered')) {
                 return response()->json(['message' => 'The upload request is too large. Send a proof photo of at most 5 MB.'], 413);

@@ -318,9 +318,9 @@
                                         {{ $return->refund_account_name }}</p>
                                     <div class="mt-1 flex items-center gap-2">
                                         <span
-                                            class="font-mono text-base font-bold tracking-wide">{{ $return->refund_account_number }}</span>
+                                            class="font-mono text-base font-bold tracking-wide">{{ $return->masked_account }}</span>
                                         <button type="button"
-                                            @click="navigator.clipboard.writeText(@js($return->refund_account_number)); copied = true; setTimeout(() => copied = false, 1500)"
+                                            @click="navigator.clipboard.writeText(@js($return->masked_account)); copied = true; setTimeout(() => copied = false, 1500)"
                                             class="rounded-lg border border-charcoal/20 px-2.5 py-1 text-[11px] font-bold text-charcoal transition hover:border-primary hover:text-primary">
                                             <span x-text="copied ? 'Copied' : 'Copy'">Copy</span>
                                         </button>
@@ -328,20 +328,7 @@
                                 </div>
 
                                 @if ($return->status === $R::STATUS_REFUND_PENDING)
-                                    <form method="POST" action="{{ route('admin.returns.refunded', $return) }}"
-                                        onsubmit="return confirm('Confirm the refund was sent?')"
-                                        class="mt-4 space-y-2">
-                                        @csrf
-                                        <input type="text" name="reference" required maxlength="100"
-                                            placeholder="Transfer reference number" class="{{ $inputClass }}">
-                                        <button type="submit"
-                                            class="w-full rounded-xl bg-leaf-green px-4 py-2.5 text-sm font-bold text-white transition hover:brightness-110">
-                                            Mark refund as sent
-                                        </button>
-                                        <p class="text-[11px] text-charcoal/50">
-                                            Send the money first, then record the reference. The buyer sees it.
-                                        </p>
-                                    </form>
+                                    <a href="{{ route('admin.refunds.index') }}" class="btn btn-primary mt-4">Open refunds queue</a>
                                 @elseif ($return->status === $R::STATUS_REFUNDED)
                                     <p class="mt-3 text-sm text-leaf-green">
                                         Sent {{ $return->refunded_at?->format('M d, Y g:i A') }}

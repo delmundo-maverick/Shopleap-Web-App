@@ -88,6 +88,10 @@ class ParcelLifecycle
                 $after($order);
             }
 
+            if ($to === Order::STATUS_COMPLETED) {
+                app(OrderLedger::class)->completed($order);
+            }
+
             return true;
         });
     }

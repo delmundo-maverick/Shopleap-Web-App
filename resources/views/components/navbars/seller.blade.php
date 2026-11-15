@@ -64,6 +64,8 @@
             ],
         ],
         'Insights' => [
+            ['route' => 'seller.earnings.index', 'label' => 'Earnings', 'key' => 'earnings'],
+            ['route' => 'seller.payouts.index', 'label' => 'Payouts', 'key' => 'payouts'],
             [
                 'route' => 'seller.reports.index',
                 'label' => 'Generate Report',
@@ -96,7 +98,7 @@
             ],
         ],
     ];
-    $currentOrder = request()->route('order');
+    $currentOrder = request()->routeIs('seller.orders.show') ? request()->route('order') : null;
     $orderStatus = $currentOrder instanceof \App\Models\Order ? $currentOrder->status : request('status', 'all');
     $prepareSelected =
         request()->routeIs('seller.orders.*') &&

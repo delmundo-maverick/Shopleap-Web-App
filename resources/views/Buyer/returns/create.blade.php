@@ -166,7 +166,7 @@
                         class="rounded-xl border border-light-gray px-3.5 py-2.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
 
                     <input type="text" name="refund_account_number" value="{{ old('refund_account_number') }}" required
-                        maxlength="60" inputmode="numeric" placeholder="Mobile or account number"
+                        minlength="4" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" autocomplete="off" placeholder="Last 4 account digits only"
                         class="rounded-xl border border-light-gray px-3.5 py-2.5 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
                 </div>
             </section>
