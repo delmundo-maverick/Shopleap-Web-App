@@ -12,6 +12,8 @@ use App\Support\Portal;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\PostTooLargeException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -37,6 +39,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(function (PostTooLargeException $exception, Request $request): ?JsonResponse {
+            if ($request->is('api/courier/deliveries/*/delivered')) {
+                return response()->json(['message' => 'The upload request is too large. Send a proof photo of at most 5 MB.'], 413);
+            }
+
+            return null;
+        });
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

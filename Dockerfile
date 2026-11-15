@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     supervisor \
     libpng-dev \
     libjpeg-dev \
+    libwebp-dev \
     libfreetype6-dev \
     libzip-dev \
     libpq-dev \
@@ -33,7 +34,7 @@ RUN apt-get update && apt-get install -y \
 
 # Configure & Install PHP extensions required by your composer.json
 RUN docker-php-ext-configure intl \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install pdo pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip intl opcache
 
 # Copy production OPcache and PHP settings (zz- prefix loads last, so it overrides defaults)

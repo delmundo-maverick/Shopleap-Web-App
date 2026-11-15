@@ -27,6 +27,7 @@ use App\Http\Controllers\Buyer\SellerFollowController;
 use App\Http\Controllers\Buyer\ShopController;
 use App\Http\Controllers\Buyer\VoucherController as BuyerVoucherController;
 use App\Http\Controllers\Buyer\WishlistController;
+use App\Http\Controllers\DeliveryProofController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\Logistics\DashboardController as LogisticsDashboardController;
 use App\Http\Controllers\Logistics\DeliveryController;
@@ -767,3 +768,12 @@ Route::middleware(['auth', 'admin', 'throttle:mutations'])
                     });
             });
     });
+
+Route::middleware(['auth', 'logistics', 'hub.scope'])->domain(Portal::host('logistics'))->group(function (): void {
+    Route::get('/logistics/delivery-proofs/{order:order_number}', [DeliveryProofController::class, 'show'])->name('logistics.delivery-proofs.show');
+    Route::get('/logistics/delivery-proofs/{order:order_number}/image', [DeliveryProofController::class, 'image'])->name('logistics.delivery-proofs.image');
+});
+Route::middleware(['auth', 'admin'])->domain(Portal::host('admin'))->group(function (): void {
+    Route::get('/admin/delivery-proofs/{order:order_number}', [DeliveryProofController::class, 'show'])->name('admin.delivery-proofs.show');
+    Route::get('/admin/delivery-proofs/{order:order_number}/image', [DeliveryProofController::class, 'image'])->name('admin.delivery-proofs.image');
+});

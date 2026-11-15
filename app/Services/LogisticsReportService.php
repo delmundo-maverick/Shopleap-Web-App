@@ -184,16 +184,29 @@ class LogisticsReportService
 
     private function delivery(int $hubId, Carbon $from, Carbon $to, array $filters): array
     {
-        $orders = $this->scopedOrders($hubId, $filters, true)->whereBetween('delivered_at', [$from, $to])->with('deliveryRider')->get();
+        $orders = $this->scopedOrders($hubId, $filters, true)->whereBetween('delivered_at', [$from, $to])->with(['deliveryRider', 'deliveryProof'])->get();
+        $orders = $orders->filter(fn (Order $order) => empty($filters['proof']) || ($filters['proof'] === 'with' ? $order->deliveryProof !== null : $order->deliveryProof === null));
         $first = $orders->where('delivery_attempts', 0)->count();
-        $rows = $orders->map(fn (Order $order) => ['order' => '#'.$order->order_number, 'date' => $order->delivered_at->format('Y-m-d H:i'), 'rider' => $order->deliveryRider?->full_name ?? 'Unassigned', 'attempts' => (int) $order->delivery_attempts, 'time' => $this->averageDays(collect([$order]))])->all();
+        $rows = $orders->map(fn (Order $order) => ['proof' => $this->proofLabel($order, $hubId), 'proof_order' => $order->deliveryProof && (int) $order->deliveryProof->logistics_profile_id === $hubId && ! $order->deliveryProof->expired_at ? $order->order_number : null, 'order' => '#'.$order->order_number, 'date' => $order->delivered_at->format('Y-m-d H:i'), 'rider' => $order->deliveryRider?->full_name ?? 'Unassigned', 'attempts' => (int) $order->delivery_attempts, 'time' => $this->averageDays(collect([$order]))])->all();
         $daily = $orders->groupBy(fn (Order $order) => $order->delivered_at->format('Y-m-d'))->sortKeys()->map->count();
         $daily = $this->days($from, $to, $daily);
 
         return $this->report('Delivery Performance', $this->cards(['Delivered' => $orders->count(), 'First-attempt success' => $this->percent($first, $orders->count()), 'Required reattempts' => $orders->count() - $first, 'Average delivery time' => $this->averageDays($orders)]),
-            $this->columns(['order' => 'Order', 'date' => 'Delivered at', 'rider' => 'Delivery rider', 'attempts' => 'Failed attempts', 'time' => 'Order to delivery']), $rows,
+            $this->columns(['order' => 'Order', 'date' => 'Delivered at', 'rider' => 'Delivery rider', 'attempts' => 'Failed attempts', 'time' => 'Order to delivery', 'proof' => 'Proof of delivery']), $rows,
             $this->chart('Deliveries by day', $daily->keys()->all(), [['label' => 'Delivered', 'data' => $daily->values()->all()]], 'line'),
             ['Based on delivered_at, including orders created before the period. Delivery is credited to the destination hub.', 'delivery_attempts records failed attempts. Zero means delivered without a failed attempt. No delivery deadline is stored, so an on-time/late SLA cannot be calculated.']);
+    }
+
+    private function proofLabel(Order $order, int $hubId): string
+    {
+        if (! $order->deliveryProof) {
+            return 'No proof (before feature)';
+        }
+        if ((int) $order->deliveryProof->logistics_profile_id !== $hubId) {
+            return 'Restricted to delivery hub';
+        }
+
+        return $order->deliveryProof->expired_at ? 'Proof expired' : 'View proof';
     }
 
     private function shippingEarnings(int $hubId, Carbon $from, Carbon $to, array $filters, bool $paginate): array
@@ -210,6 +223,11 @@ class LogisticsReportService
         if (! empty($filters['destination_area'])) {
             $query->where(fn (Builder $destination) => $destination->where('ship_municipality', $filters['destination_area'])->orWhere('delivery_area', $filters['destination_area']));
         }
+        if (($filters['proof'] ?? '') === 'with') {
+            $query->whereHas('deliveryProof');
+        } elseif (($filters['proof'] ?? '') === 'missing') {
+            $query->whereDoesntHave('deliveryProof');
+        }
         $totals = $this->earnings->totals($query);
         $daily = (clone $query)->toBase()->selectRaw('DATE(delivered_at) AS day, COUNT(*) AS parcels')->groupByRaw('DATE(delivered_at)')->pluck('parcels', 'day');
         $daily = $this->days($from, $to, $daily)->map(fn ($count) => (int) $count);
@@ -219,9 +237,10 @@ class LogisticsReportService
         $riders = $groups->map(fn ($group) => ['rider' => $couriers->get($group->courier_id)?->full_name ?? 'Unassigned',
             'barangay' => $couriers->get($group->courier_id)?->barangay ?? '-', 'parcels' => (int) $group->parcels,
             'pay' => $group->rider_pay === null ? '-' : $this->currency((float) $group->rider_pay)])->all();
-        $details = (clone $query)->with(['earningCourier', 'deliveryRider'])->orderByDesc('delivered_at')->orderByDesc('id');
+        $details = (clone $query)->with(['earningCourier', 'deliveryRider', 'deliveryProof'])->orderByDesc('delivered_at')->orderByDesc('id');
         $paginator = $paginate ? $details->paginate(25)->withQueryString() : null;
         $rows = ($paginator ? $paginator->getCollection() : $details->lazy(250))->map(fn (Order $order) => [
+            'proof' => $this->proofLabel($order, $hubId), 'proof_order' => $order->deliveryProof && (int) $order->deliveryProof->logistics_profile_id === $hubId && ! $order->deliveryProof->expired_at ? $order->order_number : null,
             'date' => $order->delivered_at->format('Y-m-d H:i'), 'order' => '#'.$order->order_number,
             'rider' => ($order->earnings_recorded_at ? $order->earningCourier : $order->deliveryRider)?->full_name ?? 'Unassigned',
             'fees' => $order->delivered_shipping_fee === null ? '-' : $this->currency((float) $order->delivered_shipping_fee),
@@ -235,7 +254,7 @@ class LogisticsReportService
 
         return ['title' => 'Shipping Fees & Earnings', 'summary' => $this->cards(['Parcels delivered' => $totals['deliveries'],
             'Shipping fees collected' => $money($totals['shipping_fees']), 'Rider payouts owed' => $money($totals['rider_pay']), 'Net margin' => $money($totals['margin'])]),
-            'secondary' => $riders, 'columns' => $this->columns(['date' => 'Date', 'order' => 'Order', 'rider' => 'Rider', 'fees' => 'Shipping fee', 'pay' => 'Rider pay', 'margin' => 'Margin']),
+            'secondary' => $riders, 'columns' => $this->columns(['date' => 'Date', 'order' => 'Order', 'rider' => 'Rider', 'fees' => 'Shipping fee', 'pay' => 'Rider pay', 'margin' => 'Margin', 'proof' => 'Proof of delivery']),
             'rows' => $rows, 'paginator' => $paginator, 'chart' => $this->chart('Parcels delivered per day', $daily->keys()->all(), [['label' => 'Delivered', 'data' => $daily->values()->all()]], 'line'),
             'notes' => ['Delivery is credited to the recorded holding hub and courier. Legacy deliveries use their destination hub and assigned rider for parcel counts only.',
                 'Money totals include recorded delivery snapshots only. Missing pay and margins are shown as -; no old orders are backfilled.',

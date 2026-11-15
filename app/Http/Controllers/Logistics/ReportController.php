@@ -85,6 +85,7 @@ class ReportController extends Controller
             'seller_id' => ['nullable', 'integer', Rule::in($service->scopedOrders($hub->id)->distinct()->pluck('seller_id')->all())],
             'origin_area' => ['nullable', 'string', 'max:255'], 'destination_area' => ['nullable', 'string', 'max:255'],
             'payment_type' => ['nullable', Rule::in(['COD'])],
+            'proof' => ['nullable', Rule::in(['with', 'missing'])],
         ]);
         $preset = $data['preset'] ?? '30d';
         $today = now();

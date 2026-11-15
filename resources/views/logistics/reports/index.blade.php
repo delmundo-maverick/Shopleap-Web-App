@@ -20,6 +20,9 @@
                 @endforeach
                 <div class="flex flex-wrap items-end gap-2"><button type="submit" class="btn btn-primary" data-report-submit>Generate report</button><a class="btn btn-outline" href="{{ route('logistics.reports.index') }}">Reset</a></div>
             </div>
+            @if (in_array($type, ['delivery_performance', 'shipping_earnings'], true))
+                <div><label for="report-proof" class="mb-1 block text-xs font-semibold">Proof of delivery</label><select id="report-proof" name="proof" class="w-full rounded border border-line px-3 py-2 text-sm sm:w-64"><option value="">All delivered parcels</option><option value="with" @selected(($params['proof'] ?? '') === 'with')>With proof</option><option value="missing" @selected(($params['proof'] ?? '') === 'missing')>Missing proof</option></select></div>
+            @endif
             <p class="text-xs text-charcoal/55">Payments are COD; prepaid payments are not supported. Dates use {{ config('app.timezone') }}. Change a date to select a custom range.</p>
         </form>
     </section>
@@ -52,7 +55,7 @@
             <div class="flex items-center justify-between gap-3 border-b border-line px-4 py-3"><h2 class="text-sm font-bold">{{ $type === 'shipping_earnings' ? 'Delivered parcels' : 'Detailed breakdown' }}</h2><span class="text-xs text-charcoal/55">{{ $rows->total() }} records</span></div>
             <x-seller.data-table label="Delivered parcels and report details" responsive="scroll" class="rounded bg-white shadow-none">
                 <x-slot:head><tr>@foreach ($report['columns'] as $column)<th scope="col" class="whitespace-nowrap px-4 py-3 font-semibold {{ $column['align'] === 'right' ? 'text-right' : '' }}">{{ $column['label'] }}</th>@endforeach</tr></x-slot:head>
-                @forelse ($rows as $row)<tr>@foreach ($report['columns'] as $column)<td class="px-4 py-3 align-top {{ $column['align'] === 'right' ? 'text-right tabular-nums' : '' }}">{{ $row[$column['key']] ?? '' }}</td>@endforeach</tr>
+                @forelse ($rows as $row)<tr>@foreach ($report['columns'] as $column)<td class="px-4 py-3 align-top {{ $column['align'] === 'right' ? 'text-right tabular-nums' : '' }}">@if ($column['key'] === 'proof' && !empty($row['proof_order']))<x-logistics.proof-action :code="$row['proof_order']" />@else{{ $row[$column['key']] ?? '' }}@endif</td>@endforeach</tr>
                 @empty<tr><td colspan="{{ count($report['columns']) }}" class="py-8 text-center">No records on this page.</td></tr>@endforelse
             </x-seller.data-table>
             @if ($rows->hasPages())<div class="border-t border-line p-4">{{ $rows->links() }}</div>@endif
@@ -60,4 +63,5 @@
     @endif
     <aside class="rounded-lg border border-line bg-white p-4 text-xs leading-relaxed text-charcoal/65"><h2 class="mb-2 font-bold text-charcoal">How this report is calculated</h2><ul class="list-inside list-disc space-y-1">@foreach ($report['notes'] as $note)<li>{{ $note }}</li>@endforeach<li>All filters also apply to CSV and PDF exports. Exports include all matching rows.</li></ul></aside>
     <script id="reportData" type="application/json">@json(['chart' => $report['chart']])</script>
+    <x-logistics.proof-modal />
 </x-logistics.layout>

@@ -9,7 +9,7 @@
     $max = \App\Models\Order::MAX_DELIVERY_ATTEMPTS;
 @endphp
 
-<x-logistics.layout title="Deliveries" :subtitle="$orders->total() . ' parcel(s) in this view'" active="deliveries">
+<x-logistics.layout title="Deliveries" :subtitle="$orders->total() . ' parcel(s) in this view'" active="deliveries" :scripts="['resources/js/pages/logistics/delivery-proofs.js']">
 
     <div class="frost-panel rounded-2xl px-4 py-3 text-sm">
         <span class="text-charcoal/60">Shipping fees earned (delivered parcels):</span>
@@ -89,14 +89,7 @@
                             </form>
                         @elseif ($tab === 'out')
                             <div class="flex flex-wrap items-start gap-3">
-                                <form method="POST" action="{{ route('logistics.deliveries.delivered', $order) }}"
-                                    onsubmit="return confirm('Confirm the parcel was handed over and ₱{{ number_format($order->grand_total, 2) }} was collected?')">
-                                    @csrf
-                                    <button type="submit"
-                                        class="rounded-xl bg-leaf-green px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110">
-                                        Mark Delivered
-                                    </button>
-                                </form>
+                                <p class="text-sm text-charcoal/60">The assigned rider records delivery with a proof photo in the rider app.</p>
                                 <details class="min-w-[18rem] flex-1">
                                     <summary
                                         class="cursor-pointer rounded-xl border border-sale-red/30 px-4 py-2.5 text-sm font-semibold text-sale-red">
@@ -148,6 +141,16 @@
                                     parcel to seller</button>
                             </form>
                         @else
+                            <section class="mb-3 rounded border border-line bg-white p-3">
+                                <h3 class="mb-2 text-sm font-semibold">Proof of delivery</h3>
+                                @if (!$order->deliveryProof)
+                                    <p class="text-xs">No proof (before feature)</p>
+                                @elseif ($order->deliveryProof->expired_at)
+                                    <p class="text-xs">Proof expired</p>
+                                @else
+                                    <x-logistics.proof-action :code="$order->order_number" />
+                                @endif
+                            </section>
                             <p class="text-xs text-charcoal/50">
                                 Delivered {{ ($order->delivered_at ?? $order->updated_at)->diffForHumans() }}.
                                 COD collected:
@@ -168,4 +171,5 @@
         <div>{{ $orders->links() }}</div>
     @endif
 
+    <x-logistics.proof-modal />
 </x-logistics.layout>
