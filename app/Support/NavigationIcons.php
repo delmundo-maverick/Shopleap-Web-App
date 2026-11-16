@@ -75,6 +75,11 @@ class NavigationIcons
         }
 
         foreach ([
+            'company.reports' => 'reports', 'company.finance' => 'ledger', 'company.activity-log' => 'logs',
+            'company.announcements.*' => 'announcements', 'logistics.company-announcements.*' => 'announcements', 'company.settings*' => 'settings',
+            'company.coverage' => 'areas', 'company.transfers.*' => 'outbound', 'company.attention' => 'history',
+            'company.map' => 'areas', 'company.managers.*' => 'account',
+            'company.hubs.*' => 'hubs', 'admin.companies.*' => 'hubs',
             'logistics.rider-rate.*' => 'rider-rate',
             'seller.earnings.*' => 'earnings', 'admin.ledger.*' => 'ledger', 'logistics.money.*' => 'cash',
             '*.payouts.*' => 'payouts', 'admin.refunds.*' => 'refunds',

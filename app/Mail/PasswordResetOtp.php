@@ -13,14 +13,14 @@ class PasswordResetOtp extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Reset your Shopleap '.($this->role === 'super_admin' ? 'Admin' : ucfirst($this->role)).' account password');
+        return new Envelope(subject: 'Reset your Shopleap '.($this->role === 'super_admin' ? 'Admin' : str($this->role)->replace('_', ' ')->title()).' account password');
     }
 
     public function content(): Content
     {
         return new Content(view: 'emails.otp', with: [
             'otp' => $this->otp,
-            'loginUrl' => Portal::url($this->role === 'logistics' ? 'logistics' : ($this->role === 'super_admin' ? 'admin' : 'main'), 'login'),
+            'loginUrl' => Portal::url(in_array($this->role, ['logistics', 'logistics_company'], true) ? 'logistics' : ($this->role === 'super_admin' ? 'admin' : 'main'), 'login'),
             'purpose' => 'password_reset',
             'heading' => 'Reset your password',
             'action' => 'to reset your Shopleap password',

@@ -104,5 +104,8 @@
             ],
         ],
     ];
+    if (auth()->user()?->logisticsProfile?->company_id) {
+        $sections['General'][] = ['route' => 'logistics.company-announcements.index', 'label' => 'Company announcements'];
+    }
 @endphp
 <x-nav.workspace label="Logistics Center" home="logistics.dashboard" :sections="$sections" :active="$active" class="workspace-navigation" />

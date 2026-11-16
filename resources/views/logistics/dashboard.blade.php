@@ -15,6 +15,7 @@
         <div class="min-w-0 flex-1">
             <x-seller.page-header :title="$hub->business_name" :description="'Logistics dashboard · '.$now->format('l, F j, Y').' · '.config('app.timezone')"><x-notification-bell /></x-seller.page-header>
             <main class="min-w-0 space-y-5 p-4 sm:space-y-6 sm:p-6">
+                <x-company.announcement-banners :receipts="$companyAnnouncements" />
                 <section aria-labelledby="attention-title" class="rounded-2xl border border-warning/30 bg-warning/5 p-4 sm:p-5">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <h2 id="attention-title" class="flex items-center gap-2 text-sm font-semibold"><x-nav.icon name="reports" class="text-warning" />Needs attention</h2>

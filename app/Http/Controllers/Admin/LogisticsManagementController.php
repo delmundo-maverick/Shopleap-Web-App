@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Company;
 use App\Models\LogisticsProfile;
 use App\Notifications\LogisticsDecisionNotification;
 use App\Services\ActivityLogger;
@@ -14,7 +15,13 @@ class LogisticsManagementController extends Controller
 {
     public function index(Request $request)
     {
-        $query = LogisticsProfile::with('user')->latest();
+        $request->validate(['company' => ['nullable', 'uuid']]);
+        $query = LogisticsProfile::with(['user', 'company' => fn ($companies) => $companies->withCount('hubs')
+            ->with(['users' => fn ($users) => $users->where('role', 'logistics_company')->select(['id', 'company_id', 'name', 'email', 'email_verified_at'])])])->latest();
+
+        if ($request->filled('company')) {
+            $query->whereHas('company', fn ($companies) => $companies->where('public_code', $request->input('company')));
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -22,6 +29,9 @@ class LogisticsManagementController extends Controller
                 $q->where('first_name', 'ilike', "%{$search}%")
                     ->orWhere('last_name', 'ilike', "%{$search}%")
                     ->orWhere('business_name', 'ilike', "%{$search}%")
+                    ->orWhere('company_name', 'ilike', "%{$search}%")
+                    ->orWhereHas('company', fn ($companies) => $companies->where('name', 'ilike', "%{$search}%"))
+                    ->orWhereHas('company.users', fn ($accounts) => $accounts->where('role', 'logistics_company')->where('email', 'ilike', "%{$search}%"))
                     ->orWhereHas('user', fn ($uq) => $uq->where('email', 'ilike', "%{$search}%"));
             });
         }
@@ -36,12 +46,15 @@ class LogisticsManagementController extends Controller
 
         $logisticsPartners = $query->paginate(15)->withQueryString();
 
-        return view('admin.registrations.logistics.index', compact('logisticsPartners'));
+        $companies = Company::select(['public_code', 'name'])->orderBy('name')->get();
+
+        return view('admin.registrations.logistics.index', compact('logisticsPartners', 'companies'));
     }
 
     public function details(LogisticsProfile $logisticsProfile)
     {
-        $logisticsProfile->load('user');
+        $logisticsProfile->load(['user', 'company' => fn ($companies) => $companies->withCount('hubs')
+            ->with(['users' => fn ($users) => $users->where('role', 'logistics_company')->select(['id', 'company_id', 'name', 'email', 'email_verified_at'])])]);
 
         return response()->json([
             'id' => $logisticsProfile->id,
@@ -49,15 +62,22 @@ class LogisticsManagementController extends Controller
             'sex' => $logisticsProfile->sex,
             'email' => $logisticsProfile->user->email,
             'contact_no' => $logisticsProfile->contact_no,
-            'birthday' => $logisticsProfile->birthday->format('M d, Y'),
+            'birthday' => $logisticsProfile->birthday?->format('M d, Y'),
             'age' => $logisticsProfile->age,
             'address' => "{$logisticsProfile->street_address}, {$logisticsProfile->barangay}, {$logisticsProfile->municipality}, {$logisticsProfile->province}",
             'business_name' => $logisticsProfile->business_name,
+            'company_name' => $logisticsProfile->company?->name ?? $logisticsProfile->company_name,
+            'company_linked' => $logisticsProfile->company !== null,
+            'company_status' => $logisticsProfile->company?->status,
+            'company_hub_count' => $logisticsProfile->company?->hubs_count ?? 0,
+            'company_account_email' => $logisticsProfile->company?->users->first()?->email,
+            'company_account_verified' => $logisticsProfile->company?->users->first()?->email_verified_at !== null,
+            'company_url' => $logisticsProfile->company ? route('admin.companies.index', ['search' => $logisticsProfile->company->name]) : null,
             'service_regions' => $logisticsProfile->service_regions ?? [],
             'sec_url' => $logisticsProfile->sec_certificate_path ? Storage::disk('r2')->temporaryUrl($logisticsProfile->sec_certificate_path, now()->addMinutes(10)) : null,
             'bir_url' => $logisticsProfile->bir_registration_path ? Storage::disk('r2')->temporaryUrl($logisticsProfile->bir_registration_path, now()->addMinutes(10)) : null,
-            'id_url' => Storage::disk('r2')->temporaryUrl($logisticsProfile->id_upload_path, now()->addMinutes(10)),
-            'permit_url' => Storage::disk('r2')->temporaryUrl($logisticsProfile->business_permit_path, now()->addMinutes(10)),
+            'id_url' => $logisticsProfile->id_upload_path ? Storage::disk('r2')->temporaryUrl($logisticsProfile->id_upload_path, now()->addMinutes(10)) : null,
+            'permit_url' => $logisticsProfile->business_permit_path ? Storage::disk('r2')->temporaryUrl($logisticsProfile->business_permit_path, now()->addMinutes(10)) : null,
             'registration_status' => $logisticsProfile->status,
             'rejection_reason' => $logisticsProfile->rejection_reason,
             'account_status' => $logisticsProfile->user->account_status,

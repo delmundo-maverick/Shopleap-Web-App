@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\PlatformPolicy;
+use App\Models\PlatformSetting;
+use App\Support\Portal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -29,12 +31,13 @@ class PolicyController extends Controller
         return $this->content(PlatformPolicy::PRIVACY_SLUG);
     }
 
-    public function show(PlatformPolicy $policy): View
+    public function show(Request $request, PlatformPolicy $policy): View
     {
         return view('policies.show', [
             'policy' => $policy,
-            'backUrl' => route('home'),
-            'backLabel' => 'Back to Shopleap',
+            'backUrl' => $this->backUrl($request),
+            'backLabel' => 'Back',
+            'supportEmail' => PlatformSetting::get('support_email', 'support@shopleap.shop'),
         ]);
     }
 
@@ -46,7 +49,8 @@ class PolicyController extends Controller
         return view('policies.show', [
             'policy' => $policy,
             'backUrl' => $backUrl,
-            'backLabel' => $backUrl === route('home') ? 'Back to Shopleap' : 'Back',
+            'backLabel' => $backUrl === Portal::url('main') ? 'Back to Shopleap' : 'Back',
+            'supportEmail' => PlatformSetting::get('support_email', 'support@shopleap.shop'),
         ]);
     }
 
@@ -67,7 +71,7 @@ class PolicyController extends Controller
 
         return response()->json([
             'title' => $policy->title,
-            'content' => $policy->contentHtml(),
+            'content' => $policy->contentHtml(3),
             'version' => $policy->version,
             'updated_at' => $policy->updated_at?->toIso8601String(),
             'updated_at_human' => $policy->updated_at?->format('F j, Y'),
@@ -92,6 +96,6 @@ class PolicyController extends Controller
             }
         }
 
-        return route('home');
+        return Portal::url('main');
     }
 }

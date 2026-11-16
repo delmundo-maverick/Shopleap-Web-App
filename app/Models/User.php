@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -22,6 +23,8 @@ use Laravel\Sanctum\HasApiTokens;
     'email',
     'password',
     'role',
+    'company_id',
+    'phone',
     'account_status',
     'email_verified_at',
     'avatar_path',
@@ -41,10 +44,15 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
+    protected $attributes = ['logistics_session_version' => 0];
+
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_login_at' => 'datetime',
+            'logistics_login_suspended_at' => 'datetime',
+            'logistics_session_version' => 'integer',
             'terms_accepted_at' => 'datetime',
             'privacy_accepted_at' => 'datetime',
             'password' => 'hashed',
@@ -71,6 +79,11 @@ class User extends Authenticatable
         $disk = Storage::disk('r2_public');
 
         return $disk->url($this->avatar_path);
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function logisticsProfile()

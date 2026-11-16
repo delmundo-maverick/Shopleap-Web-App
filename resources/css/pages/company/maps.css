@@ -1,0 +1,60 @@
+.company-map {
+    isolation: isolate;
+    z-index: 0;
+    min-height: 22rem;
+    height: min(65vh, 38rem);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-ice-blue);
+    font-family: var(--font-sans);
+}
+
+.company-pin-picker { height: 18rem; min-height: 18rem; }
+.company-map-marker { background: transparent; border: 0; }
+.company-map-pin {
+    display: block;
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--color-surface);
+    border-radius: var(--radius-sm);
+    outline: 1px solid var(--color-charcoal);
+}
+.company-map-pin-active { background: var(--color-success); }
+.company-map-pin-suspended { background: var(--color-danger); }
+.company-map-cluster {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-primary);
+    color: var(--color-surface);
+    border: 2px solid var(--color-surface);
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 14px;
+}
+.company-map .leaflet-popup-content-wrapper,
+.company-map .leaflet-popup-tip {
+    background: var(--color-surface);
+    color: var(--color-charcoal);
+    box-shadow: none;
+    border-radius: var(--radius-sm);
+}
+.company-map .leaflet-popup-content-wrapper { border: 1px solid var(--color-line); }
+.company-map .leaflet-popup-content { margin: 1rem; line-height: 1.5; min-width: 12rem; }
+.company-map .leaflet-popup-content p { margin: .375rem 0; }
+.company-map .leaflet-popup-content .btn-primary { color: var(--color-surface); margin-top: .75rem; }
+.company-map .leaflet-bar { border: 1px solid var(--color-line); box-shadow: none; border-radius: var(--radius-sm); }
+.company-map .leaflet-bar a { background: var(--color-surface); color: var(--color-charcoal); border-color: var(--color-line); }
+.company-map .leaflet-bar a:hover,
+.company-map .leaflet-bar a:focus { background: var(--color-ice-blue); color: var(--color-primary); }
+.company-map .leaflet-bar a.leaflet-disabled { color: var(--color-landing-muted); }
+.company-map .leaflet-control-attribution { background: var(--color-surface); color: var(--color-charcoal); }
+.company-map .leaflet-control-attribution a { color: var(--color-primary); }
+.company-map a.leaflet-popup-close-button { color: var(--color-charcoal); }
+.company-map a.leaflet-popup-close-button:hover { color: var(--color-primary); }
+.company-map-list { max-height: 38rem; overflow-y: auto; }
+.company-map-list [aria-current="true"] { border-color: var(--color-primary); background: var(--color-landing-blue); }
+@media (max-width: 63.99rem) {
+    .company-map a.leaflet-popup-close-button:hover { color: var(--color-primary); }
+.company-map-list { max-height: none; overflow-y: visible; }
+}

@@ -15,6 +15,8 @@ class DashboardController extends Controller
         $hub = HubContext::require($request);
         $data = $request->validated();
 
-        return view('logistics.dashboard', $dashboard->build($hub, $data['range'] ?? '7d', $data['queue'] ?? 'all'));
+        return view('logistics.dashboard', $dashboard->build($hub, $data['range'] ?? '7d', $data['queue'] ?? 'all') + [
+            'companyAnnouncements' => CompanyAnnouncementController::receipts($request)->whereNull('dismissed_at')->with('announcement')->latest()->orderByDesc('id')->limit(3)->get(),
+        ]);
     }
 }

@@ -35,6 +35,25 @@ class IsolatePortalSession
             return redirect()->route('login');
         }
 
+        if ($user?->role === 'logistics' && ! $request->session()->has('logistics_session_version') && Auth::viaRemember()
+            && $user->logistics_login_suspended_at === null && $user->account_status === 'active') {
+            $request->session()->put('logistics_session_version', (int) $user->logistics_session_version);
+            $user->forceFill(['last_login_at' => now()])->save();
+        }
+
+        if ($user?->role === 'logistics' && ($user->logistics_login_suspended_at !== null
+            || (int) $request->session()->get('logistics_session_version', 0) !== (int) $user->logistics_session_version)) {
+            $message = $user->logistics_login_suspended_at !== null
+                ? 'Your manager login has been suspended. Please contact your company.'
+                : 'Your session has ended. Please sign in again.';
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            abort_if($request->expectsJson(), 403, $message);
+
+            return redirect()->route('login')->with('status', $message);
+        }
+
         return $next($request);
     }
 }
