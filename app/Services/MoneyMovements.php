@@ -44,6 +44,7 @@ class MoneyMovements
                 ]);
                 $this->allocateCash($record, $orders, $amount, 'confirmed');
                 $this->notifier->moneyChanged('cash_handover', $record);
+                DB::afterCommit(fn () => RiderRealtime::notify($riderId));
 
                 return $record;
             });
@@ -69,6 +70,8 @@ class MoneyMovements
                 $this->allocateCash($record, $orders, $amount, 'settled');
                 DB::table('rider_cash_handovers')->where('id', $record->id)->update(['status' => 'settled', 'settled_amount' => $record->short_amount,
                     'settled_by' => $actorId, 'settled_at' => now(), 'settlement_note' => $note, 'updated_at' => now()]);
+
+                DB::afterCommit(fn () => RiderRealtime::notify((int) $record->rider_id));
 
                 return DB::table('rider_cash_handovers')->where('id', $record->id)->firstOrFail();
             });

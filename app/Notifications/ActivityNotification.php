@@ -8,8 +8,9 @@ use Illuminate\Notifications\Notification;
 class ActivityNotification extends Notification
 {
     /**
-     * @param  string       $kind  e.g. cancel.requested, return.refunded
-     * @param  string|null  $url   a path inside the site (never an absolute address)
+     * @param  string  $kind  e.g. cancel.requested, return.refunded
+     * @param  string|null  $url  a path inside the site (never an absolute address)
+     * @param  bool  $refreshRider  False when the operation already schedules a rider refresh.
      */
     public function __construct(
         public string $kind,
@@ -17,6 +18,7 @@ class ActivityNotification extends Notification
         public string $body,
         public ?string $url = null,
         public array $meta = [],
+        public bool $refreshRider = true,
     ) {}
 
     public function via(object $notifiable): array

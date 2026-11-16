@@ -67,6 +67,7 @@ class OrderTransitions
             return DB::transaction(function () use ($order, $actorId, $collected, $expectedCourierId, $expectedHubId, $proofImage, $proofData, &$stored, &$committed): bool {
                 $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
                 $order->setRawAttributes($locked->getAttributes(), true);
+                $order->unsetRelation('deliveryProof');
                 $alreadyDelivered = in_array($order->status, RiderEarnings::EARNED_STATUSES, true);
                 $courierId = $alreadyDelivered ? ($order->earning_courier_id ?? $order->delivery_rider_id) : $order->delivery_rider_id;
                 $hubId = $alreadyDelivered ? ($order->earning_hub_id ?? $order->current_hub_id ?? $order->logistics_profile_id) : ($order->current_hub_id ?? $order->logistics_profile_id);
@@ -74,10 +75,10 @@ class OrderTransitions
                     || ($expectedHubId !== null && (int) $hubId !== $expectedHubId)) {
                     return false;
                 }
-                if ($alreadyDelivered) {
+                if ($alreadyDelivered && $order->deliveryProof()->exists()) {
                     return true;
                 }
-                if ($order->status !== Order::STATUS_OUT_FOR_DELIVERY || $order->delivery_rider_id === null) {
+                if (! $alreadyDelivered && ($order->status !== Order::STATUS_OUT_FOR_DELIVERY || $order->delivery_rider_id === null)) {
                     return false;
                 }
                 if ($hubId !== null) {
@@ -96,6 +97,9 @@ class OrderTransitions
                 DB::afterCommit(function () use (&$committed): void {
                     $committed = true;
                 });
+                if ($alreadyDelivered) {
+                    return true;
+                }
                 $recordedAt = now();
                 $rate = $this->earnings->currentRate($hubId);
                 $expected = round((float) $order->total_amount + (float) $order->shipping_fee, 2);
@@ -154,7 +158,9 @@ class OrderTransitions
             if ($exception instanceof ValidationException) {
                 throw $exception;
             }
-            throw new HttpException(503, 'Delivery could not be recorded. Please retry.');
+            report($exception);
+
+            throw new HttpException(503, 'Delivery could not be recorded. Please retry.', $exception);
         }
     }
 

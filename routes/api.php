@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Courier\DeliveryController;
 use App\Http\Controllers\Api\Courier\EarningsController;
 use App\Http\Controllers\Api\Courier\HistoryController;
 use App\Http\Controllers\Api\Courier\NotificationController;
+use App\Http\Controllers\Api\Courier\OrderScanController;
 use App\Http\Controllers\Api\Courier\PickupController;
 use App\Http\Controllers\Api\HubController;
 use App\Http\Controllers\MoneyReceiptController;
@@ -64,6 +65,10 @@ Route::prefix('courier')->group(function () {
 
     // Approved, active couriers of approved hubs.
     Route::middleware(['auth:sanctum', 'courier:approved', 'throttle:courier-reads', 'throttle:mutations'])->group(function () {
+
+        Route::get('/orders/scan/{code}', OrderScanController::class)
+            ->where('code', '.+')
+            ->name('api.courier.orders.scan');
 
         // Pickups.
         Route::get('/pickups', [PickupController::class, 'index']);

@@ -65,6 +65,12 @@ class ParcelLifecycle
                 $where($query);
             }
 
+            $previous = (clone $query)->lockForUpdate()->first();
+
+            if (! $previous) {
+                return false;
+            }
+
             if ($query->update(['status' => $to] + $values) === 0) {
                 return false;
             }
@@ -90,6 +96,21 @@ class ParcelLifecycle
 
             if ($to === Order::STATUS_COMPLETED) {
                 app(OrderLedger::class)->completed($order);
+            }
+
+            if ($previous->status !== $order->status
+                || $previous->pickup_rider_id !== $order->pickup_rider_id
+                || $previous->delivery_rider_id !== $order->delivery_rider_id) {
+                $courierProfileIds = array_unique(array_filter([
+                    $previous->pickup_rider_id, $previous->delivery_rider_id,
+                    $order->pickup_rider_id, $order->delivery_rider_id,
+                ]));
+
+                DB::afterCommit(function () use ($courierProfileIds): void {
+                    foreach ($courierProfileIds as $courierProfileId) {
+                        RiderRealtime::notify((int) $courierProfileId);
+                    }
+                });
             }
 
             return true;

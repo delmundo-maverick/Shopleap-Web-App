@@ -11,6 +11,7 @@ use App\Services\Notifier;
 use App\Services\OrderTransitions;
 use App\Services\ParcelLifecycle;
 use App\Services\RiderCoverage;
+use App\Services\RiderRealtime;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -136,12 +137,24 @@ class PickupController extends Controller
             $changed,
             $pickupStatus
         ) {
+            $previousRiderId = Order::whereKey($order->id)->lockForUpdate()->value('pickup_rider_id');
+
             $order->update([
                 'pickup_rider_id' => $rider->id,
                 'pickup_status' => $pickupStatus,
                 'pickup_date' => $validated['pickup_date'],
                 'pickup_time_slot' => $validated['pickup_time_slot'],
             ]);
+
+            if ($order->wasChanged(['pickup_rider_id', 'pickup_status', 'pickup_date', 'pickup_time_slot'])) {
+                $courierProfileIds = array_unique(array_filter([$previousRiderId, $rider->id]));
+
+                DB::afterCommit(function () use ($courierProfileIds): void {
+                    foreach ($courierProfileIds as $courierProfileId) {
+                        RiderRealtime::notify((int) $courierProfileId);
+                    }
+                });
+            }
 
             $order->logInternalEvent(
                 'Pickup scheduled'.(

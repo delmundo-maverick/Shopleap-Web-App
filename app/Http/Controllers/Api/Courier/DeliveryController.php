@@ -52,11 +52,12 @@ class DeliveryController extends Controller
             return response()->json(['message' => 'This order is not at the right stage for that action.'], 409);
         }
         $retry = in_array($order->status, RiderEarnings::EARNED_STATUSES, true);
-        if (! $retry && (int) $request->server('CONTENT_LENGTH', 0) > 6 * 1024 * 1024) {
+        $needsProof = ! $retry || ! $order->deliveryProof()->exists();
+        if ($needsProof && (int) $request->server('CONTENT_LENGTH', 0) > 6 * 1024 * 1024) {
             return response()->json(['message' => 'The upload request is too large. Send a proof photo of at most 5 MB.'], 413);
         }
-        $data = $retry ? [] : $request->validate([
-            'amount' => ['required', 'numeric', 'min:0'],
+        $data = ! $needsProof ? [] : $request->validate([
+            'amount' => [$retry ? 'nullable' : 'required', 'numeric', 'min:0'],
             'proof_image' => ['bail', 'required', 'file', 'image', 'mimetypes:image/jpeg,image/png,image/webp', 'max:5120', 'dimensions:min_width=640,min_height=640'],
             'captured_at' => ['nullable', 'date', 'regex:/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
@@ -64,7 +65,7 @@ class DeliveryController extends Controller
             'notes' => ['nullable', 'string', 'max:255'],
         ], ['proof_image.required' => 'A proof of delivery photo is required.']);
 
-        if (! $transitions->delivered($order, $request->user()->id, isset($data['amount']) ? (float) $data['amount'] : null, expectedCourierId: $courier->id, expectedHubId: in_array($order->status, RiderEarnings::EARNED_STATUSES, true) ? null : $courier->logistics_profile_id, proofImage: $retry ? null : $request->file('proof_image'), proofData: $data)) {
+        if (! $transitions->delivered($order, $request->user()->id, isset($data['amount']) ? (float) $data['amount'] : null, expectedCourierId: $courier->id, expectedHubId: $retry ? null : $courier->logistics_profile_id, proofImage: $needsProof ? $request->file('proof_image') : null, proofData: $data)) {
             return response()->json(['message' => 'This order is not at the right stage for that action.'], 409);
         }
 
@@ -133,9 +134,11 @@ class DeliveryController extends Controller
 
     private function payload(Order $o): array
     {
+        $payload = $o->courierPayload();
         $ship = $o->ship_to;
 
         return [
+            ...$payload,
             'order_id' => $o->order_number,
             'order_number' => $o->order_number,
             'waybill_code' => $o->waybill_code,
@@ -143,19 +146,13 @@ class DeliveryController extends Controller
             'hub_id' => $o->current_hub_id ?? $o->logistics_profile_id,
             'delivery_area' => $o->delivery_area,
             'buyer' => [
-                'name' => $ship['name'],
-                'contact_no' => $ship['contact_no'],
-                'address' => trim(implode(', ', array_filter([
-                    $ship['street'],
-                    $ship['barangay'],
-                    $ship['municipality'],
-                    $ship['province'],
-                ]))),
+                ...$payload['buyer'],
+                'contact_no' => $payload['buyer']['phone'],
                 'barangay' => $ship['barangay'],
                 'municipality' => $ship['municipality'],
             ],
             'note_from_buyer' => $o->buyer_note,
-            'cod_amount' => round($o->grand_total, 2),
+            'cod_amount' => $payload['payment']['amount_to_collect'],
             'attempts' => (int) $o->delivery_attempts,
             'max_attempts' => Order::MAX_DELIVERY_ATTEMPTS,
             'items_count' => $o->items->sum('quantity'),

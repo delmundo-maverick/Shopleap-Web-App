@@ -7,9 +7,11 @@ use App\Models\CourierProfile;
 use App\Models\Order;
 use App\Services\OrderTransitions;
 use App\Services\RiderCoverage;
+use App\Services\RiderRealtime;
 use App\Support\ScanCode;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PickupController extends Controller
 {
@@ -22,6 +24,7 @@ class PickupController extends Controller
 
         $orders = Order::with([
             'items',
+            'buyer.buyerProfile',
             'seller.sellerProfile',
             'logisticsProfile',
         ])
@@ -87,6 +90,8 @@ class PickupController extends Controller
             $request->user()->id
         );
 
+        DB::afterCommit(fn () => RiderRealtime::notify($courier->id));
+
         return response()->json([
             'message' => 'Pickup accepted.',
             'data' => $this->payload($order, $courier),
@@ -124,6 +129,8 @@ class PickupController extends Controller
             "{$courier->full_name}: {$data['reason']}",
             $request->user()->id
         );
+
+        DB::afterCommit(fn () => RiderRealtime::notify($courier->id));
 
         return response()->json([
             'message' => 'Pickup declined. The sorting center will reassign it.',
@@ -173,6 +180,7 @@ class PickupController extends Controller
             'data' => $this->payload(
                 $order->fresh([
                     'items',
+                    'buyer.buyerProfile',
                     'seller.sellerProfile',
                     'logisticsProfile',
                 ]),
@@ -231,6 +239,7 @@ class PickupController extends Controller
      */
     private function payload(Order $o, CourierProfile $courier): array
     {
+        $payload = $o->courierPayload();
         $o->loadMissing(['items', 'seller.sellerProfile', 'logisticsProfile']);
         $seller = $o->seller?->sellerProfile;
         $sellerPhone = null;
@@ -243,6 +252,7 @@ class PickupController extends Controller
         }
 
         return [
+            ...$payload,
             'order_id' => $o->order_number,
             'order_number' => $o->order_number,
             'waybill_code' => $o->waybill_code,
