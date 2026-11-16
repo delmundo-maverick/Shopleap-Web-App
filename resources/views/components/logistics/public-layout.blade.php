@@ -17,7 +17,7 @@
     <footer class="portal-footer">
         <div class="portal-container portal-footer-top">
             <div><p class="portal-footer-brand">Shopleap <span>Logistics</span></p><p>A little coordination. A smoother delivery.<br>Your next chapter starts here.</p></div>
-            <div><p class="portal-eyebrow">Grow with us</p><a href="{{ route('company.register.choose') }}">Become a logistics partner &rarr;</a></div>
+            <div><p class="portal-eyebrow">Grow with us</p><a href="{{ route('company.register') }}">Register your logistics company &rarr;</a></div>
         </div>
         <div class="portal-container">
             <p>&copy; {{ now()->year }} ShopLeap Logistics</p>

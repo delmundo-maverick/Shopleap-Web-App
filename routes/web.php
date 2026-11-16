@@ -14,7 +14,6 @@ use App\Http\Controllers\Auth\BuyerRegistrationController;
 use App\Http\Controllers\Auth\CompanyRegistrationController;
 use App\Http\Controllers\Auth\HubInvitationController;
 use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\Auth\LogisticsRegistrationController;
 use App\Http\Controllers\Auth\ManagerPasswordController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\SellerRegistrationController;
@@ -77,6 +76,7 @@ use App\Http\Controllers\Seller\ShopVoucherController;
 use App\Http\Controllers\Seller\WaybillController;
 use App\Http\Controllers\SellerSettlementController;
 use App\Http\Controllers\SupportController;
+use App\Models\Company;
 use App\Services\MoneyReceipts;
 use App\Support\Portal;
 use Illuminate\Http\RedirectResponse;
@@ -96,6 +96,7 @@ Route::get('/', [LandingController::class, 'index'])->name('home');
 Route::domain(Portal::host('logistics'))->group(function (): void {
     Route::get('/company/register/choose', [CompanyRegistrationController::class, 'choose'])->name('company.register.choose');
     Route::get('/company/register', [CompanyRegistrationController::class, 'create'])->name('company.register');
+    Route::get('/company/register/locations', [CompanyRegistrationController::class, 'locations'])->middleware('throttle:60,1')->name('company.register.locations');
     Route::post('/company/register', [CompanyRegistrationController::class, 'store'])->middleware('throttle:10,1');
     Route::get('/company/manager-password/{hub:public_code}', [ManagerPasswordController::class, 'show'])->middleware('signed:relative')->whereUuid('hub')->name('company.manager-password.show');
     Route::post('/company/manager-password/{hub:public_code}', [ManagerPasswordController::class, 'store'])->middleware(['signed:relative', 'throttle:10,1'])->whereUuid('hub')->name('company.manager-password.store');
@@ -135,8 +136,8 @@ Route::domain(Portal::host('logistics'))->group(function (): void {
         Route::post('/hubs/{hub:public_code}/reactivate', [HubController::class, 'reactivate'])->whereUuid('hub')->name('hubs.reactivate');
         Route::post('/hubs/{hub:public_code}/invite', [HubController::class, 'invite'])->middleware('throttle:3,1')->whereUuid('hub')->name('hubs.invite');
     });
-    Route::get('/register', [LogisticsRegistrationController::class, 'create'])->name('register.logistics');
-    Route::post('/register', [LogisticsRegistrationController::class, 'store'])->middleware('throttle:10,1');
+    Route::get('/register', [CompanyRegistrationController::class, 'create'])->name('register.logistics');
+    Route::post('/register', [CompanyRegistrationController::class, 'store'])->middleware('throttle:10,1');
     Route::get('/logistics/application', [PortalController::class, 'application'])
         ->middleware('auth')->name('logistics.application');
     Route::post('/logistics/application', [PortalController::class, 'resubmit'])
@@ -790,6 +791,8 @@ Route::middleware(['auth', 'admin', 'throttle:mutations'])
 
         // Registration management: type => [controller, route parameter]
         Route::get('/companies', [CompanyController::class, 'index'])->name('companies.index');
+        Route::get('/companies/{company}/documents/{document}', [CompanyController::class, 'document'])
+            ->whereUuid('company')->whereIn('document', array_keys(Company::DOCUMENTS))->name('companies.document');
         Route::post('/companies/{company}/approve', [CompanyController::class, 'approve'])->whereUuid('company')->name('companies.approve');
         Route::post('/companies/{company}/reject', [CompanyController::class, 'reject'])->whereUuid('company')->name('companies.reject');
         Route::post('/companies/{company}/status', [CompanyController::class, 'accountStatus'])->whereUuid('company')->name('companies.status');

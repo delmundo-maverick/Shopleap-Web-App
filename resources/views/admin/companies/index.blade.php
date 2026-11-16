@@ -21,14 +21,36 @@
                     <button class="btn btn-primary">Filter</button>
                 </form>
                 <x-seller.data-table label="Logistics company accounts" responsive="scroll" class="bg-surface! shadow-none! backdrop-blur-none!">
-                    <x-slot:head><tr>@foreach (['Company', 'Account holder', 'Status', 'Hubs', 'Actions'] as $heading)<th class="p-3">{{ $heading }}</th>@endforeach</tr></x-slot:head>
+                    <x-slot:head><tr>@foreach (['Company', 'Account holder', 'Status', 'Hubs', 'Documents', 'Actions'] as $heading)<th class="p-3">{{ $heading }}</th>@endforeach</tr></x-slot:head>
                     @forelse ($companies as $company)
                         <tr>
-                            <td class="p-3"><div class="flex items-center gap-3">@if ($company->logo_path)<img src="{{ Storage::disk('public')->url($company->logo_path) }}" alt="" class="size-10 rounded-sm object-contain">@endif<strong>{{ $company->name }}</strong></div><p class="mt-2 text-xs">{{ $company->address }}</p><p class="text-xs">{{ $company->contact_email }} ? {{ $company->contact_phone }}</p></td>
+                            <td class="p-3"><div class="flex items-center gap-3">@if ($company->logo_path)<img src="{{ Storage::disk('public')->url($company->logo_path) }}" alt="" class="size-10 rounded-sm object-contain">@endif<strong>{{ $company->name }}</strong></div><p class="mt-2 text-xs">{{ $company->address }}</p><p class="text-xs">{{ $company->contact_email }} &middot; {{ $company->contact_phone }}</p>@if ($company->service_regions)<p class="mt-2 text-xs">Service regions: {{ implode(', ', $company->service_regions) }}</p>@endif</td>
                             <td class="p-3">@foreach ($company->users as $account)<p>{{ $account->name }}</p><p class="text-xs">{{ $account->email }} ? {{ $account->phone }}</p><x-status-label :status="$account->account_status" domain="company" class="rounded-sm!" /><span class="block text-xs">Logistics Company</span>@if ($account->email_verified_at)<span class="block text-xs text-success">Email verified</span>@endif
-                            @endforeach</td>
+                            @endforeach
+                                @if ($company->first_name)
+                                    <details class="mt-3 text-xs"><summary class="cursor-pointer text-primary">Representative details</summary>
+                                        <p class="mt-2">{{ trim(implode(' ', array_filter([$company->first_name, $company->middle_initial, $company->last_name]))) }}</p>
+                                        <p>{{ ucfirst($company->sex ?? '') }}</p>
+                                        @if ($company->birthday)<p>Birthday: {{ $company->birthday->format('F j, Y') }}</p>@endif
+                                        @if ($company->age !== null)<p>Age at application: {{ $company->age }}</p>@endif
+                                    </details>
+                                @endif
+                            </td>
                             <td class="p-3"><x-status-label :status="$company->status" domain="company" class="rounded-sm!" />@if ($company->rejection_reason)<p class="mt-2 max-w-xs text-xs">{{ $company->rejection_reason }}</p>@endif</td>
                             <td class="p-3"><a href="{{ route('admin.registrations.logistics.index', ['company' => $company->public_code]) }}" class="font-semibold text-primary">{{ $company->hubs_count }} hubs</a></td>
+                            <td class="p-3">
+                                <ul class="space-y-2 text-xs">
+                                    @foreach (\App\Models\Company::DOCUMENTS as $key => $document)
+                                        <li>
+                                            @if ($company->{$document['path']})
+                                                <a href="{{ route('admin.companies.document', [$company, $key]) }}" target="_blank" rel="noopener noreferrer" class="text-primary underline">{{ $document['label'] }}</a>
+                                            @else
+                                                <span>{{ $document['label'] }}: Not provided</span>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </td>
                             <td class="p-3">
                                 @if ($company->status === 'pending')
                                     <form method="POST" action="{{ route('admin.companies.approve', $company) }}" data-confirm="Approve this company and allow it to create hubs?">@csrf<button class="btn btn-primary">Approve</button></form>
@@ -39,7 +61,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="p-6 text-center">No company accounts found.</td></tr>
+                        <tr><td colspan="6" class="p-6 text-center">No company accounts found.</td></tr>
                     @endforelse
                 </x-seller.data-table>
                 {{ $companies->links() }}

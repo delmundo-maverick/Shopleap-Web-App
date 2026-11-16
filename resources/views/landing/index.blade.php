@@ -47,7 +47,7 @@
             </section>
             <section x-reveal id="deals" aria-labelledby="products-heading">
                 <div class="landing-section-heading"><div><p class="landing-eyebrow">The discovery edit</p><h2 id="products-heading">Featured products</h2><p>A few finds to get your inspiration going.</p></div><a href="#discover" class="landing-text-link">Keep exploring &rarr;</a></div>
-                <x-landing.product-grid :products="$bestSellers" />
+                <x-landing.product-grid :products="$bestSellers->take(6)" />
             </section>
             <section x-reveal id="discover" aria-labelledby="discover-heading">
                 <div class="landing-section-heading"><div><p class="landing-eyebrow">Something worth a second look</p><h2 id="discover-heading">Daily Discover</h2><p class="landing-section-description">Take a look around. Your next favorite could be right here.</p></div>@if (request()->filled('search') || request()->filled('category'))<a href="{{ route('home') }}#discover" class="btn btn-outline">Clear filters</a>@endif</div>

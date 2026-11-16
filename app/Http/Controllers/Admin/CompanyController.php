@@ -9,8 +9,10 @@ use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CompanyController extends Controller
 {
@@ -30,6 +32,24 @@ class CompanyController extends Controller
         $this->decide($request, $company, true);
 
         return back()->with('status', 'Company approved. The account holder will be notified by email.');
+    }
+
+    public function document(Company $company, string $document): StreamedResponse
+    {
+        $definition = Company::DOCUMENTS[$document] ?? abort(404);
+        $path = $company->{$definition['path']};
+        $disk = Storage::disk('r2');
+        abort_unless($path && $disk->exists($path), 404);
+        $mimeType = $disk->mimeType($path);
+        abort_unless(in_array($mimeType, ['image/jpeg', 'image/png', 'application/pdf'], true), 404);
+
+        return $disk->response($path, null, [
+            'Content-Type' => $mimeType,
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; frame-ancestors 'self'",
+            'X-Robots-Tag' => 'noindex, nofollow',
+        ]);
     }
 
     public function reject(Request $request, Company $company): RedirectResponse

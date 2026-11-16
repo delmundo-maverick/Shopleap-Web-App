@@ -1,18 +1,24 @@
 const PSGC_BASE = 'https://psgc.gitlab.io/api';
 
-export function initPsgcCascade({ province, municipality, barangay, helpEl = null, initial = {} }) {
+export function initPsgcCascade({ province, municipality, barangay, helpEl = null, initial = {}, locationsUrl = null }) {
+    const locationUrl = (level, code = null) => {
+        const url = new URL(locationsUrl, window.location.origin);
+        url.searchParams.set('level', level);
+        if (code) url.searchParams.set('code', code);
+        return url.toString();
+    };
     const levels = [
         {
             select: province, placeholder: 'Select province', resetText: 'Select province',
-            url: () => `${PSGC_BASE}/provinces/`, initial: initial.province, token: 0,
+            url: () => locationsUrl ? locationUrl('province') : `${PSGC_BASE}/provinces/`, initial: initial.province, token: 0,
         },
         {
             select: municipality, placeholder: 'Select municipality / city', resetText: 'Select a province first',
-            url: (code) => `${PSGC_BASE}/provinces/${code}/cities-municipalities/`, initial: initial.municipality, token: 0,
+            url: (code) => locationsUrl ? locationUrl('municipality', code) : `${PSGC_BASE}/provinces/${code}/cities-municipalities/`, initial: initial.municipality, token: 0,
         },
         {
             select: barangay, placeholder: 'Select barangay', resetText: 'Select a municipality first',
-            url: (code) => `${PSGC_BASE}/cities-municipalities/${code}/barangays/`, initial: initial.barangay, token: 0,
+            url: (code) => locationsUrl ? locationUrl('barangay', code) : `${PSGC_BASE}/cities-municipalities/${code}/barangays/`, initial: initial.barangay, token: 0,
         },
     ].filter((level) => level.select);
 
@@ -90,4 +96,12 @@ export function initPsgcCascade({ province, municipality, barangay, helpEl = nul
     });
 
     load(0);
+
+    return {
+        reload() {
+            levels.forEach(level => { level.initial = level.select.value || level.initial; });
+            resetFrom(0);
+            return load(0);
+        },
+    };
 }
