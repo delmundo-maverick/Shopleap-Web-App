@@ -44,9 +44,11 @@ class MoneyMovementQueries
 
     public function remittable(?int $hubId = null): Builder
     {
-        return $this->deliveries($hubId)->where('o.total_amount', '>', 0)
+        $outstanding = app(SellerSettlements::class)->orderBalances('hub', 'cod_to_remit');
+
+        return $this->deliveries($hubId)->joinSub($outstanding, 'remittance_due', 'remittance_due.order_id', '=', 'o.id')->where('remittance_due.amount', '>', 0)
             ->whereNotExists(fn (Builder $q) => $q->selectRaw('1')->from('remittance_items as ri')->whereColumn('ri.active_order_id', 'o.id'))
-            ->select('o.id', 'o.order_number', 'o.delivered_at', 'o.earning_hub_id', 'o.total_amount as amount')->orderBy('o.delivered_at')->orderBy('o.id');
+            ->select('o.id', 'o.order_number', 'o.delivered_at', 'o.earning_hub_id', 'remittance_due.amount')->orderBy('o.delivered_at')->orderBy('o.id');
     }
 
     public function unremittedHubs(): Collection

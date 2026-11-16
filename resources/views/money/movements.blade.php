@@ -15,6 +15,7 @@
     <div class="flex min-w-0 flex-1 flex-col">
         <x-seller.page-header :title="$title" description="Cash handover and remittance records" class="bg-surface! bg-none! shadow-none! backdrop-blur-none!" />
         <main class="space-y-5 p-4 sm:p-6">
+            @if ($section === 'remittances')<p class="text-sm">New logistics-managed orders remit only Shopleap's commission here. Seller proceeds are paid through Logistics seller payments. Historical platform-managed orders retain their original merchandise remittance.</p>@endif
             @if (session('status'))<p role="status" class="rounded-sm border border-line bg-surface p-3 text-sm">{{ session('status') }}</p>@endif
             @if (session('money_warning'))<p role="alert" class="rounded-sm border border-warning bg-surface p-3 text-sm text-warning">{{ session('money_warning') }}</p>@endif
             @if ($errors->any())<div role="alert" class="rounded-sm border border-danger bg-surface p-3 text-sm text-danger">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
@@ -49,7 +50,7 @@
                                     @endif
                                 </td>
                                 <td class="p-3"><div class="flex min-w-40 flex-col items-start gap-2">
-                                    <a class="btn btn-outline rounded-sm!" href="{{ route($role === 'logistics' ? 'logistics.receipts.show' : 'money.receipts.show', ['type' => $section === 'cash' ? 'cash-handovers' : 'remittances', 'reference' => $row->reference_no]) }}">View receipt</a>
+                                    <a class="btn btn-outline rounded-sm!" href="{{ route($role === 'logistics' ? 'logistics.receipts.show' : 'admin.receipts.show', ['type' => $section === 'cash' ? 'cash-handovers' : 'remittances', 'reference' => $row->reference_no]) }}">View receipt</a>
                                     @if ($role === 'logistics' && $section === 'cash' && $row->status === 'short')
                                         <form method="POST" action="{{ route('logistics.movements.cash.settle', $row->reference_no) }}" data-money-form data-confirm="Confirm receipt of the remaining shortage cash?" class="space-y-2">@csrf<label class="block text-xs">Settlement note<input name="notes" required minlength="3" maxlength="1000" class="mt-1 w-full rounded-sm border border-line p-2"></label><button class="btn btn-primary rounded-sm!">Mark shortage settled</button></form>
                                     @elseif ($role === 'admin' && $section === 'remittances' && $row->status === 'submitted')

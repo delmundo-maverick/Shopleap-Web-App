@@ -32,8 +32,12 @@ class LoginController extends Controller
 
     // â”€â”€ LOGIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    public function create(Request $request)
+    public function create(Request $request): View|RedirectResponse
     {
+        if ($request->user()) {
+            return $this->redirectAuthenticatedUser($request->user());
+        }
+
         if (Portal::isLogistics($request)) {
             return view('logistics.login');
         }
@@ -55,7 +59,7 @@ class LoginController extends Controller
     public function store(Request $request): View|RedirectResponse
     {
         if (Auth::check()) {
-            throw ValidationException::withMessages(['email' => 'Please log out before signing in to another account.']);
+            return $this->redirectAuthenticatedUser($request->user());
         }
 
         $roles = Portal::loginRoles($request);
@@ -179,6 +183,19 @@ class LoginController extends Controller
             'logistics' => redirect()->intended(route('logistics.dashboard')),
             default => redirect()->intended(route('home')),
         };
+    }
+
+    protected function redirectAuthenticatedUser(User $user): RedirectResponse
+    {
+        return redirect()->route(match ($user->role) {
+            'super_admin' => 'admin.dashboard',
+            'seller' => 'seller.dashboard',
+            'buyer' => 'buyer.home',
+            'logistics' => $user->logisticsProfile?->status === 'approved'
+                ? 'logistics.dashboard'
+                : 'logistics.application',
+            default => 'home',
+        });
     }
 
     public function destroy(Request $request)

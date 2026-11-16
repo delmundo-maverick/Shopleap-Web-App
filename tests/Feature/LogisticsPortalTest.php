@@ -114,6 +114,45 @@ it('rejects invalid admin credentials on the shared login', function () {
     $this->assertGuest();
 });
 
+it('redirects signed-in storefront users away from login without changing accounts', function (string $role, string $destination, string $method) {
+    $user = User::factory()->create(['role' => $role]);
+    $otherUser = User::factory()->create(['role' => $role]);
+
+    $this->actingAs($user)->withSession(['url.intended' => Portal::url('main', 'login')]);
+
+    $response = $method === 'get'
+        ? $this->get(Portal::url('main', 'login'))
+        : $this->post(Portal::url('main', 'login'), ['email' => $otherUser->email, 'password' => 'password']);
+
+    $response->assertSessionHasNoErrors()->assertRedirect(route($destination));
+    $this->assertAuthenticatedAs($user);
+})->with([
+    ['buyer', 'buyer.home'],
+    ['seller', 'seller.dashboard'],
+    ['super_admin', 'admin.dashboard'],
+])->with(['get', 'post']);
+
+it('redirects signed-in logistics users away from login according to application status', function (string $status, string $destination, string $method) {
+    $user = portalPartner($status);
+    $this->actingAs($user);
+
+    $response = $method === 'get'
+        ? $this->get(Portal::url('logistics', 'login'))
+        : $this->post(Portal::url('logistics', 'login'));
+
+    $response->assertSessionHasNoErrors()->assertRedirect(route($destination));
+    $this->assertAuthenticatedAs($user);
+})->with([
+    ['approved', 'logistics.dashboard'],
+    ['pending', 'logistics.application'],
+    ['rejected', 'logistics.application'],
+])->with(['get', 'post']);
+
+it('still shows the storefront login form to guests', function () {
+    $this->get(Portal::url('main', 'login'))->assertOk()->assertViewIs('auth.login');
+    $this->assertGuest();
+});
+
 it('keeps admin pages restricted to admins on the shared host', function (string $role) {
     $this->actingAs(User::factory()->create(['role' => $role]))
         ->get(route('admin.dashboard'))->assertForbidden();

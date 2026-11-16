@@ -11,8 +11,8 @@ class LedgerService
 {
     /** @var array<string, array<int, string>> */
     public const ACCOUNTS = [
-        'seller' => ['pending', 'available', 'payout_locked', 'withdrawn'],
-        'hub' => ['cash_receivable', 'cash_held', 'cod_to_remit', 'shipping_earned', 'rider_pay_owed', 'rider_pay_paid', 'rider_expense', 'collection_variance'],
+        'seller' => ['pending', 'available', 'payout_locked', 'withdrawn', 'hub_receivable'],
+        'hub' => ['cash_receivable', 'cash_held', 'cod_to_remit', 'shipping_earned', 'rider_pay_owed', 'rider_pay_paid', 'rider_expense', 'collection_variance', 'seller_payable', 'cash_in_transit'],
         'rider' => ['cash_on_hand', 'cash_due_hub', 'earnings_accrued', 'earnings_paid', 'earnings_income'],
         'platform' => ['cod_receivable', 'cod_held', 'commission_pending', 'commission_earned'],
         'buyer' => ['refunds_issued'],
@@ -20,7 +20,7 @@ class LedgerService
     ];
 
     /** @var array<int, string> */
-    public const DEBIT_ACCOUNTS = ['cash_on_hand', 'cash_receivable', 'cash_held', 'cod_receivable', 'cod_held', 'rider_expense', 'earnings_accrued', 'earnings_paid', 'EXTERNAL_BANK', 'collection_variance'];
+    public const DEBIT_ACCOUNTS = ['cash_on_hand', 'cash_receivable', 'cash_held', 'cod_receivable', 'cod_held', 'rider_expense', 'earnings_accrued', 'earnings_paid', 'EXTERNAL_BANK', 'collection_variance', 'hub_receivable', 'cash_in_transit'];
 
     public function synchronized(Closure $callback): mixed
     {

@@ -6,7 +6,7 @@
             @if (in_array($section, $collapsibleSections, true))
                 <div x-data="productNavigation(@js(request()->routeIs('seller.products.*')))">
                     <button type="button" class="nav-item mt-3 w-full" @click="toggleGroup()" :aria-expanded="expanded" aria-controls="seller-products-navigation" title="Products">
-                        <svg class="size-5 shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="1.7" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                        <x-nav.icon name="products" />
                         <span class="nav-label flex-1 text-left">{{ $section }}</span><span class="nav-label" aria-hidden="true" x-text="expanded ? '-' : '+'"></span>
                     </button>
                     <div id="seller-products-navigation" x-show="expanded" x-cloak class="space-y-1">
@@ -21,7 +21,7 @@
                     if ($link['route'] === 'messages.support') { $selected = $active === 'help'; }
                     $selected = $link['selected'] ?? $selected;
                 @endphp
-                <x-nav.link :href="route($link['route'], $link['params'] ?? [])" :active="$selected" :icon="\App\Support\NavigationIcons::forRoute($link['route']) ?? ($link['icon'] ?? null)" :badge="$link['count'] ?? null" :message="!empty($link['badge'])" :title="$link['title'] ?? $link['label']">{{ $link['label'] }}</x-nav.link>
+                <x-nav.link :href="route($link['route'], $link['params'] ?? [])" :active="$selected" :icon="\App\Support\NavigationIcons::forRoute($link['route'], $link['params'] ?? []) ?? ($link['icon'] ?? null)" :badge="$link['count'] ?? null" :message="!empty($link['badge'])" :title="$link['title'] ?? $link['label']">{{ $link['label'] }}</x-nav.link>
             @endforeach
             @if (in_array($section, $collapsibleSections, true))</div></div>@endif
         @endforeach

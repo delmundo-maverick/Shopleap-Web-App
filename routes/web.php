@@ -60,6 +60,7 @@ use App\Http\Controllers\Seller\ReturnController as SellerReturnController;
 use App\Http\Controllers\Seller\ReviewController as SellerReviewController;
 use App\Http\Controllers\Seller\ShopVoucherController;
 use App\Http\Controllers\Seller\WaybillController;
+use App\Http\Controllers\SellerSettlementController;
 use App\Http\Controllers\SupportController;
 use App\Services\MoneyReceipts;
 use App\Support\Portal;
@@ -394,6 +395,11 @@ Route::middleware(['auth', 'seller', 'throttle:mutations'])
 
         Route::get('/earnings', [MoneyController::class, 'index'])->name('earnings.index');
         Route::get('/payouts', [PayoutController::class, 'index'])->name('payouts.index');
+        Route::get('/settlements', [SellerSettlementController::class, 'index'])->name('settlements.index');
+        Route::get('/settlements/{reference}/proof', [SellerSettlementController::class, 'proof'])->name('settlements.proof');
+        Route::get('/settlement-evidence/{event}', [SellerSettlementController::class, 'orderProof'])->whereNumber('event')->name('settlements.evidence');
+        Route::post('/settlements/{reference}/confirm', [SellerSettlementController::class, 'confirm'])->name('settlements.confirm');
+        Route::post('/settlements/{reference}/dispute', [SellerSettlementController::class, 'dispute'])->name('settlements.dispute');
         Route::post('/payouts', [PayoutController::class, 'requestSeller'])->name('payouts.store');
         Route::post('/payout-methods', [PayoutController::class, 'addMethod'])->name('payouts.methods.store');
         Route::delete('/payout-methods/{method}', [PayoutController::class, 'removeMethod'])->whereNumber('method')->name('payouts.methods.destroy');
@@ -665,6 +671,14 @@ Route::middleware(['auth', 'logistics', 'hub.scope', 'throttle:mutations'])
         Route::get('/reports/ledger', [MoneyController::class, 'index'])->name('money.index');
         Route::get('/receipts/{type}/{reference}', [MoneyReceiptController::class, 'show'])->whereIn('type', MoneyReceipts::TYPES)->name('receipts.show');
         Route::get('/money/rider-payouts', [PayoutController::class, 'index'])->name('payouts.index');
+        Route::get('/money/seller-settlements', [SellerSettlementController::class, 'index'])->name('settlements.index');
+        Route::post('/money/seller-settlements', [SellerSettlementController::class, 'store'])->name('settlements.store');
+        Route::post('/money/seller-settlements/{reference}/send', [SellerSettlementController::class, 'send'])->name('settlements.send');
+        Route::post('/money/seller-settlements/{reference}/cancel', [SellerSettlementController::class, 'cancel'])->name('settlements.cancel');
+        Route::get('/money/seller-settlements/{reference}/proof', [SellerSettlementController::class, 'proof'])->name('settlements.proof');
+        Route::get('/money/settlement-evidence/{event}', [SellerSettlementController::class, 'orderProof'])->whereNumber('event')->name('settlements.evidence');
+        Route::post('/money/seller-recoveries/{order}', [SellerSettlementController::class, 'recovery'])->whereNumber('order')->name('settlements.recovery');
+        Route::post('/money/seller-refunds/{reference}', [SellerSettlementController::class, 'refund'])->name('settlements.refund');
         Route::post('/money/rider-payouts', [PayoutController::class, 'payRider'])->name('payouts.store');
         Route::get('/money/{section}', [MoneyMovementController::class, 'index'])->whereIn('section', ['cash', 'remittances'])->name('movements.index');
         Route::post('/money/cash', [MoneyMovementController::class, 'handover'])->name('movements.cash.store');
@@ -701,6 +715,12 @@ Route::middleware(['auth', 'admin', 'throttle:mutations'])
 
         Route::get('/ledger', [MoneyController::class, 'index'])->name('ledger.index');
         Route::get('/money/seller-payouts', [PayoutController::class, 'index'])->name('payouts.index');
+        Route::get('/receipts/{type}/{reference}', [MoneyReceiptController::class, 'show'])->whereIn('type', MoneyReceipts::TYPES)->name('receipts.show');
+        Route::get('/money/seller-settlements', [SellerSettlementController::class, 'index'])->name('settlements.index');
+        Route::post('/money/seller-settlements/{reference}/resolve', [SellerSettlementController::class, 'resolve'])->name('settlements.resolve');
+        Route::get('/money/seller-settlements/{reference}/proof', [SellerSettlementController::class, 'proof'])->name('settlements.proof');
+        Route::get('/money/settlement-evidence/{event}', [SellerSettlementController::class, 'orderProof'])->whereNumber('event')->name('settlements.evidence');
+        Route::post('/money/commission-returns/{order}', [SellerSettlementController::class, 'commissionReturn'])->whereNumber('order')->name('settlements.commission-return');
         Route::post('/money/seller-payouts/{reference}/{decision}', [PayoutController::class, 'decideSeller'])->whereIn('decision', ['approve', 'pay', 'reject'])->name('payouts.decide');
         Route::get('/money/refunds', [PayoutController::class, 'index'])->name('refunds.index');
         Route::post('/money/refunds/{reference}/pay', [PayoutController::class, 'payRefund'])->name('refunds.pay');
