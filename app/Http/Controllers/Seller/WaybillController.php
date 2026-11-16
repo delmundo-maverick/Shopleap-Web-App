@@ -38,7 +38,9 @@ class WaybillController extends Controller
         $qrWriter = new Writer(new ImageRenderer(new RendererStyle(200, 2), new SvgImageBackEnd));
         $qrBase64 = base64_encode($qrWriter->writeString($order->waybill_qr_code));
 
-        $pdf = Pdf::loadView('seller.orders.waybill', compact('order', 'orderCode', 'barcodeBase64', 'qrBase64'))
+        $courierPayload = $order->courierPayload();
+
+        $pdf = Pdf::loadView('seller.orders.waybill', compact('order', 'orderCode', 'barcodeBase64', 'qrBase64', 'courierPayload'))
             ->setPaper([0, 0, 288, 432]); // 4in x 6in shipping label (72pt/in)
 
         if (! $order->waybill_printed_at) {

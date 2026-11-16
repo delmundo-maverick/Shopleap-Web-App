@@ -13,6 +13,7 @@ use App\Services\PayoutQueries;
 use App\Services\Payouts;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
@@ -98,6 +99,57 @@ function riderMoneyHandover(object $context, string $amount = '940.00'): object
 {
     return app(MoneyMovements::class)->handover($context->hub->id, $context->rider->id, $amount, $amount === '940.00' ? null : 'Cash shortage recorded.', (string) Str::uuid(), $context->hubUser->id);
 }
+
+it('refreshes once per committed cash handover settlement and rider payout including database notification creation', function () {
+    config()->set('services.supabase', ['url' => 'https://realtime.example.test', 'service_key' => 'test-service-key']);
+    Http::preventStrayRequests();
+    Http::fake(function () {
+        expect(DB::transactionLevel())->toBe(0);
+
+        return Http::response([], 202);
+    });
+    $key = (string) Str::uuid();
+    $handover = DB::transaction(function () use ($key) {
+        $record = app(MoneyMovements::class)->handover($this->hub->id, $this->rider->id, '900.00', 'Short cash', $key, $this->hubUser->id);
+        Http::assertNothingSent();
+
+        return $record;
+    });
+    Http::assertSentCount(1);
+    expect($this->riderUser->notifications()->count())->toBe(1);
+    app(MoneyMovements::class)->handover($this->hub->id, $this->rider->id, '900.00', 'Short cash', $key, $this->hubUser->id);
+    Http::assertSentCount(1);
+
+    DB::transaction(function () use ($handover) {
+        app(MoneyMovements::class)->settleShortage($this->hub->id, $handover->reference_no, 'Remaining cash', $this->hubUser->id);
+        Http::assertSentCount(1);
+    });
+    Http::assertSentCount(2);
+    app(MoneyMovements::class)->settleShortage($this->hub->id, $handover->reference_no, 'Remaining cash', $this->hubUser->id);
+    Http::assertSentCount(2);
+
+    $payoutKey = (string) Str::uuid();
+    DB::transaction(function () use ($payoutKey) {
+        app(Payouts::class)->payRider($this->hub->id, $this->rider->id, null, null, $payoutKey, $this->hubUser->id);
+        Http::assertSentCount(2);
+    });
+    Http::assertSentCount(3);
+    expect($this->riderUser->notifications()->count())->toBe(2);
+    app(Payouts::class)->payRider($this->hub->id, $this->rider->id, null, null, $payoutKey, $this->hubUser->id);
+    Http::assertSentCount(3);
+    Http::assertSent(fn ($request): bool => $request['messages'][0]['topic'] === 'rider:'.$this->rider->id);
+});
+
+it('does not refresh rolled back cash handovers', function () {
+    config()->set('services.supabase', ['url' => 'https://realtime.example.test', 'service_key' => 'test-service-key']);
+    Http::fake();
+    DB::beginTransaction();
+    riderMoneyHandover($this);
+    DB::rollBack();
+
+    Http::assertNothingSent();
+    $this->assertDatabaseCount('rider_cash_handovers', 0);
+});
 
 it('returns cash on hand from the same outstanding parcel query as the hub', function () {
     $handover = riderMoneyHandover($this, '900.00');

@@ -54,6 +54,7 @@ class Payouts
                 }
 
                 $this->notifier->moneyChanged('rider_payout', $record);
+                DB::afterCommit(fn () => RiderRealtime::notify($riderId));
 
                 return $record;
             });

@@ -55,6 +55,38 @@ class CourierProfile extends Model
         return trim("{$this->first_name} {$this->last_name}");
     }
 
+    /** @return array<string, mixed> */
+    public function apiPayload(): array
+    {
+        $this->loadMissing(['user', 'logisticsProfile']);
+
+        return [
+            'id' => $this->id,
+            'name' => $this->full_name,
+            'email' => $this->user?->email,
+            'user' => ['email' => $this->user?->email],
+            'status' => $this->status,
+            'is_active' => (bool) $this->is_active,
+            'rejection_reason' => $this->rejection_reason,
+            'vehicle_type' => $this->vehicle_type,
+            'plate_number' => $this->plate_number,
+            'contact_no' => $this->contact_no,
+            'house_number' => $this->house_number,
+            'street_address' => $this->street_address,
+            'province' => $this->province,
+            'municipality' => $this->municipality,
+            'barangay' => $this->barangay,
+            'avatar_url' => $this->user?->avatar_url,
+            'hub' => $this->logisticsProfile ? [
+                'id' => $this->logisticsProfile->id,
+                'name' => $this->logisticsProfile->business_name,
+                'company' => $this->logisticsProfile->company_name,
+                'municipality' => $this->logisticsProfile->municipality,
+                'province' => $this->logisticsProfile->province,
+            ] : null,
+        ];
+    }
+
     /**
      * Maps the rider's registration barangay to this rider, inside the hub's service area
      * for the same municipality. Never overwrites a barangay held by another approved,

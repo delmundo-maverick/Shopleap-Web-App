@@ -45,7 +45,7 @@ class Notifier
         $this->send($hub?->user, null, 'cash.handover.'.$record->status, $title, $body,
             route('logistics.movements.index', ['section' => 'cash'], false), $meta);
         $this->send($rider?->user, null, 'cash.handover.'.$record->status, $title, $body,
-            route('api.courier.cash.history', [], false), $meta + ['screen' => 'cash']);
+            route('api.courier.cash.history', [], false), $meta + ['screen' => 'cash'], refreshRider: false);
     }
 
     private function remittanceReviewed(object $record): void
@@ -67,7 +67,7 @@ class Notifier
         $amount = '₱'.number_format((float) $record->amount, 2);
         $this->send($rider?->user, null, 'rider.payout.paid', 'Earnings paid', "Your earnings payout {$record->reference_no} of {$amount} has been paid.",
             route('api.courier.earnings.history', ['period' => 'all'], false),
-            ['screen' => 'earnings', 'reference_no' => $record->reference_no, 'amount' => LedgerService::decimal(LedgerService::cents((string) $record->amount)), 'currency' => 'PHP', 'status' => 'paid']);
+            ['screen' => 'earnings', 'reference_no' => $record->reference_no, 'amount' => LedgerService::decimal(LedgerService::cents((string) $record->amount)), 'currency' => 'PHP', 'status' => 'paid'], refreshRider: false);
     }
 
     private function sellerPayoutChanged(object $record): void
@@ -155,7 +155,8 @@ class Notifier
                 'Pickup cancelled',
                 "Order {$no} was cancelled. Do not collect the parcel.",
                 null,
-                $meta
+                $meta,
+                refreshRider: false
             );
         }
     }
@@ -558,7 +559,8 @@ class Notifier
                     'New delivery assigned',
                     "Order {$no} to Brgy. {$ship['barangay']}, {$ship['municipality']}. Cash to collect: {$cash}.",
                     null,
-                    $meta
+                    $meta,
+                    refreshRider: false
                 );
 
                 // The first assignment is internal; a note with failed attempts means a reschedule.
@@ -693,7 +695,8 @@ class Notifier
             "Order #{$order->order_number}: collect from ".($order->seller?->sellerProfile?->business_name ?? $order->seller?->name)
                 ." on {$order->pickup_date?->format('M d')} ({$slot}). Please accept it.",
             null,
-            ['order_id' => $order->order_number, 'waybill_code' => $order->waybill_code]
+            ['order_id' => $order->order_number, 'waybill_code' => $order->waybill_code],
+            refreshRider: false
         );
     }
 
@@ -842,16 +845,16 @@ class Notifier
      * Sends to one user or a collection, skipping whoever did the action.
      * A failure is reported and swallowed: notifications must never break an order action.
      */
-    private function send(User|Collection|null $to, ?int $exceptUserId, string $kind, string $title, string $body, ?string $url, array $meta = []): void
+    private function send(User|Collection|null $to, ?int $exceptUserId, string $kind, string $title, string $body, ?string $url, array $meta = [], bool $refreshRider = true): void
     {
         $users = $to instanceof User ? collect([$to]) : collect($to ?? []);
 
         $users->filter()
             ->reject(fn ($user) => $user->id === $exceptUserId)
             ->unique('id')
-            ->each(function (User $user) use ($kind, $title, $body, $url, $meta) {
+            ->each(function (User $user) use ($kind, $title, $body, $url, $meta, $refreshRider) {
                 try {
-                    $user->notify(new ActivityNotification($kind, $title, $body, $url, $meta));
+                    $user->notify(new ActivityNotification($kind, $title, $body, $url, $meta, $refreshRider));
                 } catch (\Throwable $e) {
                     report($e);
                 }

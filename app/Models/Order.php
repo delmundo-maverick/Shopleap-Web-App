@@ -585,6 +585,51 @@ class Order extends Model
     }
 
     /**
+     * @return array{
+     *     payment: array{method: string, amount_to_collect: string|null, currency: string},
+     *     buyer: array{name: string|null, phone: string|null, address: string},
+     *     items: array<int, array{name: string, variant: string, quantity: int}>,
+     *     parcel_weight_kg: string
+     * }
+     */
+    public function courierPayload(): array
+    {
+        $this->loadMissing(['items', 'buyer.buyerProfile']);
+        $ship = $this->ship_to;
+        $method = strtolower(trim($this->payment_method ?? 'cod'));
+        $method = in_array($method, ['cod', 'cash_on_delivery'], true) ? 'cod' : $method;
+        $amount = $this->total;
+
+        if ($amount === null && $this->total_amount !== null && $this->shipping_fee !== null) {
+            $amount = number_format($this->grand_total, 2, '.', '');
+        }
+
+        return [
+            'payment' => [
+                'method' => $method,
+                'amount_to_collect' => $method === 'cod' ? $amount : '0.00',
+                'currency' => 'PHP',
+            ],
+            'buyer' => [
+                'name' => $ship['name'] ?? null,
+                'phone' => $ship['contact_no'] ?? null,
+                'address' => trim(implode(', ', array_filter([
+                    $ship['street'] ?? null,
+                    $ship['barangay'] ?? null,
+                    $ship['municipality'] ?? null,
+                    $ship['province'] ?? null,
+                ]))),
+            ],
+            'items' => $this->items->map(fn (OrderItem $item): array => [
+                'name' => $item->product_name,
+                'variant' => collect($item->selected_options)->map(fn ($value, $key): string => "{$key}: {$value}")->implode(', '),
+                'quantity' => (int) $item->quantity,
+            ])->values()->all(),
+            'parcel_weight_kg' => number_format($this->total_weight_kg, 2, '.', ''),
+        ];
+    }
+
+    /**
      * Commission rate that applied to this order.
      * Calculated from the saved amounts, so later rate changes do not alter it.
      */

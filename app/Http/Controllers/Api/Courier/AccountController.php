@@ -3,21 +3,30 @@
 namespace App\Http\Controllers\Api\Courier;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class AccountController extends Controller
 {
-    /** Contact number and address only. Vehicle, plate and documents change through the hub. */
+    /** Email, contact number and address. Vehicle, plate and documents change through the hub. */
     public function updateProfile(Request $request): JsonResponse
     {
         $courier = $request->attributes->get('courier');
+        $user = $request->user();
+
+        if (is_string($request->input('email'))) {
+            $request->merge(['email' => strtolower(trim($request->input('email')))]);
+        }
 
         $data = $request->validate([
+            'email' => ['sometimes', 'required', 'email', 'max:255', Rule::unique(User::class, 'email')->ignore($user)],
             'contact_no' => ['required', 'string', 'regex:/^[0-9+\-\s()]{7,20}$/'],
             'province' => ['required', 'string', 'max:100', 'not_regex:/^\d+$/'],
             'municipality' => ['required', 'string', 'max:100', 'not_regex:/^\d+$/'],
@@ -26,9 +35,21 @@ class AccountController extends Controller
             'house_number' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $courier->update($data);
+        DB::transaction(function () use ($courier, $user, $data): void {
+            if (array_key_exists('email', $data)) {
+                $user->update(['email' => $data['email']]);
+                unset($data['email']);
+            }
 
-        return response()->json(['message' => 'Profile updated.', 'courier' => $this->summary($request, $courier->fresh())]);
+            $courier->update($data);
+        });
+
+        return response()->json([
+            'message' => 'Profile updated.',
+            'email' => $user->email,
+            'user' => ['email' => $user->email],
+            'courier' => $courier->fresh()->apiPayload(),
+        ]);
     }
 
     public function updatePassword(Request $request): JsonResponse
@@ -82,21 +103,6 @@ class AccountController extends Controller
         $this->deleteQuietly($old);
 
         return response()->json(['message' => 'Profile photo removed.']);
-    }
-
-    private function summary(Request $request, $courier): array
-    {
-        return [
-            'id' => $courier->id,
-            'name' => $courier->full_name,
-            'contact_no' => $courier->contact_no,
-            'province' => $courier->province,
-            'municipality' => $courier->municipality,
-            'barangay' => $courier->barangay,
-            'street_address' => $courier->street_address,
-            'house_number' => $courier->house_number,
-            'avatar_url' => $request->user()->avatar_url,
-        ];
     }
 
     private function deleteQuietly(?string $path): void

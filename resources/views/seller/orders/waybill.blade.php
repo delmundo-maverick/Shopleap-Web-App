@@ -138,8 +138,9 @@
         $sellerProfile = $order->seller->sellerProfile;
         $ship = $order->ship_to;
         $maxItems = 5;
-        $visibleItems = $order->items->take($maxItems);
-        $hiddenCount = max(0, $order->items->count() - $maxItems);
+        $items = collect($courierPayload['items']);
+        $visibleItems = $items->take($maxItems);
+        $hiddenCount = max(0, $items->count() - $maxItems);
     @endphp
 
     <table>
@@ -167,10 +168,10 @@
 
     <p class="section-title">Ship To (Buyer)</p>
     <div class="box">
-        <div class="name">{{ $ship['name'] ?? '—' }}</div>
+        <div class="name">{{ $courierPayload['buyer']['name'] ?? '—' }}</div>
         @if ($ship['municipality'])
-            {{ $ship['street'] }}, {{ $ship['barangay'] }}, {{ $ship['municipality'] }}, {{ $ship['province'] }}<br>
-            Contact: {{ $ship['contact_no'] }}
+            {{ $courierPayload['buyer']['address'] }}<br>
+            Contact: {{ $courierPayload['buyer']['phone'] }}
         @else
             —
         @endif
@@ -186,7 +187,7 @@
         @endif
     </div>
 
-    <p class="section-title">Items ({{ $order->items->sum('quantity') }} total)</p>
+    <p class="section-title">Items ({{ $items->sum('quantity') }} total)</p>
     <table class="items">
         <tr>
             <th>Item</th>
@@ -195,14 +196,14 @@
         @foreach ($visibleItems as $item)
             <tr>
                 <td>
-                    {{ $item->product_name }}
-                    @if ($item->selected_options)
+                    {{ $item['name'] }}
+                    @if ($item['variant'])
                         <div class="variant">
-                            {{ collect($item->selected_options)->map(fn($v, $k) => "{$k}: {$v}")->implode(', ') }}
+                            {{ $item['variant'] }}
                         </div>
                     @endif
                 </td>
-                <td style="text-align: right;">{{ $item->quantity }}</td>
+                <td style="text-align: right;">{{ $item['quantity'] }}</td>
             </tr>
         @endforeach
         @if ($hiddenCount > 0)
@@ -212,9 +213,9 @@
         @endif
     </table>
 
-    @if (($order->total_weight_kg ?? 0) > 0)
+    @if ($courierPayload['parcel_weight_kg'] > 0)
         <p class="muted" style="font-size: 7px; margin-top: 4px;">
-            Parcel weight: {{ number_format($order->total_weight_kg, 2) }} kg
+            Parcel weight: {{ $courierPayload['parcel_weight_kg'] }} kg
         </p>
     @endif
 
@@ -223,11 +224,11 @@
             <tr>
                 <td>
                     <span class="muted" style="font-size: 6px; text-transform: uppercase;">Payment</span><br>
-                    <b>Cash on Delivery</b>
+                    <b>{{ $courierPayload['payment']['method'] === 'cod' ? 'Cash on Delivery' : 'Prepaid' }}</b>
                 </td>
                 <td style="text-align: right;">
                     <span class="muted" style="font-size: 6px; text-transform: uppercase;">Amount to collect</span><br>
-                    <span class="cod-amount">₱{{ number_format($order->grand_total, 2) }}</span>
+                    <span class="cod-amount">₱{{ $courierPayload['payment']['amount_to_collect'] === null ? '—' : number_format((float) $courierPayload['payment']['amount_to_collect'], 2) }}</span>
                 </td>
             </tr>
         </table>

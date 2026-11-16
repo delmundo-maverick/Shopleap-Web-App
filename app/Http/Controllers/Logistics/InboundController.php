@@ -534,13 +534,14 @@ class InboundController extends Controller
         string $type = 'parcel',
         ?string $reference = null,
     ) {
-        $publicOrder = $orderId ? Order::find($orderId) : null;
+        $publicOrder = $orderId ? Order::with(['items', 'buyer.buyerProfile'])->find($orderId) : null;
         if ($publicOrder) {
             $message = str_replace('#'.$orderId, '#'.$publicOrder->order_number, $message);
             $reference = $reference === '#'.$orderId ? '#'.$publicOrder->order_number : $reference;
         }
         if ($request->expectsJson()) {
             return response()->json([
+                ...($publicOrder?->courierPayload() ?? []),
                 'success' => $ok,
                 'message' => $message,
                 'order_id' => $publicOrder?->order_number,

@@ -4,6 +4,7 @@ paths:
   - app/Services/LogisticsDashboardService.php
   - app/Services/RiderEarnings.php
   - app/Services/OrderReturns.php
+  - app/Services/OrderTransitions.php
 ---
 
 # Services
@@ -19,3 +20,6 @@ Rider pay is set by append-only per-hub rates at successful delivery, never by t
 
 ## Refund merchandise only after delivery
 Delivered-order refunds repay merchandise after allocated vouchers and reverse its commission. Do not include outbound shipping in shipping_amount or refund_amount: hub shipping income and rider pay remain earned. The refund payable must agree with OrderLedger refunds_issued.
+
+## Repair missing delivery proof without replaying delivery money
+A delivery retry with no proof must store a validated photo from the original delivery rider, attributed to the frozen earning hub/courier. Keep existing proof records (including expired records) immutable. Photo repair must not replay lifecycle events, COD, ledger entries, or earnings snapshots; retain order locking and rollback file cleanup.

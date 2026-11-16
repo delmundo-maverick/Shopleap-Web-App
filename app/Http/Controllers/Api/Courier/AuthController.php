@@ -207,7 +207,11 @@ class AuthController extends Controller
     {
         $profile = $request->attributes->get('courier')->load('logisticsProfile');
 
-        return response()->json(['courier' => $this->payload($profile)]);
+        return response()->json([
+            'email' => $request->user()->email,
+            'user' => ['email' => $request->user()->email],
+            'courier' => $this->payload($profile),
+        ]);
     }
 
     /** After a rejection: resubmit to the same hub or a different one. */
@@ -364,28 +368,6 @@ class AuthController extends Controller
 
     private function payload(CourierProfile $p): array
     {
-        return [
-            'id' => $p->id,
-            'name' => $p->full_name,
-            'status' => $p->status,                 // pending | approved | rejected
-            'is_active' => (bool) $p->is_active,
-            'rejection_reason' => $p->rejection_reason,
-            'vehicle_type' => $p->vehicle_type,
-            'plate_number' => $p->plate_number,
-            'contact_no' => $p->contact_no,
-            'house_number' => $p->house_number,
-            'street_address' => $p->street_address,
-            'province' => $p->province,
-            'municipality' => $p->municipality,
-            'barangay' => $p->barangay,
-            'avatar_url' => $p->user?->avatar_url,
-            'hub' => $p->logisticsProfile ? [
-                'id' => $p->logisticsProfile->id,
-                'name' => $p->logisticsProfile->business_name,
-                'company' => $p->logisticsProfile->company_name,
-                'municipality' => $p->logisticsProfile->municipality,
-                'province' => $p->logisticsProfile->province,
-            ] : null,
-        ];
+        return $p->apiPayload();
     }
 }
