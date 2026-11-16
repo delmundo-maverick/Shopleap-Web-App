@@ -195,7 +195,7 @@ class OrderReturns
             $auto ? 'Approved automatically' : 'Seller approved the request',
             $auto
                 ? 'The seller did not respond within '.OrderReturn::RESPONSE_DAYS.' days.'
-                : ($refundOnly ? 'Shopleap will send the refund.' : 'The buyer can now ship the item back.'),
+                : ($refundOnly ? 'The approved refund is ready for payment.' : 'The buyer can now ship the item back.'),
             $actorId
         );
     }
@@ -229,7 +229,7 @@ class OrderReturns
             $auto ? 'Receipt confirmed automatically' : 'Seller received the item',
             $auto
                 ? 'The seller did not respond within '.OrderReturn::RECEIPT_DAYS.' days of the shipment.'
-                : 'Shopleap will send the refund.',
+                : 'The approved refund is ready for payment.',
             $actorId
         );
     }

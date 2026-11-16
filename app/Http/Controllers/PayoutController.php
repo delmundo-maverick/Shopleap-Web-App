@@ -9,6 +9,7 @@ use App\Services\MoneyHistory;
 use App\Services\MoneyReport;
 use App\Services\PayoutQueries;
 use App\Services\Payouts;
+use App\Services\SellerSettlements;
 use App\Support\LedgerPresentation;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -20,10 +21,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PayoutController extends Controller
 {
-    public function index(Request $request, PayoutQueries $queries, MoneyReport $report, MoneyHistory $historyTools): View|StreamedResponse
+    public function index(Request $request, PayoutQueries $queries, MoneyReport $report, MoneyHistory $historyTools): View|StreamedResponse|RedirectResponse
     {
         $role = $request->routeIs('seller.*') ? 'seller' : ($request->routeIs('logistics.*') ? 'logistics' : 'admin');
         $refunds = $request->routeIs('admin.refunds.*');
+        if ($role === 'admin' && ! $refunds && ! app(SellerSettlements::class)->hasLegacyPlatformPayouts()) {
+            return redirect()->route('admin.settlements.index');
+        }
         $request->validate(['status' => ['nullable', Rule::in(['all', 'open', 'pending', 'processing', 'paid', 'rejected'])], 'page' => ['nullable', 'integer', 'min:1'], 'riders_page' => ['nullable', 'integer', 'min:1']]);
         $statusOptions = $role === 'logistics' ? ['all' => 'All statuses', 'paid' => 'Paid'] : ($refunds
             ? ['all' => 'All statuses', 'pending' => 'Pending', 'paid' => 'Paid']
@@ -31,7 +35,7 @@ class PayoutController extends Controller
         $historyFilters = $historyTools->filters($request, array_keys($statusOptions), $role === 'admin' ? ($refunds ? 'pending' : 'open') : 'all');
         $status = $historyFilters['status'];
         $data = ['role' => $role, 'refunds' => $refunds, 'selectedStatus' => $status,
-            'title' => $refunds ? 'Refunds' : ($role === 'logistics' ? 'Rider payouts' : ($role === 'admin' ? 'Seller payouts' : 'Payouts')),
+            'title' => $refunds ? 'Refunds' : ($role === 'logistics' ? 'Rider payouts' : ($role === 'admin' ? 'Legacy platform seller payouts' : 'Payouts')),
             'riders' => null, 'riderOrders' => collect(), 'recordOrders' => collect(), 'methods' => collect(), 'hasActive' => false,
             'minimumPayout' => (string) PlatformSetting::get('minimum_payout', '100.00'), 'historyFilters' => $historyFilters, 'statusOptions' => $statusOptions];
         if ($role === 'logistics') {
@@ -51,6 +55,7 @@ class PayoutController extends Controller
             $sellerId = $role === 'seller' ? $request->user()->id : null;
             $data['balances'] = $report->balances($sellerId ? 'seller' : 'platform', $sellerId ?? 0);
             if ($sellerId) {
+                $data['balances']['available'] = LedgerService::decimal(max(0, LedgerService::cents($data['balances']['available']) - app(SellerSettlements::class)->directAvailable($sellerId)));
                 $data['methods'] = DB::table('seller_payout_methods')->where('seller_id', $sellerId)->orderByDesc('is_default')->orderByDesc('id')->get();
                 $data['hasActive'] = DB::table('seller_payouts')->where('active_seller_id', $sellerId)->exists();
             }

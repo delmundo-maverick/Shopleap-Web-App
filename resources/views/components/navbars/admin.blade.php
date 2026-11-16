@@ -17,7 +17,7 @@
     ];
     array_unshift($sections['Financials & Logs'], ['route' => 'admin.ledger.index', 'label' => 'Platform ledger', 'key' => 'ledger']);
     $sections['Money'] = [
-        ['route' => 'admin.payouts.index', 'label' => 'Seller payouts'],
+        ['route' => 'admin.settlements.index', 'label' => 'Seller settlement oversight'],
         ['route' => 'admin.refunds.index', 'label' => 'Refunds'],
     ];
     foreach (['remittances' => 'Remittances', 'settings' => 'Remittance settings'] as $section => $label) {

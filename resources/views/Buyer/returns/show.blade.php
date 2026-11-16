@@ -177,7 +177,7 @@
 
                 @case($R::STATUS_REFUND_PENDING)
                     <p class="text-sm text-charcoal/70">
-                        Approved. Shopleap is sending <b>₱{{ number_format($return->refund_amount, 2) }}</b> to your
+                        Approved. A refund of <b>₱{{ number_format($return->refund_amount, 2) }}</b> will be sent to your
                         {{ $return->refund_method_label }} ({{ $return->masked_account }}). We'll mark it here once it's sent.
                     </p>
                 @break

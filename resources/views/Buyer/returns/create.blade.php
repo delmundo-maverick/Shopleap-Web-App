@@ -150,8 +150,8 @@
             {{-- 4. Refund payout --}}
             <section class="rounded-lg bg-white p-5 shadow-sm shadow-charcoal/5">
                 <h2 class="mb-1 text-sm font-bold text-charcoal">4. Where should we send your refund?</h2>
-                <p class="mb-3 text-xs text-charcoal/50">You paid cash on delivery, so Shopleap sends the refund to this
-                    account. Only Shopleap sees the full number.</p>
+                <p class="mb-3 text-xs text-charcoal/50">Your approved COD refund will be paid to this account. Only the last four
+                    digits are retained. Arrange full payment details with the paying party through your verified communication channel.</p>
 
                 <div class="grid gap-3 sm:grid-cols-3">
                     <select name="refund_method" required

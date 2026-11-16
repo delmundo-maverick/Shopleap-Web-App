@@ -239,8 +239,8 @@
                                     @break
 
                                     @case($R::STATUS_REFUND_PENDING)
-                                        <p class="text-sm text-charcoal/70">Approved. Shopleap is sending the refund to the
-                                            buyer. Nothing more to do.</p>
+                                        <p class="text-sm text-charcoal/70">Approved. The buyer refund is awaiting payment.
+                                            Check Logistics payments for any seller funds that must be returned.</p>
                                     @break
 
                                     @case($R::STATUS_REFUNDED)

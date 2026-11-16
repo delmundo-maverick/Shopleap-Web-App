@@ -10,6 +10,7 @@ use App\Services\MoneyHistory;
 use App\Services\MoneyMovementQueries;
 use App\Services\MoneyMovements;
 use App\Services\MoneyReport;
+use App\Services\SellerSettlements;
 use App\Support\LedgerPresentation;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -72,9 +73,9 @@ class MoneyMovementController extends Controller
                 ->where('a.owner_type', 'hub')->where('a.account_type', 'cash_held')->whereIn('a.owner_id', $data['rows']->getCollection()->pluck('hub_id'))
                 ->groupBy('a.owner_id')->select('a.owner_id')->selectRaw("ROUND(SUM(CASE WHEN e.direction = 'debit' THEN e.amount ELSE -e.amount END), 2) as amount")->pluck('amount', 'owner_id');
             $data['overdueHubs'] = $queries->deliveries($hubId)->join('logistics_profiles as h', 'h.id', '=', 'o.earning_hub_id')
+                ->joinSub(app(SellerSettlements::class)->orderBalances('hub', 'cod_to_remit'), 'due', 'due.order_id', '=', 'o.id')->where('due.amount', '>', 0)
                 ->where('o.delivered_at', '<', now()->subDays($data['dueDays']))
-                ->whereNotExists(fn (Builder $query) => $query->selectRaw('1')->from('remittance_items as i')->join('remittances as r', 'r.id', '=', 'i.remittance_id')->whereColumn('i.order_id', 'o.id')->where('r.status', 'verified'))
-                ->select('h.id', 'h.business_name')->selectRaw('COUNT(*) as orders, ROUND(SUM(o.total_amount), 2) as amount')->groupBy('h.id', 'h.business_name')->get();
+                ->select('h.id', 'h.business_name')->selectRaw('COUNT(*) as orders, ROUND(SUM(due.amount), 2) as amount')->groupBy('h.id', 'h.business_name')->get();
         }
 
         return view('money.movements', $data);

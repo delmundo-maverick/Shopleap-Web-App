@@ -66,6 +66,7 @@
         'Insights' => [
             ['route' => 'seller.earnings.index', 'label' => 'Earnings', 'key' => 'earnings'],
             ['route' => 'seller.payouts.index', 'label' => 'Payouts', 'key' => 'payouts'],
+            ['route' => 'seller.settlements.index', 'label' => 'Logistics payments', 'key' => 'settlements'],
             [
                 'route' => 'seller.reports.index',
                 'label' => 'Generate Report',

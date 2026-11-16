@@ -39,7 +39,7 @@
     </a>
 
 </x-slot:location>
-    <x-slot:desktopLinks><x-nav.link class="buyer-header-top-link" :active="request()->routeIs('buyer.account.*')" :href="route('buyer.account.index').'#address'">Delivery address</x-nav.link><x-nav.link class="buyer-header-top-link" :active="request()->routeIs('buyer.orders.*')" :href="route('buyer.orders.index', ['tab' => 'to_deliver'])">Track My Order</x-nav.link></x-slot:desktopLinks>
+    <x-slot:desktopLinks><x-nav.link class="buyer-header-top-link" :icon="\App\Support\NavigationIcons::path('areas')" :active="request()->routeIs('buyer.account.*')" :href="route('buyer.account.index').'#address'">Delivery address</x-nav.link><x-nav.link class="buyer-header-top-link" :icon="\App\Support\NavigationIcons::path('tracking')" :active="request()->routeIs('buyer.orders.*')" :href="route('buyer.orders.index', ['tab' => 'to_deliver'])">Track My Order</x-nav.link></x-slot:desktopLinks>
     <x-slot:utilityActions>                {{-- Notifications --}}
                 <x-notification-bell-script />
 
@@ -144,15 +144,15 @@
                     <div x-show="open" x-cloak x-transition
                         class="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-line bg-white py-1.5 text-charcoal shadow-lg">
                         <a href="{{ route('buyer.account.index') }}"
-                            class="block px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue">My Account</a>
+                            class="flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue"><x-nav.icon name="account" />My Account</a>
                         <a href="{{ route('buyer.orders.index') }}"
-                            class="block px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue">Purchases</a>
+                            class="flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue"><x-nav.icon name="orders" />Purchases</a>
                         <a href="{{ route('buyer.wishlist.index') }}"
-                            class="block px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue">Wishlist</a>
+                            class="flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue"><x-nav.icon name="wishlist" />Wishlist</a>
                         <a href="{{ route('buyer.vouchers.index') }}"
-                            class="block px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue">Vouchers</a>
+                            class="flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue"><x-nav.icon name="vouchers" />Vouchers</a>
                         <a href="{{ route('messages.index') }}"
-                            class="block px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue">Chat / Messages</a>
+                            class="flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-ice-blue"><x-nav.icon name="messages" />Chat / Messages</a>
 
                         <div class="my-1 h-px bg-line"></div>
 
@@ -246,14 +246,14 @@
 </x-slot:actions>
     <x-slot:mobileUser><div id="buyer-mobile-profile"><x-nav.user-menu id="buyer-mobile-profile-menu" /></div></x-slot:mobileUser>
     <x-slot:mobileMenu>
-        <x-nav.link :href="route('buyer.home')">Home</x-nav.link>
-        <x-nav.link :href="route('buyer.products.index')">Browse products</x-nav.link>
-        <x-nav.link :href="route('buyer.account.index')">My Account</x-nav.link>
-        <x-nav.link :href="route('buyer.orders.index')">Purchases</x-nav.link>
-        <x-nav.link :href="route('buyer.wishlist.index')">Wishlist</x-nav.link>
-        <x-nav.link :href="route('buyer.vouchers.index')">Vouchers</x-nav.link>
-        <x-nav.link :href="route('messages.index')">Messages</x-nav.link>
-        <x-nav.link :href="route('notifications.index')">Notifications</x-nav.link>
+        <x-nav.link :icon="\App\Support\NavigationIcons::forRoute('buyer.home')" :href="route('buyer.home')">Home</x-nav.link>
+        <x-nav.link :icon="\App\Support\NavigationIcons::forRoute('buyer.products.index')" :href="route('buyer.products.index')">Browse products</x-nav.link>
+        <x-nav.link :icon="\App\Support\NavigationIcons::forRoute('buyer.account.index')" :href="route('buyer.account.index')">My Account</x-nav.link>
+        <x-nav.link :icon="\App\Support\NavigationIcons::forRoute('buyer.orders.index')" :href="route('buyer.orders.index')">Purchases</x-nav.link>
+        <x-nav.link :icon="\App\Support\NavigationIcons::forRoute('buyer.wishlist.index')" :href="route('buyer.wishlist.index')">Wishlist</x-nav.link>
+        <x-nav.link :icon="\App\Support\NavigationIcons::forRoute('buyer.vouchers.index')" :href="route('buyer.vouchers.index')">Vouchers</x-nav.link>
+        <x-nav.link :icon="\App\Support\NavigationIcons::forRoute('messages.index')" :href="route('messages.index')">Messages</x-nav.link>
+        <x-nav.link :icon="\App\Support\NavigationIcons::forRoute('notifications.index')" :href="route('notifications.index')">Notifications</x-nav.link>
     </x-slot:mobileMenu>
 </x-nav.shell>
 

@@ -108,6 +108,7 @@ class Payouts
                 $cents = $this->amount($amount);
                 $minimum = LedgerService::cents((string) (DB::table('platform_settings')->where('key', 'minimum_payout')->lockForUpdate()->value('value') ?? '100.00'));
                 $available = LedgerService::cents($this->report->balances('seller', $sellerId)['available']);
+                $available = max(0, $available - app(SellerSettlements::class)->directAvailable($sellerId));
                 $this->ensure($cents >= $minimum && $cents <= $available, 'The payout must be at least ₱'.number_format($minimum / 100, 2).' and no more than your available balance.');
                 $record = MoneyReferences::insert('seller_payouts', 'SP', [
                     'seller_id' => $sellerId, 'active_seller_id' => $sellerId, 'request_key' => $key, 'amount' => LedgerService::decimal($cents),
@@ -185,28 +186,52 @@ class Payouts
         }, 3);
     }
 
-    public function payRefund(string $reference, int $actorId): object
+    public function payRefund(string $reference, int $actorId, ?int $hubId = null, ?string $transferReference = null, ?string $proofPath = null): object
     {
-        return DB::transaction(function () use ($reference, $actorId): object {
+        return DB::transaction(function () use ($reference, $actorId, $hubId, $transferReference, $proofPath): object {
             $initial = DB::table('refund_payouts')->where('reference_no', $reference)->firstOrFail();
             Order::whereKey($initial->order_id)->lockForUpdate()->firstOrFail();
             $return = OrderReturn::whereKey($initial->order_return_id)->lockForUpdate()->firstOrFail();
             $record = DB::table('refund_payouts')->where('id', $initial->id)->lockForUpdate()->firstOrFail();
-            if ($record->status === 'paid') {
-                return $record;
-            }
-            $this->ensure($return->status === OrderReturn::STATUS_REFUND_PENDING && $record->status === 'pending', 'Only approved refunds ready for payment can be paid.');
-            $cents = $this->amount((string) $record->amount);
-            $this->ledger->post('refund-payout:'.$record->id.':paid', 'refund_payout_paid', $record->order_id, 'Refund paid - '.$record->reference_no, [
-                $this->line('platform', 0, 'cod_held', 'credit', $cents),
-                $this->line('system', 0, 'EXTERNAL_BANK', 'debit', $cents),
-            ]);
-            DB::table('refund_payouts')->where('id', $record->id)->update(['status' => 'paid', 'paid_by' => $actorId, 'paid_at' => now(), 'updated_at' => now()]);
-            $return->forceFill(['status' => OrderReturn::STATUS_REFUNDED, 'refund_reference' => $reference, 'refunded_by' => $actorId, 'refunded_at' => now()])->save();
-            $return->events()->create(['actor_id' => $actorId, 'title' => 'Refund paid', 'note' => '₱'.number_format($cents / 100, 2).' · '.$reference]);
-            DB::afterCommit(fn () => app(Notifier::class)->returnChanged($return, $actorId));
 
-            return DB::table('refund_payouts')->where('id', $record->id)->firstOrFail();
+            return $this->ledger->synchronized(function () use ($record, $return, $reference, $actorId, $hubId, $transferReference, $proofPath): object {
+                $direct = app(SellerSettlements::class)->isDirect($record->order_id);
+                $source = $direct ? DB::table('seller_settlement_orders')->where('order_id', $record->order_id)->firstOrFail() : null;
+                if ($direct) {
+                    abort_unless($hubId !== null && (int) $source->hub_id === $hubId && User::findOrFail($actorId)->role === 'logistics'
+                        && (int) LogisticsProfile::where('user_id', $actorId)->value('id') === $hubId, 403);
+                } else {
+                    abort_unless($hubId === null && User::findOrFail($actorId)->role === 'super_admin', 403);
+                }
+                if ($record->status === 'paid') {
+                    return $record;
+                }
+                $this->ensure($return->status === OrderReturn::STATUS_REFUND_PENDING && $record->status === 'pending', 'Only approved refunds ready for payment can be paid.');
+                $cents = $this->amount((string) $record->amount);
+                if ($direct) {
+                    $this->ensure($transferReference !== null && trim($transferReference) !== '' && $proofPath !== null, 'A refund transfer reference and proof are required.');
+                    app(SellerSettlements::class)->assertTransferReferenceAvailable($transferReference);
+                    $this->ensure(app(SellerSettlements::class)->orderAmount($record->order_id, 'hub', 'cash_held') >= $cents, 'Recover seller funds and any remitted commission before funding this refund.');
+                }
+                $this->ledger->post('refund-payout:'.$record->id.':paid', 'refund_payout_paid', $record->order_id, 'Refund paid - '.$record->reference_no, [
+                    $this->line($direct ? 'hub' : 'platform', $direct ? $source->hub_id : 0, $direct ? 'cash_held' : 'cod_held', 'credit', $cents),
+                    $this->line('system', 0, 'EXTERNAL_BANK', 'debit', $cents),
+                ]);
+                $values = ['status' => 'paid', 'paid_by' => $actorId, 'paid_at' => now(), 'updated_at' => now()];
+                if ($direct) {
+                    $values += ['transfer_reference' => $transferReference, 'proof_path' => $proofPath];
+                }
+                DB::table('refund_payouts')->where('id', $record->id)->update($values);
+                if ($direct) {
+                    DB::table('seller_settlement_events')->insert(['order_id' => $record->order_id, 'actor_id' => $actorId, 'action' => 'buyer_refund',
+                        'transfer_reference' => $transferReference, 'proof_path' => $proofPath, 'amount' => LedgerService::decimal($cents), 'created_at' => now(), 'updated_at' => now()]);
+                }
+                $return->forceFill(['status' => OrderReturn::STATUS_REFUNDED, 'refund_reference' => $reference, 'refunded_by' => $actorId, 'refunded_at' => now()])->save();
+                $return->events()->create(['actor_id' => $actorId, 'title' => 'Refund paid', 'note' => '₱'.number_format($cents / 100, 2).' · '.$reference]);
+                DB::afterCommit(fn () => app(Notifier::class)->returnChanged($return, $actorId));
+
+                return DB::table('refund_payouts')->where('id', $record->id)->firstOrFail();
+            });
         }, 3);
     }
 

@@ -19,6 +19,7 @@
     <div class="flex min-w-0 flex-1 flex-col">
         <x-seller.page-header :title="$title" description="Payout records and payment history" class="bg-surface! bg-none! shadow-none! backdrop-blur-none!" />
         <main class="space-y-5 p-4 sm:p-6">
+            @if ($role === 'admin' && !$refunds)<p class="rounded-sm border border-line p-3 text-sm">This page covers historical platform-managed seller funds only. New seller payments are handled directly by logistics. <a class="text-primary underline" href="{{ route('admin.settlements.index') }}">Open settlement oversight</a>.</p>@endif
             @if (session('status'))<p role="status" class="rounded-sm border border-line bg-surface p-3 text-sm">{{ session('status') }}</p>@endif
             @if ($errors->any())<div role="alert" class="rounded-sm border border-danger bg-surface p-3 text-sm text-danger">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
             <div class="grid gap-3 sm:grid-cols-3">
@@ -29,7 +30,8 @@
             @if ($role === 'seller')
                 <div class="grid gap-5 xl:grid-cols-2">
                     <section class="space-y-4 rounded-sm border border-line bg-surface p-4">
-                        <h2 class="font-semibold">Request a payout</h2>
+                        <h2 class="font-semibold">Request a platform-managed payout</h2>
+                        <p class="text-sm">New logistics-managed orders are paid directly by the hub after completion and cash receipt. <a class="text-primary underline" href="{{ route('seller.settlements.index') }}">View logistics payments</a>. This form covers legacy platform-managed earnings.</p>
                         <p class="text-sm">Minimum payout {{ $peso($minimumPayout) }}. Choose an account and amount.</p>
                         @if ((float) $balances['available'] <= 0)<p role="status" class="text-sm text-warning">You have no available balance to withdraw. Payout requests are disabled until your available balance is positive.</p>
                         @elseif ((float) $balances['available'] < (float) $minimumPayout)<p role="status" class="text-sm text-warning">Your available balance is below the minimum payout of {{ $peso($minimumPayout) }}.</p>@endif
@@ -89,7 +91,7 @@
             @endif
             <section class="space-y-3">
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <h2 class="font-semibold">{{ $role === 'admin' ? 'Payment queue and history' : 'Payout history' }}</h2>
+                    <h2 class="font-semibold">{{ $role === 'admin' ? ($refunds ? 'Refund queue and history' : 'Legacy platform payment queue and history') : 'Payout history' }}</h2>
                 </div>
                 <x-money.history-filters :filters="$historyFilters" :statuses="$statusOptions" />
                 <x-seller.data-table label="Payout history" responsive="scroll" class="rounded-sm! bg-surface! bg-none! shadow-none! backdrop-blur-none!">
@@ -104,8 +106,10 @@
                                 @else<p>{{ match ($row->method_type) { 'gcash' => 'GCash', 'maya' => 'Maya', 'bank' => 'Bank', default => $row->method_type } }} · {{ \App\Support\LedgerPresentation::text($row->account_name) }}</p><p class="mt-1 font-mono">•••• {{ substr(preg_replace('/\D/', '', $row->account_number_masked), -4) }}</p>@if (!empty($row->rejection_reason))<p class="mt-2 text-danger">{{ \App\Support\LedgerPresentation::text($row->rejection_reason) }}</p>@endif @endif
                             </td>
                             <td class="p-3">
-                                <a class="btn btn-outline mb-2 rounded-sm!" href="{{ route($role === 'logistics' ? 'logistics.receipts.show' : 'money.receipts.show', ['type' => $refunds ? 'refunds' : ($role === 'logistics' ? 'rider-payouts' : 'seller-payouts'), 'reference' => $row->reference_no]) }}">View receipt</a>
-                                @if ($role === 'admin' && $refunds && $row->status === 'pending')
+                                <a class="btn btn-outline mb-2 rounded-sm!" href="{{ route($role === 'logistics' ? 'logistics.receipts.show' : ($role === 'admin' ? 'admin.receipts.show' : 'money.receipts.show'), ['type' => $refunds ? 'refunds' : ($role === 'logistics' ? 'rider-payouts' : 'seller-payouts'), 'reference' => $row->reference_no]) }}">View receipt</a>
+                                @if ($role === 'admin' && $refunds && !empty($row->logistics_order_id))
+                                    <a class="text-sm text-primary underline" href="{{ route('admin.settlements.index') }}">Logistics-funded refund · view oversight</a>
+                                @elseif ($role === 'admin' && $refunds && $row->status === 'pending')
                                     <form method="POST" action="{{ route('admin.refunds.pay', $row->reference_no) }}" data-money-form data-confirm="Confirm the buyer has received this refund? This records the completed payment.">@csrf<button class="btn btn-primary whitespace-nowrap rounded-sm!">Mark refund paid</button></form>
                                 @elseif ($role === 'admin' && !$refunds && in_array($row->status, ['pending', 'processing'], true))
                                     <div class="flex min-w-44 flex-col items-start gap-2">

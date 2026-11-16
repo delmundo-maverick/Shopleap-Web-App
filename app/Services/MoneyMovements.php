@@ -93,6 +93,11 @@ class MoneyMovements
             $this->lockOrders($query);
             $orders = $query->get();
             $this->ensure(($orderCodes === null || $orders->count() === count(array_unique($orderCodes))) && $orders->isNotEmpty(), 'Select eligible orders belonging to this hub. Some orders may already be submitted.');
+            foreach ($orders as $order) {
+                if (app(SellerSettlements::class)->isDirect($order->id)) {
+                    $this->ensure(app(SellerSettlements::class)->orderAmount($order->id, 'hub', 'cash_held') >= LedgerService::cents((string) $order->amount), 'Collect the rider cash before remitting this order.');
+                }
+            }
             $record = MoneyReferences::insert('remittances', 'RM', ['hub_id' => $hubId, 'request_key' => $key,
                 'total_amount' => LedgerService::decimal($this->sum($orders)), 'status' => 'submitted', 'proof_path' => $proofPath,
                 'submitted_by' => $actorId, 'submitted_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
@@ -123,12 +128,20 @@ class MoneyMovements
                 if ($verify) {
                     foreach ($items as $item) {
                         $cents = LedgerService::cents((string) $item->amount);
+                        if (app(SellerSettlements::class)->isDirect($item->order_id)) {
+                            $this->ensure(app(SellerSettlements::class)->orderAmount($item->order_id, 'hub', 'cod_to_remit') >= $cents
+                                && app(SellerSettlements::class)->orderAmount($item->order_id, 'hub', 'cash_held') >= $cents,
+                                'Commission or available cash changed. Reject this remittance and submit the current amount.');
+                        }
                         $this->ledger->post('remittance:'.$record->id.':'.$item->order_id, 'remittance', $item->order_id, 'Remittance verified - '.$record->reference_no, [
                             $this->line('hub', $record->hub_id, 'cod_to_remit', 'debit', $cents),
                             $this->line('platform', 0, 'cod_receivable', 'credit', $cents),
                             $this->line('platform', 0, 'cod_held', 'debit', $cents),
                             $this->line('hub', $record->hub_id, 'cash_held', 'credit', $cents),
                         ]);
+                        if (app(SellerSettlements::class)->isDirect($item->order_id)) {
+                            DB::table('remittance_items')->where('id', $item->id)->update(['active_order_id' => null]);
+                        }
                     }
                 } else {
                     DB::table('remittance_items')->where('remittance_id', $record->id)->update(['active_order_id' => null]);

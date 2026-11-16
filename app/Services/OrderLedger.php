@@ -59,7 +59,15 @@ class OrderLedger
             $lines[] = $this->line('rider', $order->earning_courier_id, 'earnings_income', 'credit', $pay);
         }
 
-        return $this->ledger->post('order:'.$order->id.':delivered', 'delivery', $order->id, 'COD collected - Order '.$order->order_number, $lines);
+        return DB::transaction(function () use ($order, $lines): int {
+            $existing = $this->hasDelivery($order->id);
+            $id = $this->ledger->post('order:'.$order->id.':delivered', 'delivery', $order->id, 'COD collected - Order '.$order->order_number, $lines);
+            if (! $existing && config('money.logistics_seller_settlements')) {
+                app(SellerSettlements::class)->routeOrder($order);
+            }
+
+            return $id;
+        });
     }
 
     public function completed(Order $order, ?string $releaseKey = null): ?int
@@ -93,6 +101,7 @@ class OrderLedger
         if (in_array($return->status, [OrderReturn::STATUS_CANCELLED, OrderReturn::STATUS_EXPIRED, OrderReturn::STATUS_REJECTED], true)) {
             if ($original !== null) {
                 $this->ledger->reverse($original, 'return:'.$return->id.':reversed');
+                app(SellerSettlements::class)->applyRefund($return, reverse: true);
                 if ($order->status === Order::STATUS_COMPLETED) {
                     $this->completed($order, 'return:'.$return->id.':release-restored');
                 }
@@ -114,6 +123,7 @@ class OrderLedger
             $this->line('platform', 0, $confirmed ? 'commission_earned' : 'commission_pending', 'debit', $commission),
             $this->line('buyer', $order->buyer_id, 'refunds_issued', 'credit', $items),
         ]);
+        app(SellerSettlements::class)->applyRefund($return);
     }
 
     public function hasDelivery(int $orderId): bool

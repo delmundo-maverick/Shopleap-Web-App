@@ -76,6 +76,7 @@
         ],
         'Money' => [
             ['route' => 'logistics.payouts.index', 'label' => 'Rider payouts'],
+            ['route' => 'logistics.settlements.index', 'label' => 'Seller payments'],
             ['route' => 'logistics.movements.index', 'params' => ['section' => 'cash'], 'label' => 'Rider cash', 'selected' => request()->routeIs('logistics.movements.index') && request()->route('section') === 'cash'],
             ['route' => 'logistics.movements.index', 'params' => ['section' => 'remittances'], 'label' => 'Remittance', 'selected' => request()->routeIs('logistics.movements.index') && request()->route('section') === 'remittances'],
         ],

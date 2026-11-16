@@ -54,9 +54,12 @@ class PayoutQueries
 
     public function refunds(): Builder
     {
+        $routing = DB::table('ledger_transactions')->where('type', 'logistics_routing')->select('order_id');
+
         return DB::table('refund_payouts as p')->join('order_returns as r', 'r.id', '=', 'p.order_return_id')
             ->join('orders as o', 'o.id', '=', 'p.order_id')->join('users as u', 'u.id', '=', 'p.buyer_id')
+            ->leftJoinSub($routing, 'routing', 'routing.order_id', '=', 'o.id')
             ->whereIn('r.status', ['refund_pending', 'refunded'])
-            ->select('p.*', 'o.order_number', 'u.name as party_name', 'r.refund_method as method_type', 'r.refund_account_name as account_name', 'r.refund_account_number as account_number_masked');
+            ->select('p.*', 'o.order_number', 'routing.order_id as logistics_order_id', 'u.name as party_name', 'r.refund_method as method_type', 'r.refund_account_name as account_name', 'r.refund_account_number as account_number_masked');
     }
 }
