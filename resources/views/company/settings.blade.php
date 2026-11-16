@@ -1,0 +1,13 @@
+<x-company.layout title="Settings" description="Company profile and account security">
+    <form method="POST" action="{{ route('company.settings.update') }}" enctype="multipart/form-data" class="max-w-4xl space-y-5 rounded-sm border border-line bg-surface p-5">@csrf @method('PUT')<h2 class="text-lg font-semibold">Company profile</h2>
+        @if ($company->logo_path)<img src="{{ Storage::disk('public')->url($company->logo_path) }}" alt="Company logo" class="size-20 rounded-sm object-contain">@endif
+        <div class="grid gap-4 sm:grid-cols-2">@foreach (['name' => ['Company name', 'text', 255], 'address' => ['Address', 'text', 2000], 'contact_phone' => ['Contact phone', 'tel', 20], 'contact_email' => ['Contact email', 'email', 255]] as $key => [$label, $type, $max])<label class="block text-sm">{{ $label }}<input name="{{ $key }}" type="{{ $type }}" value="{{ old($key, $company->$key) }}" required maxlength="{{ $max }}" class="mt-1 block w-full rounded-sm border border-line p-3"></label>@endforeach
+            <label class="block text-sm">Logo (optional)<input type="file" name="logo" accept="image/jpeg,image/png,image/webp" class="mt-1 block w-full rounded-sm border border-line p-3"><span class="mt-1 block text-xs">JPG, PNG or WebP, up to 2 MB.</span></label>
+            <label class="block text-sm">Suggested rider rate (PHP)<input type="number" name="default_rider_rate" min="0" step="0.01" max="99999999.99" value="{{ old('default_rider_rate', $company->default_rider_rate) }}" class="mt-1 block w-full rounded-sm border border-line p-3"><span class="mt-1 block text-xs">Optional. Must be lower than the lowest shipping fee. New hubs receive this initial rate; managers can change it. Existing rates stay as they are.</span></label>
+        </div><button class="btn btn-primary">Save settings</button>
+    </form>
+    <form method="POST" action="{{ route('company.settings.password') }}" class="max-w-2xl space-y-4 rounded-sm border border-line bg-surface p-5">@csrf @method('PUT')<h2 class="text-lg font-semibold">Change company account password</h2>
+        @if ($errors->password->any())<p role="alert" class="text-sm text-danger">{{ $errors->password->first() }}</p>@endif
+        @foreach (['current_password' => 'Current password', 'password' => 'New password', 'password_confirmation' => 'Confirm new password'] as $key => $label)<label class="block text-sm">{{ $label }}<input type="password" name="{{ $key }}" required autocomplete="{{ $key === 'current_password' ? 'current-password' : 'new-password' }}" @if ($key !== 'current_password') minlength="8" @endif class="mt-1 block w-full rounded-sm border border-line p-3"></label>@endforeach<button class="btn btn-primary">Change password</button>
+    </form>
+</x-company.layout>

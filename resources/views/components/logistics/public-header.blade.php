@@ -8,7 +8,7 @@
         </nav>
         <nav class="portal-actions" aria-label="Account">
             <a class="portal-button portal-button-outline" href="{{ \App\Support\Portal::url('logistics', 'login') }}">Log In</a>
-            <a class="portal-button" href="{{ route('register.logistics') }}">Register</a>
+            <a class="portal-button" href="{{ route('company.register.choose') }}">Create account</a>
         </nav>
     </div>
 </header>

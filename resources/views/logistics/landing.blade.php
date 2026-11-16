@@ -6,7 +6,7 @@
                 <h1>Keep the Philippines moving.<br><span>Deliver with ShopLeap.</span></h1>
                 <p class="portal-lead">Deliver ShopLeap orders across the Philippines with your own riders and a portal that keeps every delivery in view.</p>
                 <div class="portal-cta">
-                    <a class="portal-button" href="{{ route('register.logistics') }}">Register your company <span aria-hidden="true">&rarr;</span></a>
+                    <a class="portal-button" href="{{ route('company.register.choose') }}">Create account <span aria-hidden="true">&rarr;</span></a>
                     <a class="portal-button portal-button-light" href="{{ route('login') }}">Log in</a>
                 </div>
                 <p class="portal-small">For logistics companies ready to go the extra mile. Grow with us.</p>
@@ -75,5 +75,5 @@
             @endforeach
         </div>
     </section>
-    <section class="portal-final-cta portal-container"><div><h2>Your next chapter starts here.</h2><p>Put your delivery network to work with ShopLeap.</p></div><a class="portal-button" href="{{ route('register.logistics') }}">Register your company &rarr;</a></section>
+    <section class="portal-final-cta portal-container"><div><h2>Your next chapter starts here.</h2><p>Put your delivery network to work with ShopLeap.</p></div><a class="portal-button" href="{{ route('company.register.choose') }}">Register your company &rarr;</a></section>
 </x-logistics.public-layout>

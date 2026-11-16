@@ -80,13 +80,14 @@ class MoneyReport
     }
 
     /** @param array{money_from: string|null, money_to: string|null, money_status?: string} $filters */
-    public function history(string $ownerType, int $ownerId, bool $all, array $filters): Builder
+    public function history(string $ownerType, int $ownerId, bool $all, array $filters, ?Builder $ownerIds = null): Builder
     {
         $debitTypes = "'".implode("','", LedgerService::DEBIT_ACCOUNTS)."'";
         $movement = "CASE WHEN (a.account_type IN ({$debitTypes}) AND e.direction = 'debit') OR (a.account_type NOT IN ({$debitTypes}) AND e.direction = 'credit') THEN e.amount ELSE -e.amount END";
         $base = DB::table('ledger_entries as e')->join('ledger_transactions as t', 't.id', '=', 'e.transaction_id')
             ->join('wallet_accounts as a', 'a.id', '=', 'e.account_id')
             ->leftJoin('orders as o', 'o.id', '=', 't.order_id')
+            ->when($ownerIds !== null, fn (Builder $query) => $query->where('a.owner_type', $ownerType)->whereIn('a.owner_id', $ownerIds))
             ->when(! $all, fn (Builder $query) => $query->where('a.owner_type', $ownerType)->where('a.owner_id', $ownerId))
             ->select('e.id', 'e.amount', 'e.direction', 'a.account_type', 'a.owner_type', 'a.owner_id', 't.reference_no', 't.posted_at', 't.description', 'o.order_number', 'o.items_subtotal', 'o.voucher_discount', 'o.commission_amount', 'o.total_amount')
             ->selectRaw("CASE WHEN t.reversal_of IS NOT NULL OR EXISTS (SELECT 1 FROM ledger_transactions AS reversal WHERE reversal.reversal_of = t.id) THEN 'reversed' ELSE t.status END as status")

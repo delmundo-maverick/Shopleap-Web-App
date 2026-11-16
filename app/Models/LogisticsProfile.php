@@ -3,11 +3,19 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LogisticsProfile extends Model
 {
     protected $fillable = [
         'user_id',
+        'company_id',
+        'public_code',
+        'latitude',
+        'longitude',
+        'manager_invite_token',
+        'manager_invite_expires_at',
+        'manager_password_set_at',
         'last_name',
         'first_name',
         'middle_initial',
@@ -32,14 +40,25 @@ class LogisticsProfile extends Model
         'reviewed_at',
     ];
 
+    protected $hidden = ['manager_invite_token'];
+
     protected function casts(): array
     {
         return [
             'service_regions' => 'array',
+            'latitude' => 'decimal:7',
+            'longitude' => 'decimal:7',
+            'manager_invite_expires_at' => 'datetime',
+            'manager_password_set_at' => 'datetime',
             'birthday' => 'date',
             'reviewed_at' => 'datetime',
             'joining_existing_company' => 'boolean',
         ];
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function user()
@@ -55,11 +74,16 @@ class LogisticsProfile extends Model
     }
 
     /**
-     * Normalized company name. Hubs without a company name are treated as
+     * Stable company identity, with normalized names for standalone hubs.
+     * Hubs without a company name are treated as
      * their own company so two unnamed hubs never match by accident.
      */
     public function companyKey(): string
     {
+        if ($this->company_id !== null) {
+            return 'company:'.$this->company_id;
+        }
+
         $name = $this->company_name ?: $this->business_name;
 
         return $name
@@ -70,6 +94,11 @@ class LogisticsProfile extends Model
     /** Whether this hub and another hub belong to the same logistics company. */
     public function isSameCompanyAs(self $other): bool
     {
+        if ($this->company_id !== null || $other->company_id !== null) {
+            return $this->company_id !== null && $other->company_id !== null
+                && (int) $this->company_id === (int) $other->company_id;
+        }
+
         return $this->companyKey() === $other->companyKey();
     }
 

@@ -1,0 +1,4 @@
+<x-logistics.layout title="Company announcement">
+    <a href="{{ route('logistics.company-announcements.index') }}" class="text-sm text-primary">All company announcements</a>
+    <article class="max-w-3xl space-y-4 rounded-sm border border-line bg-surface p-5"><h1 class="text-xl font-semibold">{{ $announcement->title }}</h1><p class="text-xs">{{ $announcement->created_at->timezone('Asia/Manila')->format('M d, Y g:i A') }} PHT</p><p class="whitespace-pre-wrap break-words text-sm">{{ $announcement->body }}</p>@if (!$receipt->dismissed_at)<form method="POST" action="{{ route('logistics.company-announcements.dismiss', $announcement->public_code) }}">@csrf<button class="btn btn-outline">Dismiss dashboard banner</button></form>@else<p class="text-sm">Dashboard banner dismissed.</p>@endif</article>
+</x-logistics.layout>

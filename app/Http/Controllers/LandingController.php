@@ -13,6 +13,10 @@ class LandingController extends Controller
     public function index(Request $request, PublicCatalog $catalog): View|RedirectResponse
     {
         if (Portal::isLogistics($request)) {
+            if ($request->user()?->role === 'logistics_company') {
+                return redirect()->route('company.dashboard');
+            }
+
             if ($request->user()?->role === 'logistics') {
                 return redirect()->route('logistics.dashboard');
             }

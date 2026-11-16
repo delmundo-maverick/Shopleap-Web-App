@@ -24,7 +24,7 @@ class EnforcePortalHost
         if (! $request->is('api/*')) {
             app('session')->driver()->setName(config('session.cookie'));
         }
-        $logisticsPath = $request->is('logistics', 'logistics/*', 'register/logistics', 'register/logistics/*');
+        $logisticsPath = $request->is('logistics', 'logistics/*', 'register/logistics', 'register/logistics/*', 'company', 'company/*', 'register/logistics_company/*');
 
         if ($logisticsPath && ! $isLogistics) {
             $path = $request->is('register/logistics') ? '/register' : $request->getPathInfo();
@@ -42,7 +42,7 @@ class EnforcePortalHost
 
         if ($isLogistics) {
             abort_unless($request->is(
-                '/', 'login', 'logout', 'register', 'register/logistics/*', 'logistics/*',
+                '/', 'login', 'logout', 'register', 'register/logistics/*', 'register/logistics_company/*', 'logistics/*', 'company', 'company/*',
                 'forgot-password', 'forgot-password/*', 'terms', 'terms/*', 'privacy', 'privacy/*',
                 'policies/*', 'help', 'help/*', 'messages', 'messages/*', 'notifications', 'notifications/*',
             ), 404);

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\BuyerManagementController;
+use App\Http\Controllers\Admin\CompanyController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\HubAdminController;
 use App\Http\Controllers\Admin\LogisticsManagementController;
@@ -10,8 +11,11 @@ use App\Http\Controllers\Admin\ReturnController as AdminReturnController;
 use App\Http\Controllers\Admin\SellerManagementController;
 use App\Http\Controllers\Admin\TransactionController;
 use App\Http\Controllers\Auth\BuyerRegistrationController;
+use App\Http\Controllers\Auth\CompanyRegistrationController;
+use App\Http\Controllers\Auth\HubInvitationController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogisticsRegistrationController;
+use App\Http\Controllers\Auth\ManagerPasswordController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\SellerRegistrationController;
 use App\Http\Controllers\Buyer\AccountController as BuyerAccountController;
@@ -27,8 +31,19 @@ use App\Http\Controllers\Buyer\SellerFollowController;
 use App\Http\Controllers\Buyer\ShopController;
 use App\Http\Controllers\Buyer\VoucherController as BuyerVoucherController;
 use App\Http\Controllers\Buyer\WishlistController;
+use App\Http\Controllers\Company\AnnouncementController;
+use App\Http\Controllers\Company\CoverageController;
+use App\Http\Controllers\Company\DashboardController;
+use App\Http\Controllers\Company\FinanceController;
+use App\Http\Controllers\Company\HubController;
+use App\Http\Controllers\Company\HubMapController;
+use App\Http\Controllers\Company\ManagerController;
+use App\Http\Controllers\Company\ReportController;
+use App\Http\Controllers\Company\SettingsController;
+use App\Http\Controllers\Company\TransferController;
 use App\Http\Controllers\DeliveryProofController;
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\Logistics\CompanyAnnouncementController;
 use App\Http\Controllers\Logistics\DashboardController as LogisticsDashboardController;
 use App\Http\Controllers\Logistics\DeliveryController;
 use App\Http\Controllers\Logistics\InboundController;
@@ -79,6 +94,47 @@ Route::get('/money/receipts/{type}/{reference}', [MoneyReceiptController::class,
 Route::get('/', [LandingController::class, 'index'])->name('home');
 
 Route::domain(Portal::host('logistics'))->group(function (): void {
+    Route::get('/company/register/choose', [CompanyRegistrationController::class, 'choose'])->name('company.register.choose');
+    Route::get('/company/register', [CompanyRegistrationController::class, 'create'])->name('company.register');
+    Route::post('/company/register', [CompanyRegistrationController::class, 'store'])->middleware('throttle:10,1');
+    Route::get('/company/manager-password/{hub:public_code}', [ManagerPasswordController::class, 'show'])->middleware('signed:relative')->whereUuid('hub')->name('company.manager-password.show');
+    Route::post('/company/manager-password/{hub:public_code}', [ManagerPasswordController::class, 'store'])->middleware(['signed:relative', 'throttle:10,1'])->whereUuid('hub')->name('company.manager-password.store');
+    Route::get('/company/invitation/{hub:public_code}', [HubInvitationController::class, 'show'])->middleware('signed:relative')->whereUuid('hub')->name('company.invitation.show');
+    Route::post('/company/invitation/{hub:public_code}', [HubInvitationController::class, 'store'])->middleware(['signed:relative', 'throttle:10,1'])->whereUuid('hub')->name('company.invitation.store');
+    Route::middleware(['auth', 'logistics_company', 'throttle:mutations'])->prefix('company')->name('company.')->group(function (): void {
+        Route::get('/status', [DashboardController::class, 'status'])->name('status');
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/attention', [DashboardController::class, 'attention'])->name('attention');
+        Route::get('/reports', [ReportController::class, 'index'])->name('reports');
+        Route::get('/finance', [FinanceController::class, 'index'])->name('finance');
+        Route::get('/activity-log', [App\Http\Controllers\Company\ActivityLogController::class, 'index'])->name('activity-log');
+        Route::get('/announcements', [AnnouncementController::class, 'index'])->name('announcements.index');
+        Route::post('/announcements', [AnnouncementController::class, 'store'])->middleware('throttle:10,1')->name('announcements.store');
+        Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
+        Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
+        Route::put('/settings/password', [SettingsController::class, 'password'])->middleware('throttle:5,1')->name('settings.password');
+        Route::get('/coverage', [CoverageController::class, 'index'])->name('coverage');
+        Route::get('/transfers', [TransferController::class, 'index'])->name('transfers.index');
+        Route::get('/transfers/{bag:code}', [TransferController::class, 'show'])->name('transfers.show');
+        Route::get('/map', [HubMapController::class, 'index'])->name('map');
+        Route::get('/managers', [ManagerController::class, 'index'])->name('managers.index');
+        Route::put('/managers/{hub:public_code}', [ManagerController::class, 'update'])->whereUuid('hub')->name('managers.update');
+        Route::post('/managers/{hub:public_code}/suspend', [ManagerController::class, 'suspend'])->whereUuid('hub')->name('managers.suspend');
+        Route::post('/managers/{hub:public_code}/reactivate', [ManagerController::class, 'reactivate'])->whereUuid('hub')->name('managers.reactivate');
+        Route::post('/managers/{hub:public_code}/reset-password', [ManagerController::class, 'resetPassword'])->middleware('throttle:3,1')->whereUuid('hub')->name('managers.reset-password');
+        Route::post('/managers/{hub:public_code}/invite', [ManagerController::class, 'invite'])->middleware('throttle:3,1')->whereUuid('hub')->name('managers.invite');
+        Route::post('/managers/{hub:public_code}/logout', [ManagerController::class, 'forceLogout'])->whereUuid('hub')->name('managers.logout');
+        Route::get('/locations', [HubController::class, 'locations'])->name('locations');
+        Route::get('/barangays', [HubController::class, 'barangays'])->name('barangays');
+        Route::get('/hubs', [HubController::class, 'index'])->name('hubs.index');
+        Route::get('/hubs/create', [HubController::class, 'create'])->name('hubs.create');
+        Route::post('/hubs', [HubController::class, 'store'])->name('hubs.store');
+        Route::get('/hubs/{hub:public_code}/edit', [HubController::class, 'edit'])->whereUuid('hub')->name('hubs.edit');
+        Route::put('/hubs/{hub:public_code}', [HubController::class, 'update'])->whereUuid('hub')->name('hubs.update');
+        Route::post('/hubs/{hub:public_code}/suspend', [HubController::class, 'suspend'])->whereUuid('hub')->name('hubs.suspend');
+        Route::post('/hubs/{hub:public_code}/reactivate', [HubController::class, 'reactivate'])->whereUuid('hub')->name('hubs.reactivate');
+        Route::post('/hubs/{hub:public_code}/invite', [HubController::class, 'invite'])->middleware('throttle:3,1')->whereUuid('hub')->name('hubs.invite');
+    });
     Route::get('/register', [LogisticsRegistrationController::class, 'create'])->name('register.logistics');
     Route::post('/register', [LogisticsRegistrationController::class, 'store'])->middleware('throttle:10,1');
     Route::get('/logistics/application', [PortalController::class, 'application'])
@@ -142,7 +198,7 @@ Route::prefix('register')->group(function () {
 
     // OTP verification (shared by all three roles)
     Route::prefix('{role}')
-        ->where(['role' => 'buyer|seller|logistics'])
+        ->where(['role' => 'buyer|seller|logistics|logistics_company'])
         ->controller(LoginController::class)
         ->group(function () {
             Route::get('/verify', 'showOtpForm')->name('register.otp.form');
@@ -538,6 +594,9 @@ Route::middleware(['auth', 'logistics', 'hub.scope', 'throttle:mutations'])
     ->name('logistics.')
     ->group(function () {
 
+        Route::get('/company-announcements', [CompanyAnnouncementController::class, 'index'])->name('company-announcements.index');
+        Route::get('/company-announcements/{announcement:public_code}', [CompanyAnnouncementController::class, 'show'])->whereUuid('announcement')->name('company-announcements.show');
+        Route::post('/company-announcements/{announcement:public_code}/dismiss', [CompanyAnnouncementController::class, 'dismiss'])->whereUuid('announcement')->name('company-announcements.dismiss');
         Route::get('/dashboard', [LogisticsDashboardController::class, 'index'])
             ->name('dashboard');
 
@@ -730,6 +789,11 @@ Route::middleware(['auth', 'admin', 'throttle:mutations'])
         Route::get('/money/remittances/{reference}/proof', [MoneyMovementController::class, 'proof'])->name('money.proof');
 
         // Registration management: type => [controller, route parameter]
+        Route::get('/companies', [CompanyController::class, 'index'])->name('companies.index');
+        Route::post('/companies/{company}/approve', [CompanyController::class, 'approve'])->whereUuid('company')->name('companies.approve');
+        Route::post('/companies/{company}/reject', [CompanyController::class, 'reject'])->whereUuid('company')->name('companies.reject');
+        Route::post('/companies/{company}/status', [CompanyController::class, 'accountStatus'])->whereUuid('company')->name('companies.status');
+
         $registrations = [
             'sellers' => [SellerManagementController::class, 'sellerProfile'],
             'buyers' => [BuyerManagementController::class, 'buyerProfile'],

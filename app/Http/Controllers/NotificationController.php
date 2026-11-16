@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Buyer\Concerns\LoadsCartSummary;
+use App\Models\CompanyAnnouncementReceipt;
 use App\Support\OrderCodes;
 use Illuminate\Http\Request;
 
@@ -59,6 +60,7 @@ class NotificationController extends Controller
     {
         $notification = $request->user()->notifications()->whereKey($id)->firstOrFail();
         $notification->markAsRead();
+        $this->syncCompanyAnnouncementReads($request);
         OrderCodes::presentNotifications([$notification]);
 
         $url = $this->safeUrl($notification->data['url'] ?? null) ?? route('notifications.index', [], false);
@@ -76,12 +78,22 @@ class NotificationController extends Controller
     public function readAll(Request $request)
     {
         $request->user()->unreadNotifications->markAsRead();
+        $this->syncCompanyAnnouncementReads($request);
 
         if ($request->expectsJson()) {
             return response()->json(['unread' => 0]);
         }
 
         return back();
+    }
+
+    private function syncCompanyAnnouncementReads(Request $request): void
+    {
+        if ($request->user()->role !== 'logistics' || $request->user()->logisticsProfile?->company_id === null) {
+            return;
+        }
+        CompanyAnnouncementReceipt::where('user_id', $request->user()->id)->whereNull('read_at')
+            ->whereIn('notification_id', $request->user()->notifications()->whereNotNull('read_at')->select('id'))->update(['read_at' => now()]);
     }
 
     /** Only paths inside this site, never an outside address. */

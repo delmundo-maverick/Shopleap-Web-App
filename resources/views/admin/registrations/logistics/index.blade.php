@@ -35,7 +35,7 @@
         ],
     ];
 
-    $columns = ['Applicant', 'Business', 'Registration', 'Account', 'Submitted'];
+    $columns = ['Applicant', 'Hub', 'Company', 'Registration', 'Account', 'Submitted'];
 @endphp
 
 <body class="min-h-screen bg-ice-blue text-charcoal antialiased" x-data="logisticsPage()"
@@ -76,10 +76,14 @@
                             </svg>
                         </div>
                         <input type="text" name="search" value="{{ request('search') }}"
-                            placeholder="Search by name, business, or email..." aria-label="Search logistics partners"
+                            placeholder="Search by name, hub, company, or email..." aria-label="Search logistics partners"
                             class="frost-input w-full rounded-xl py-2.5 pl-10 pr-4 text-sm">
                     </div>
 
+                    <select name="company" aria-label="Filter by mother company" class="frost-input rounded-sm border border-line bg-surface px-3.5 py-2.5 text-sm">
+                        <option value="">All companies</option>
+                        @foreach ($companies as $company)<option value="{{ $company->public_code }}" @selected(request('company') === $company->public_code)>{{ $company->name }}</option>@endforeach
+                    </select>
                     @foreach ($filters as $filter)
                         <select name="{{ $filter['name'] }}" aria-label="{{ $filter['label'] }}"
                             onchange="this.form.submit()" class="frost-input rounded-xl px-3.5 py-2.5 text-sm">
@@ -98,7 +102,7 @@
                 </form>
 
                 <!-- TABLE -->
-                <div class="frost-panel overflow-hidden rounded-3xl">
+                <div class="frost-panel overflow-x-auto rounded-3xl">
 
                     @if ($logisticsPartners->isEmpty())
                         <div class="flex h-64 flex-col items-center justify-center text-center">
@@ -106,7 +110,7 @@
                             <p class="mt-1 text-xs text-charcoal/50">Try adjusting your search or filters.</p>
                         </div>
                     @else
-                        <table class="app-table w-full text-left text-sm">
+                        <table class="app-table w-full min-w-[64rem] text-left text-sm">
                             <thead>
                                 <tr>
                                     @foreach ($columns as $column)
@@ -129,6 +133,16 @@
                                             {{ $profile->business_name }}
                                             @if ($profile->joining_existing_company)
                                                 <span class="ml-1 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold text-orange-600">joining existing company</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-5 py-4">
+                                            @if ($profile->company)
+                                                <a href="{{ route('admin.companies.index', ['search' => $profile->company->name]) }}" class="block font-semibold text-primary">{{ $profile->company->name }}</a>
+                                                <div class="mt-1 flex flex-wrap items-center gap-2"><x-status-label :status="$profile->company->status" domain="company" class="rounded-sm!" /><span class="text-xs">{{ $profile->company->hubs_count }} hubs</span></div>
+                                                <p class="mt-1 break-all text-xs">{{ $profile->company->users->first()?->email }}</p>
+                                                @if ($profile->company->users->first()?->email_verified_at)<p class="mt-1 text-xs text-success">Email verified</p>@endif
+                                            @else
+                                                <p>{{ $profile->company_name ?: 'Independent hub' }}</p><p class="mt-1 text-xs text-charcoal/60">No mother account linked</p>
                                             @endif
                                         </td>
                                         <td class="px-5 py-4">
@@ -211,6 +225,12 @@
                             <span x-text="record.rejection_reason"></span>
                         </div>
 
+                        <div class="modal-section space-y-2">
+                            <p class="modal-section__title">Company account</p>
+                            <p class="font-semibold" x-text="record.company_name || 'Independent hub'"></p>
+                            <template x-if="record.company_linked"><div class="space-y-2 text-sm"><p><span class="font-semibold">Mother account:</span> <span x-text="record.company_account_email || 'No company account'"></span></p><p x-show="record.company_account_verified" class="text-xs text-success">Email verified</p><p><span x-text="record.company_hub_count"></span> linked hubs <span class="ml-2 capitalize" x-text="record.company_status"></span></p><a :href="record.company_url" class="inline-block text-primary">View company account</a></div></template>
+                            <p x-show="!record.company_linked" class="text-xs text-charcoal/60">This hub has no mother account linked.</p>
+                        </div>
                         <!-- Personal info -->
                         <div class="modal-section">
                             <p class="modal-section__title mb-3">Personal information</p>
@@ -234,7 +254,7 @@
                         <div class="modal-section">
                             <p class="modal-section__title mb-3">Documents</p>
                             <div class="grid grid-cols-2 gap-3">
-                                <a :href="record.id_url" target="_blank" rel="noopener noreferrer"
+                                <a x-show="record.id_url" :href="record.id_url" target="_blank" rel="noopener noreferrer"
                                     class="block overflow-hidden rounded-xl border border-white/70">
                                     <img :src="record.id_url" alt="Valid ID" class="h-28 w-full object-cover">
                                     <p
@@ -242,7 +262,7 @@
                                         Valid ID
                                     </p>
                                 </a>
-                                <a :href="record.permit_url" target="_blank" rel="noopener noreferrer"
+                                <a x-show="record.permit_url" :href="record.permit_url" target="_blank" rel="noopener noreferrer"
                                     class="block overflow-hidden rounded-xl border border-white/70">
                                     <img :src="record.permit_url" alt="Business/DTI permit"
                                         class="h-28 w-full object-cover">

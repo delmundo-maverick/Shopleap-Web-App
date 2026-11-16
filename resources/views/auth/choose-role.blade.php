@@ -16,7 +16,7 @@
             <form method="POST" action="{{ route('login') }}" class="mt-6 space-y-3">
                 @csrf
                 @foreach ($roles as $role)
-                    <button type="submit" name="role" value="{{ $role }}" class="block w-full rounded-md bg-primary px-4 py-3 font-semibold text-surface">Continue as {{ ucfirst($role) }}</button>
+                    <button type="submit" name="role" value="{{ $role }}" class="block w-full rounded-md bg-primary px-4 py-3 font-semibold text-surface">Continue as {{ str($role)->replace('_', ' ')->title() }}</button>
                 @endforeach
             </form>
             <a href="{{ route('login') }}" class="mt-6 block text-sm text-primary">Back to login</a>

@@ -63,8 +63,8 @@
             <div x-show="policiesLoaded()" x-cloak x-ref="termsScrollArea" @scroll.passive="checkTermsScroll()"
                 class="max-h-[62vh] overflow-y-auto px-5 py-4 sm:px-6 sm:py-5">
                 <section>
-                    <h4 class="text-base font-bold text-charcoal"
-                        x-text="termsDocuments.terms.title || 'Terms and Conditions'"></h4>
+                    <h2 class="text-base font-bold text-charcoal"
+                        x-text="termsDocuments.terms.title || 'Terms and Conditions'"></h2>
                     <p class="mt-1 text-[11px] text-charcoal/45" x-show="termsDocuments.terms.status === 'ready'">
                         <span x-show="termsDocuments.terms.version"
                             x-text="'v' + termsDocuments.terms.version"></span>
@@ -81,8 +81,8 @@
                 </section>
 
                 <section class="mt-8 border-t border-light-gray pt-6">
-                    <h4 class="text-base font-bold text-charcoal"
-                        x-text="termsDocuments.privacy.title || 'Privacy Policy'"></h4>
+                    <h2 class="text-base font-bold text-charcoal"
+                        x-text="termsDocuments.privacy.title || 'Privacy Policy'"></h2>
                     <p class="mt-1 text-[11px] text-charcoal/45" x-show="termsDocuments.privacy.status === 'ready'">
                         <span x-show="termsDocuments.privacy.version"
                             x-text="'v' + termsDocuments.privacy.version"></span>

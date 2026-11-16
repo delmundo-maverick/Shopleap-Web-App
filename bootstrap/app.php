@@ -5,6 +5,7 @@ use App\Http\Middleware\EnsureCourier;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsBuyer;
 use App\Http\Middleware\EnsureUserIsLogistics;
+use App\Http\Middleware\EnsureUserIsLogisticsCompany;
 use App\Http\Middleware\EnsureUserIsSeller;
 use App\Http\Middleware\IsolatePortalSession;
 use App\Http\Middleware\ResolveHubScope;
@@ -32,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
             'logistics' => EnsureUserIsLogistics::class,
+            'logistics_company' => EnsureUserIsLogisticsCompany::class,
             'hub.scope' => ResolveHubScope::class,
             'seller' => EnsureUserIsSeller::class,
             'buyer' => EnsureUserIsBuyer::class,

@@ -25,7 +25,7 @@ class OtpNotification extends Notification
     public function toMail($notifiable): MailMessage
     {
         $reset = $this->purpose === 'reset';
-        $role = in_array($this->role, ['courier', 'courier_reset'], true) ? 'Rider' : ucfirst($this->role);
+        $role = in_array($this->role, ['courier', 'courier_reset'], true) ? 'Rider' : str($this->role)->replace('_', ' ')->title()->toString();
 
         return (new MailMessage)
             ->subject(
@@ -34,7 +34,7 @@ class OtpNotification extends Notification
                     : "Verify your {$role} account"
             )
             ->view('emails.otp', [
-                'loginUrl' => Portal::url(in_array($this->role, ['logistics', 'courier', 'courier_reset']) ? 'logistics' : 'main', in_array($this->role, ['courier', 'courier_reset']) ? '' : 'login'),
+                'loginUrl' => Portal::url(in_array($this->role, ['logistics', 'logistics_company', 'courier', 'courier_reset']) ? 'logistics' : 'main', in_array($this->role, ['courier', 'courier_reset']) ? '' : 'login'),
                 'loginLabel' => in_array($this->role, ['courier', 'courier_reset']) ? 'About ShopLeap Logistics' : 'Go to Login',
                 'loginHint' => in_array($this->role, ['courier', 'courier_reset']) ? 'Continue verification and sign in through the ShopLeap Rider app.' : 'Already verified, or coming back later?',
                 'otp' => $this->otp,

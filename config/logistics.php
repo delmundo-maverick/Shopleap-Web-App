@@ -19,6 +19,8 @@ return [
 
     'stale_parcel_hours' => (int) env('STALE_PARCEL_HOURS', 24),
 
+    'company_delayed_parcel_hours' => (int) env('COMPANY_DELAYED_PARCEL_HOURS', 48),
+
     'stale_bag_hours' => (int) env('STALE_BAG_HOURS', 48),
 
 ];

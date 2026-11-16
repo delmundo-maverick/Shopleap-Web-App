@@ -33,12 +33,24 @@ class PlatformPolicy extends Model
     }
 
     /**
-     * The admin editor is plain text, so escape it first and then add line
-     * breaks. This keeps the JSON/page HTML safe without stripping the
-     * author's formatting.
+     * Render numbered sections from the plain-text editor. Escape all authored
+     * content so both public pages and registration dialogs remain safe.
      */
-    public function contentHtml(): string
+    public function contentHtml(int $headingLevel = 2): string
     {
-        return nl2br(e($this->body), false);
+        $headingLevel = max(2, min(6, $headingLevel));
+        $blocks = preg_split('/\R[\t ]*\R/', trim($this->body)) ?: [];
+
+        return implode("\n", array_map(function (string $block) use ($headingLevel): string {
+            $parts = preg_split('/\R/', $block, 2);
+            if (preg_match('/^\d+\.\s+\S/', $parts[0])) {
+                $heading = '<h'.$headingLevel.' class="mb-3 text-lg font-semibold text-charcoal">'.e($parts[0]).'</h'.$headingLevel.'>';
+                $body = isset($parts[1]) ? '<p>'.nl2br(e($parts[1]), false).'</p>' : '';
+
+                return '<section class="mt-6">'.$heading.$body.'</section>';
+            }
+
+            return '<p class="mt-4">'.nl2br(e($block), false).'</p>';
+        }, $blocks));
     }
 }

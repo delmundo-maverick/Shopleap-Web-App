@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\BuyerProfile;
+use App\Models\Company;
 use App\Models\LogisticsProfile;
 use App\Models\SellerProfile;
 use App\Models\User;
@@ -22,12 +23,12 @@ use Illuminate\View\View;
 
 class LoginController extends Controller
 {
-    protected array $validRoles = ['buyer', 'seller', 'logistics'];
+    protected array $validRoles = ['buyer', 'seller', 'logistics', 'logistics_company'];
 
     protected function checkRole(string $role): void
     {
         abort_unless(in_array($role, $this->validRoles), 404);
-        abort_unless(($role === 'logistics') === Portal::isLogistics(), 404);
+        abort_unless(in_array($role, ['logistics', 'logistics_company'], true) === Portal::isLogistics(), 404);
     }
 
     // â”€â”€ LOGIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -154,12 +155,19 @@ class LoginController extends Controller
             ])->onlyInput('email');
         }
 
-        if ($user->account_status !== 'active') {
+        if ($user->role === 'logistics_company') {
+            $request->session()->regenerate();
+            $request->session()->forget('url.intended');
+
+            return $this->redirectAuthenticatedUser($user);
+        }
+
+        if ($user->account_status !== 'active' || ($user->role === 'logistics' && $user->logistics_login_suspended_at !== null)) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            $message = $user->account_status === 'suspended'
+            $message = $user->account_status === 'suspended' || $user->logistics_login_suspended_at !== null
                 ? 'Your account has been suspended. Please contact support.'
                 : 'Your account has been deactivated.';
 
@@ -171,6 +179,8 @@ class LoginController extends Controller
         $request->session()->regenerate();
 
         if ($user->role === 'logistics') {
+            $user->forceFill(['last_login_at' => now()])->save();
+            $request->session()->put('logistics_session_version', (int) $user->logistics_session_version);
             $request->session()->forget('url.intended');
 
             return redirect()->route($profile?->status === 'approved' ? 'logistics.dashboard' : 'logistics.application');
@@ -188,6 +198,7 @@ class LoginController extends Controller
     protected function redirectAuthenticatedUser(User $user): RedirectResponse
     {
         return redirect()->route(match ($user->role) {
+            'logistics_company' => $user->company?->status === 'approved' && $user->account_status === 'active' ? 'company.dashboard' : 'company.status',
             'super_admin' => 'admin.dashboard',
             'seller' => 'seller.dashboard',
             'buyer' => 'buyer.home',
@@ -222,7 +233,7 @@ class LoginController extends Controller
             'Please start registration again.'
         );
 
-        return view($role === 'logistics' ? 'logistics.verify-otp' : 'auth.verify-otp', [
+        return view(in_array($role, ['logistics', 'logistics_company'], true) ? 'logistics.verify-otp' : 'auth.verify-otp', [
             'role' => $role,
             'email' => $pending['email'],
         ]);
@@ -269,9 +280,13 @@ class LoginController extends Controller
 
         try {
             DB::transaction(function () use ($pending, $role) {
+                $company = $role === 'logistics_company' ? Company::create($pending['profile']) : null;
                 $user = User::create(
-                    $pending['user'] + ['email_verified_at' => now()]
+                    $pending['user'] + ['email_verified_at' => now()] + ($company ? ['company_id' => $company->id] : [])
                 );
+                if ($company) {
+                    return;
+                }
 
                 $profileData = $pending['profile'] + [
                     'user_id' => $user->id,

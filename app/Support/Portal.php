@@ -22,7 +22,7 @@ class Portal
         $request ??= request();
 
         if (self::isLogistics($request)) {
-            return ['logistics'];
+            return ['logistics', 'logistics_company'];
         }
 
         if (self::host('admin') !== self::host('main') && $request->getHost() === self::host('admin')) {
