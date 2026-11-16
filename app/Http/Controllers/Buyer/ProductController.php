@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Buyer;
 
 use App\Http\Controllers\Buyer\Concerns\LoadsCartSummary;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Buyer\SearchProductsRequest;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Review;
+use App\Services\BuyerCatalogSearch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class ProductController extends Controller
 {
@@ -28,21 +31,26 @@ class ProductController extends Controller
         ])->header('Cache-Control', 'no-store, private');
     }
 
-    public function index(Request $request)
+    public function index(SearchProductsRequest $request, BuyerCatalogSearch $catalogSearch): View
     {
-        $search = $request->get('search');
-        $category = $request->get('category');
-        $sort = in_array($request->get('sort'), ['newest', 'price_low', 'price_high', 'bestseller'], true)
-            ? $request->get('sort') : 'newest';
+        $filters = $request->validated();
+        $search = trim($filters['search'] ?? '');
+        $category = $filters['category'] ?? null;
+        $sort = in_array($filters['sort'] ?? null, ['newest', 'price_low', 'price_high', 'bestseller'], true)
+            ? $filters['sort'] : 'newest';
 
-        $query = Product::with(['images', 'liveDiscount'])->active();
-
-        if ($search) {
-            $query->where('name', 'ilike', "%{$search}%");
-        }
+        $query = Product::with(['images', 'liveDiscount', 'variants', 'seller.sellerProfile'])->active();
 
         if ($category) {
             $query->where('category', $category);
+        }
+
+        $shops = null;
+
+        if ($search !== '') {
+            $query = $catalogSearch->products($query, $search);
+            $shops = $catalogSearch->shops($search)->orderBy('business_name')->orderBy('id')
+                ->paginate(6, pageName: 'shops_page')->withQueryString()->fragment('search-shops');
         }
 
         if ($sort === 'bestseller') {
@@ -68,11 +76,11 @@ class ProductController extends Controller
         // Must come after the sort block: select('products.*') would wipe the rating columns.
         $query->withReviewStats();
 
-        $products = $query->paginate(24)->withQueryString();
+        $products = $query->orderBy('products.id')->paginate(24)->withQueryString()->fragment('search-products');
         $categories = config('shopleap_categories.list');
 
         return view('Buyer.products.index', array_merge(
-            compact('products', 'categories', 'search', 'category', 'sort'),
+            compact('products', 'shops', 'categories', 'search', 'category', 'sort'),
             $this->cartSummary($request)
         ));
     }

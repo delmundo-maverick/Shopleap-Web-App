@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
         eyeOpen?.classList.toggle('hidden', reveal);
         eyeClosed?.classList.toggle('hidden', !reveal);
         toggle.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+        toggle.setAttribute('aria-pressed', String(reveal));
     });
 
     // Caps Lock warning

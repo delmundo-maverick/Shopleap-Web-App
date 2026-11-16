@@ -97,6 +97,10 @@
     @if (auth()->user()?->role === 'buyer')
         <x-Buyer.wishlist-button :product="$product" class="absolute right-2 top-2 z-10" />
     @elseif (auth()->guest())
-        <a href="{{ route('login', array_merge(['continue' => 'landing'], request()->only(['search', 'category']))) }}" aria-label="Log in to save {{ $product->name }}" class="absolute right-2 top-2 z-10 flex size-10 items-center justify-center rounded border border-line bg-white text-primary"><span aria-hidden="true">?</span></a>
+        <a href="{{ route('login', array_merge(['continue' => 'landing'], request()->only(['search', 'category']))) }}" aria-label="Log in to save {{ $product->name }}" class="absolute right-2 top-2 z-10 flex size-10 items-center justify-center rounded border border-line bg-white text-primary">
+            <svg class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+        </a>
     @endif
 </div>

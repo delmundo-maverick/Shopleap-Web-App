@@ -188,7 +188,7 @@
                 <a href="{{ route('buyer.products.index', ['sort' => 'bestseller']) }}"
                     class="shrink-0 text-xs font-semibold text-primary hover:underline">See all</a>
             </div>
-            <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-6">
                 @foreach ($bestSellers as $product)
                     <x-Buyer.product-card :product="$product" />
                 @endforeach
@@ -196,21 +196,23 @@
         </section>
 
         <!-- DAILY DISCOVER / RECOMMENDED -->
-        <section>
+        <section id="daily-discover" class="scroll-mt-28" aria-labelledby="daily-discover-heading">
             <div class="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <h2 class="text-base font-bold text-charcoal">Daily Discover</h2>
+                <h2 id="daily-discover-heading" class="text-base font-bold text-charcoal">Daily Discover</h2>
                 <span class="text-xs text-charcoal/60">Recommended for you</span>
             </div>
 
-            <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-                @foreach ($recommended as $product)
+            <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-6">
+                @forelse ($recommended as $product)
                     <x-Buyer.product-card :product="$product" />
-                @endforeach
+                @empty
+                    <p class="col-span-full rounded-xl border border-line bg-white p-6 text-sm text-charcoal/60">No products to discover yet. Check back soon for new finds.</p>
+                @endforelse
             </div>
 
             <!-- PAGINATION -->
-            <div class="pagination-frost mt-6 flex justify-center sm:mt-8">
-                {{ $recommended->onEachSide(1)->links() }}
+            <div class="mt-6 sm:mt-8">
+                {{ $recommended->onEachSide(1)->links('components.Buyer.discover-pagination') }}
             </div>
         </section>
 

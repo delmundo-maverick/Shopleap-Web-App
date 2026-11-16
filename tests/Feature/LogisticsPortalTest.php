@@ -62,6 +62,11 @@ it('serves the lightweight logistics landing and separate login and registration
     $this->get(Portal::url('logistics'))->assertOk()->assertSee('Keep the Philippines moving.')
         ->assertSee('SEC Certificate')->assertSee('BIR Form 2303')->assertDontSee('chart.js');
     $this->get(Portal::url('logistics', 'login'))->assertOk()->assertSee('Log in to Logistics')
+        ->assertSee('frost-panel-solid', false)->assertSee('id="loginForm"', false)
+        ->assertSee('id="togglePassword"', false)->assertSee('aria-label="Show password"', false)
+        ->assertSee('aria-controls="password"', false)->assertSee('autocomplete="current-password"', false)
+        ->assertSee(route('register.logistics'), false)->assertDontSee('register/buyer')
+        ->assertSee('name="robots" content="noindex, nofollow"', false)
         ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
     $this->get(Portal::url('logistics', 'register'))->assertOk()->assertSee('sec_certificate')
         ->assertSee('service_regions[]', false)->assertHeader('X-Robots-Tag', 'noindex, nofollow');

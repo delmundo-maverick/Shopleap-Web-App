@@ -38,8 +38,7 @@
 @media (640px <= width < 768px)       { .landing-discover-item:nth-child(n + 16) { display: none; } }
 @media (768px <= width < 1024px)      { .landing-discover-item:nth-child(n + 21) { display: none; } }
 @media (1024px <= width < 1280px)     { .landing-discover-item:nth-child(n + 26) { display: none; } }
-@media (1280px <= width < 1536px)     { .landing-discover-item:nth-child(n + 36) { display: none; } }
-@media (width >= 1536px)              { .landing-discover-item:nth-child(n + 41) { display: none; } }
+@media (width >= 1280px)              { .landing-discover-item:nth-child(n + 31) { display: none; } }
 
 /* ---------- Navigation ---------- */
 .landing-navigation { transition: box-shadow 300ms var(--ease); }

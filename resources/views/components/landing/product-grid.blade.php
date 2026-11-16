@@ -1,5 +1,5 @@
 @props(['products'])
-<div class="landing-discover-grid grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 2xl:grid-cols-8">
+<div class="landing-discover-grid grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
     @forelse ($products as $product)
         <div x-reveal="{{ $loop->index }}" class="landing-discover-item min-w-0"><x-Buyer.product-card :product="$product" /></div>
     @empty
